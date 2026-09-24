@@ -173,6 +173,8 @@ if (app.Environment.IsDevelopment() || true) // Enable Swagger in all environmen
     });
 }
 
+app.UseStaticFiles();
+
 app.UseCors("AllowFrontend");
 
 app.UseAuthentication();

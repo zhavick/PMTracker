@@ -12,7 +12,13 @@ import {
   AlertCircle, 
   Palette,
   Eye,
-  EyeOff
+  EyeOff,
+  Image as ImageIcon,
+  Upload,
+  Sparkles,
+  Trash2,
+  RefreshCw,
+  Link as LinkIcon
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
@@ -24,9 +30,19 @@ function getInitials(name) {
   return name.slice(0, 2).toUpperCase();
 }
 
+const PRESET_COVERS = [
+  { name: 'Aurora Indigo', value: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%)' },
+  { name: 'Cyberpunk Neon', value: 'linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #4C1D95 100%)' },
+  { name: 'Emerald Forest', value: 'linear-gradient(135deg, #064E3B 0%, #047857 50%, #10B981 100%)' },
+  { name: 'Sunset Crimson', value: 'linear-gradient(135deg, #991B1B 0%, #D97706 50%, #F59E0B 100%)' },
+  { name: 'Deep Ocean Blue', value: 'linear-gradient(135deg, #0369A1 0%, #0284C7 50%, #38BDF8 100%)' },
+  { name: 'Dark Slate Minimal', value: 'linear-gradient(135deg, #18181B 0%, #27272A 50%, #3F3F46 100%)' }
+];
+
 export default function ProfilePage() {
-  const { user, refreshUser } = useAuth();
-  const fileInputRef = useRef(null);
+  const { user, refreshProfile } = useAuth();
+  const coverFileInputRef = useRef(null);
+  const avatarFileInputRef = useRef(null);
 
   // Profile Form State
   const [profileData, setProfileData] = useState({
@@ -35,10 +51,16 @@ export default function ProfilePage() {
     avatarColor: '#6366F1',
     email: '',
     companyName: '',
-    role: ''
+    role: '',
+    profilePictureUrl: '',
+    coverPictureUrl: ''
   });
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileMsg, setProfileMsg] = useState(null);
+
+  // Upload States
+  const [coverLoading, setCoverLoading] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(false);
 
   // Password Form State
   const [passwords, setPasswords] = useState({
@@ -50,10 +72,6 @@ export default function ProfilePage() {
   const [passLoading, setPassLoading] = useState(false);
   const [passMsg, setPassMsg] = useState(null);
 
-  // Cover Upload State
-  const [coverLoading, setCoverLoading] = useState(false);
-  const [coverUrl, setCoverUrl] = useState(null);
-
   useEffect(() => {
     if (user) {
       setProfileData({
@@ -62,9 +80,10 @@ export default function ProfilePage() {
         avatarColor: user.avatarColor || '#6366F1',
         email: user.email || '',
         companyName: user.companyName || 'PT Elistec Teknologi',
-        role: user.role || 'User'
+        role: user.role || 'User',
+        profilePictureUrl: user.profilePictureUrl || user.avatarUrl || '',
+        coverPictureUrl: user.coverPictureUrl || ''
       });
-      setCoverUrl(user.coverPictureUrl || null);
     }
   }, [user]);
 
@@ -74,12 +93,14 @@ export default function ProfilePage() {
     setProfileMsg(null);
     try {
       await axiosClient.put('/api/auth/profile', {
-        fullName: profileData.fullName,
-        jobTitle: profileData.jobTitle,
-        avatarColor: profileData.avatarColor
+        fullName: profileData.fullName.trim(),
+        jobTitle: profileData.jobTitle.trim(),
+        avatarColor: profileData.avatarColor,
+        profilePictureUrl: profileData.profilePictureUrl?.trim() || null,
+        coverPictureUrl: profileData.coverPictureUrl?.trim() || null
       });
       setProfileMsg({ type: 'success', text: 'Data profil Anda berhasil disimpan.' });
-      if (refreshUser) await refreshUser();
+      if (refreshProfile) await refreshProfile();
     } catch (err) {
       setProfileMsg({ type: 'error', text: err.response?.data?.message || 'Gagal memperbarui profil.' });
     } finally {
@@ -106,6 +127,7 @@ export default function ProfilePage() {
     }
   };
 
+  // Upload Cover File
   const handleCoverUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -116,63 +138,139 @@ export default function ProfilePage() {
       const res = await axiosClient.post('/api/members/profile/cover', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      if (res.data?.data?.coverPictureUrl) {
-        setCoverUrl(res.data.data.coverPictureUrl);
+      const newCoverUrl = res.data?.data?.coverPictureUrl;
+      if (newCoverUrl) {
+        setProfileData(prev => ({ ...prev, coverPictureUrl: newCoverUrl }));
       }
-      if (refreshUser) await refreshUser();
+      if (refreshProfile) await refreshProfile();
+      setProfileMsg({ type: 'success', text: 'Foto sampul berhasil diunggah.' });
     } catch (err) {
-      alert('Gagal mengunggah foto sampul.');
+      alert(err.response?.data?.message || 'Gagal mengunggah foto sampul.');
     } finally {
       setCoverLoading(false);
     }
   };
 
+  // Upload Avatar File
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarLoading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await axiosClient.post('/api/members/profile/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const newAvatarUrl = res.data?.data?.profilePictureUrl;
+      if (newAvatarUrl) {
+        setProfileData(prev => ({ ...prev, profilePictureUrl: newAvatarUrl }));
+      }
+      if (refreshProfile) await refreshProfile();
+      setProfileMsg({ type: 'success', text: 'Foto profil berhasil diunggah.' });
+    } catch (err) {
+      alert(err.response?.data?.message || 'Gagal mengunggah foto profil.');
+    } finally {
+      setAvatarLoading(false);
+    }
+  };
+
+  const isCoverGradient = profileData.coverPictureUrl?.startsWith('linear-gradient');
+
   return (
-    <div className="space-y-6 pb-12 animate-fade-in max-w-5xl mx-auto">
-      {/* Cover Banner Card */}
+    <div className="space-y-6 pb-16 animate-fade-in max-w-5xl mx-auto">
+      {/* ── Cover Banner Card ── */}
       <div 
-        className="relative rounded-3xl border overflow-hidden shadow-sm"
+        className="relative rounded-3xl border overflow-hidden shadow-md"
         style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
       >
         {/* Banner Image or Gradient */}
         <div 
-          className="h-44 sm:h-56 w-full relative transition-all bg-cover bg-center"
+          className="h-48 sm:h-64 w-full relative transition-all bg-cover bg-center"
           style={{
-            backgroundImage: coverUrl 
-              ? `url(${coverUrl})` 
+            background: profileData.coverPictureUrl
+              ? (isCoverGradient ? profileData.coverPictureUrl : `url(${profileData.coverPictureUrl}) center / cover no-repeat`)
               : 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%)'
           }}
         >
           {/* Subtle Overlay */}
-          <div className="absolute inset-0 bg-black/20" />
+          <div className="absolute inset-0 bg-black/25" />
 
-          {/* Change Banner Button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={coverLoading}
-            className="absolute top-4 right-4 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-black/40 backdrop-blur-md hover:bg-black/60 transition-all border border-white/20 shadow-md"
-          >
-            <Camera className="w-3.5 h-3.5" />
-            {coverLoading ? 'Mengunggah...' : 'Ubah Foto Sampul'}
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleCoverUpload}
-            accept="image/*"
-            className="hidden"
-          />
+          {/* Controls on Cover (Top Right) */}
+          <div className="absolute top-4 right-4 flex items-center gap-2">
+            {profileData.coverPictureUrl && (
+              <button
+                type="button"
+                onClick={() => setProfileData(p => ({ ...p, coverPictureUrl: '' }))}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-rose-600/70 hover:bg-rose-600 backdrop-blur-md transition-all shadow-md"
+                title="Hapus foto sampul"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Reset Sampul
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => coverFileInputRef.current?.click()}
+              disabled={coverLoading}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-black/45 backdrop-blur-md hover:bg-black/65 transition-all border border-white/20 shadow-md"
+            >
+              {coverLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+              {coverLoading ? 'Mengunggah...' : 'Upload Foto Sampul'}
+            </button>
+            <input
+              type="file"
+              ref={coverFileInputRef}
+              onChange={handleCoverUpload}
+              accept="image/*"
+              className="hidden"
+            />
+          </div>
         </div>
 
         {/* Profile Info Row */}
         <div className="px-6 pb-6 pt-0 relative flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4 -mt-16 sm:-mt-14">
           <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 text-center sm:text-left">
-            {/* Avatar */}
-            <div 
-              className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl flex items-center justify-center font-bold text-2xl sm:text-3xl text-white shadow-xl ring-4 ring-white dark:ring-slate-900 overflow-hidden flex-shrink-0"
-              style={{ backgroundColor: profileData.avatarColor || '#6366F1' }}
-            >
-              {getInitials(profileData.fullName)}
+            {/* Avatar Container with Upload Overlay */}
+            <div className="relative group">
+              <div 
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl flex items-center justify-center font-bold text-2xl sm:text-3xl text-white shadow-xl ring-4 ring-white dark:ring-slate-900 overflow-hidden flex-shrink-0 relative"
+                style={{ backgroundColor: profileData.avatarColor || '#6366F1' }}
+              >
+                {profileData.profilePictureUrl ? (
+                  <img 
+                    src={profileData.profilePictureUrl} 
+                    alt={profileData.fullName} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  getInitials(profileData.fullName)
+                )}
+
+                {/* Hover overlay button to change avatar */}
+                <button
+                  type="button"
+                  onClick={() => avatarFileInputRef.current?.click()}
+                  disabled={avatarLoading}
+                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10px] font-semibold gap-1 cursor-pointer"
+                >
+                  <Camera className="w-5 h-5" />
+                  <span>{avatarLoading ? 'Upload...' : 'Ganti Foto'}</span>
+                </button>
+              </div>
+
+              <input
+                type="file"
+                ref={avatarFileInputRef}
+                onChange={handleAvatarUpload}
+                accept="image/*"
+                className="hidden"
+              />
             </div>
 
             <div className="space-y-1 mb-1">
@@ -180,7 +278,7 @@ export default function ProfilePage() {
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
                   {profileData.fullName || 'Pengguna'}
                 </h1>
-                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-bold bg-indigo-500/15 text-indigo-500">
+                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-bold bg-indigo-500/15 text-indigo-500 border border-indigo-500/20">
                   <Shield className="w-3 h-3" />
                   {profileData.role}
                 </span>
@@ -190,35 +288,63 @@ export default function ProfilePage() {
               </p>
             </div>
           </div>
+
+          {/* Quick Buttons for Avatar actions */}
+          <div className="flex items-center gap-2 self-center sm:self-end">
+            <button
+              type="button"
+              onClick={() => avatarFileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold hover:bg-slate-500/10 transition-all"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+            >
+              <Upload className="w-3.5 h-3.5 text-indigo-400" />
+              Upload Avatar
+            </button>
+            {profileData.profilePictureUrl && (
+              <button
+                type="button"
+                onClick={() => setProfileData(p => ({ ...p, profilePictureUrl: '' }))}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold text-rose-500 hover:bg-rose-500/10 border-rose-500/30 transition-all"
+                title="Gunakan inisial"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Hapus Foto
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Forms Grid */}
+      {/* ── Form Notification Messages ── */}
+      {profileMsg && (
+        <div className={`p-4 rounded-2xl flex items-center gap-3 border text-sm font-medium animate-fade-in ${
+          profileMsg.type === 'success'
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+            : 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400'
+        }`}>
+          {profileMsg.type === 'success' ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 flex-shrink-0" />}
+          <span>{profileMsg.text}</span>
+        </div>
+      )}
+
+      {/* ── Forms Grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Profile Form */}
+        {/* Profile & Customization Form */}
         <div 
-          className="rounded-2xl border p-6 shadow-sm space-y-5"
+          className="rounded-3xl border p-6 shadow-sm space-y-5"
           style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
         >
-          <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-            <User className="w-4 h-4 text-indigo-500" />
-            Informasi Profil & Identitas
-          </h2>
-
-          {profileMsg && (
-            <div className={`p-4 rounded-xl flex items-center gap-3 border text-sm font-medium ${
-              profileMsg.type === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                : 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400'
-            }`}>
-              {profileMsg.type === 'success' ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 flex-shrink-0" />}
-              <span>{profileMsg.text}</span>
-            </div>
-          )}
+          <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-color)' }}>
+            <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <User className="w-4 h-4 text-indigo-500" />
+              Kostumisasi Foto & Identitas Profil
+            </h2>
+            <Sparkles className="w-4 h-4 text-amber-400" />
+          </div>
 
           <form onSubmit={handleProfileSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
                 Nama Lengkap *
               </label>
               <input
@@ -232,7 +358,7 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
                 Jabatan / Job Title *
               </label>
               <input
@@ -245,22 +371,63 @@ export default function ProfilePage() {
               />
             </div>
 
+            {/* Custom Avatar URL Field */}
             <div>
-              <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                Alamat Email (Akun Utama)
+              <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400 flex items-center gap-1.5">
+                <LinkIcon className="w-3.5 h-3.5 text-indigo-400" /> URL Foto Profil (Avatar)
               </label>
               <input
-                type="email"
-                disabled
-                value={profileData.email}
-                className="w-full px-3.5 py-2.5 rounded-xl border text-sm opacity-60 cursor-not-allowed"
+                type="url"
+                value={profileData.profilePictureUrl || ''}
+                onChange={(e) => setProfileData({ ...profileData, profilePictureUrl: e.target.value })}
+                placeholder="https://images.unsplash.com/... atau /uploads/avatars/..."
+                className="w-full px-3.5 py-2.5 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Anda dapat mengunggah file foto melalui tombol kamera di atas atau menempelkan tautan gambar online di sini.
+              </p>
+            </div>
+
+            {/* Custom Cover Picture URL Field */}
+            <div>
+              <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400 flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-indigo-400" /> URL Foto Sampul (Cover Picture)
+              </label>
+              <input
+                type="text"
+                value={profileData.coverPictureUrl || ''}
+                onChange={(e) => setProfileData({ ...profileData, coverPictureUrl: e.target.value })}
+                placeholder="https://images.unsplash.com/... atau pilih preset di bawah"
+                className="w-full px-3.5 py-2.5 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
               />
             </div>
 
+            {/* Preset Cover Selection */}
             <div>
-              <label className="block text-xs font-semibold uppercase mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                <Palette className="w-3.5 h-3.5" /> Warna Aksen Avatar
+              <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
+                Pilih Preset Sampul Modern
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {PRESET_COVERS.map((preset) => (
+                  <div
+                    key={preset.name}
+                    onClick={() => setProfileData(prev => ({ ...prev, coverPictureUrl: preset.value }))}
+                    className={`h-12 rounded-xl border cursor-pointer transition-all flex items-center justify-center p-2 text-center text-[10px] font-bold text-white shadow-sm ${
+                      profileData.coverPictureUrl === preset.value ? 'ring-2 ring-white scale-105' : 'hover:opacity-90'
+                    }`}
+                    style={{ background: preset.value, borderColor: 'rgba(255,255,255,0.2)' }}
+                  >
+                    {preset.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase mb-1.5 flex items-center gap-1.5 text-slate-400">
+                <Palette className="w-3.5 h-3.5 text-indigo-400" /> Warna Aksen Avatar (Fallback Inisial)
               </label>
               <div className="flex items-center gap-3">
                 <input
@@ -283,25 +450,28 @@ export default function ProfilePage() {
               <button
                 type="submit"
                 disabled={profileLoading}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:opacity-95 transition-all disabled:opacity-50"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:opacity-95 transition-all disabled:opacity-50"
                 style={{ backgroundColor: 'var(--accent-primary)' }}
               >
                 <Save className="w-4 h-4" />
-                {profileLoading ? 'Menyimpan...' : 'Simpan Profil'}
+                {profileLoading ? 'Menyimpan...' : 'Simpan Perubahan Profil'}
               </button>
             </div>
           </form>
         </div>
 
-        {/* Change Password Form */}
+        {/* Change Password & Security Form */}
         <div 
-          className="rounded-2xl border p-6 shadow-sm space-y-5"
+          className="rounded-3xl border p-6 shadow-sm space-y-5"
           style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
         >
-          <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-            <Lock className="w-4 h-4 text-indigo-500" />
-            Keamanan & Ganti Kata Sandi
-          </h2>
+          <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-color)' }}>
+            <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Lock className="w-4 h-4 text-indigo-500" />
+              Keamanan & Ganti Kata Sandi
+            </h2>
+            <Shield className="w-4 h-4 text-indigo-400" />
+          </div>
 
           {passMsg && (
             <div className={`p-4 rounded-xl flex items-center gap-3 border text-sm font-medium ${
@@ -316,7 +486,7 @@ export default function ProfilePage() {
 
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
                 Kata Sandi Saat Ini *
               </label>
               <div className="relative">
@@ -325,7 +495,7 @@ export default function ProfilePage() {
                   required
                   value={passwords.currentPassword}
                   onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
-                  placeholder="••••••••••••"
+                  placeholder="Masukkan kata sandi lama Anda"
                   className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 />
@@ -340,8 +510,8 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                Kata Sandi Baru * (Min 6 Karakter)
+              <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
+                Kata Sandi Baru *
               </label>
               <input
                 type={showPass ? 'text' : 'password'}
@@ -349,15 +519,15 @@ export default function ProfilePage() {
                 minLength={6}
                 value={passwords.newPassword}
                 onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
-                placeholder="••••••••••••"
+                placeholder="Minimal 6 karakter"
                 className="w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                Ulangi Kata Sandi Baru *
+              <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
+                Konfirmasi Kata Sandi Baru *
               </label>
               <input
                 type={showPass ? 'text' : 'password'}
@@ -365,7 +535,7 @@ export default function ProfilePage() {
                 minLength={6}
                 value={passwords.confirmNewPassword}
                 onChange={(e) => setPasswords({ ...passwords, confirmNewPassword: e.target.value })}
-                placeholder="••••••••••••"
+                placeholder="Ulangi kata sandi baru"
                 className="w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
               />
@@ -375,11 +545,11 @@ export default function ProfilePage() {
               <button
                 type="submit"
                 disabled={passLoading}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:opacity-95 transition-all disabled:opacity-50"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:opacity-95 transition-all disabled:opacity-50"
                 style={{ backgroundColor: 'var(--accent-primary)' }}
               >
-                <Save className="w-4 h-4" />
-                {passLoading ? 'Mengubah...' : 'Perbarui Kata Sandi'}
+                <Lock className="w-4 h-4" />
+                {passLoading ? 'Menyimpan...' : 'Perbarui Kata Sandi'}
               </button>
             </div>
           </form>

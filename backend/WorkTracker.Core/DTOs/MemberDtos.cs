@@ -16,6 +16,7 @@ public class MemberDto
     public bool IsActive { get; set; }
     public string? AvatarUrl { get; set; }
     public string? CoverPictureUrl { get; set; }
+    public string? AvatarColor { get; set; }
     public int? CompanyId { get; set; }
     public string? CompanyName { get; set; }
     public int TotalTasksAssigned { get; set; }
@@ -37,6 +38,10 @@ public class UpdateMemberProfileDto
     public string? PhoneNumber { get; set; }
     public string? Role { get; set; }
     public int? CompanyId { get; set; }
+    public string? AvatarUrl { get; set; }
+    public string? ProfilePictureUrl { get; set; }
+    public string? CoverPictureUrl { get; set; }
+    public string? AvatarColor { get; set; }
 }
 
 public class ApproveUserDto

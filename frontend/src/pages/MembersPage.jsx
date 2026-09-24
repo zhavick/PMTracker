@@ -24,7 +24,10 @@ import {
   Info,
   Phone,
   Mail,
-  Briefcase
+  Briefcase,
+  Camera,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
@@ -60,8 +63,13 @@ export default function MembersPage() {
     jobTitle: '',
     phoneNumber: '',
     role: 'User',
-    companyId: ''
+    companyId: '',
+    avatarUrl: '',
+    coverPictureUrl: '',
+    avatarColor: '#6366F1'
   });
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState(null);
 
@@ -168,9 +176,54 @@ export default function MembersPage() {
       jobTitle: member.jobTitle || '',
       phoneNumber: member.phoneNumber || '',
       role: member.role || 'User',
-      companyId: member.companyId ? String(member.companyId) : (companies.length > 0 ? String(companies[0].id) : '')
+      companyId: member.companyId ? String(member.companyId) : (companies.length > 0 ? String(companies[0].id) : ''),
+      avatarUrl: member.avatarUrl || member.profilePictureUrl || '',
+      coverPictureUrl: member.coverPictureUrl || '',
+      avatarColor: member.avatarColor || '#6366F1'
     });
     setEditError(null);
+  };
+
+  const handleAdminAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !editModalUser) return;
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await axiosClient.post(`/api/members/${editModalUser.id}/avatar`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data?.avatarUrl) {
+        setEditForm(prev => ({ ...prev, avatarUrl: res.data.avatarUrl }));
+      }
+    } catch (err) {
+      console.error('Failed to upload member avatar:', err);
+      alert('Gagal mengunggah foto profil.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleAdminCoverUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !editModalUser) return;
+    setUploadingCover(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await axiosClient.post(`/api/members/${editModalUser.id}/cover`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data?.coverPictureUrl) {
+        setEditForm(prev => ({ ...prev, coverPictureUrl: res.data.coverPictureUrl }));
+      }
+    } catch (err) {
+      console.error('Failed to upload member cover:', err);
+      alert('Gagal mengunggah foto cover.');
+    } finally {
+      setUploadingCover(false);
+    }
   };
 
   const handleEditSubmit = async (e) => {
@@ -192,6 +245,10 @@ export default function MembersPage() {
         payload.email = editForm.email.trim();
         payload.jobTitle = editForm.jobTitle.trim();
         payload.phoneNumber = editForm.phoneNumber.trim();
+        payload.avatarUrl = editForm.avatarUrl ? editForm.avatarUrl.trim() : null;
+        payload.profilePictureUrl = editForm.avatarUrl ? editForm.avatarUrl.trim() : null;
+        payload.coverPictureUrl = editForm.coverPictureUrl ? editForm.coverPictureUrl.trim() : null;
+        payload.avatarColor = editForm.avatarColor;
         if (editForm.companyId) {
           payload.companyId = parseInt(editForm.companyId, 10);
         }
@@ -265,18 +322,27 @@ export default function MembersPage() {
       >
         {/* Cover Banner Mock / Color */}
         <div 
-          className="h-16 w-full relative bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20"
+          className="h-20 w-full relative bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 bg-cover bg-center"
           style={{ 
             backgroundImage: member.coverPictureUrl ? `url(${member.coverPictureUrl})` : undefined,
-            backgroundSize: 'cover'
           }}
         />
 
         <div className="p-5 pt-0 flex-1 flex flex-col justify-between space-y-4">
           {/* Avatar and Header */}
           <div className="flex items-start justify-between -mt-8">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 border-4 shadow-md flex items-center justify-center text-white font-black text-lg flex-shrink-0" style={{ borderColor: 'var(--card-bg)' }}>
-              {getInitials(member.fullName)}
+            <div 
+              className="w-16 h-16 rounded-2xl border-4 shadow-md flex items-center justify-center text-white font-black text-lg flex-shrink-0 overflow-hidden" 
+              style={{ 
+                borderColor: 'var(--card-bg)',
+                backgroundColor: member.avatarColor || '#6366F1'
+              }}
+            >
+              {member.avatarUrl ? (
+                <img src={member.avatarUrl} alt={member.fullName} className="w-full h-full object-cover" />
+              ) : (
+                getInitials(member.fullName)
+              )}
             </div>
 
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-8 ${
@@ -628,211 +694,374 @@ export default function MembersPage() {
       {editModalUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div 
-            className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden p-6 space-y-4"
+            className="w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden"
             style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
           >
-            <div className="flex items-center justify-between">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-5 border-b flex-shrink-0" style={{ borderColor: 'var(--border-color)' }}>
               <div className="flex items-center space-x-2">
                 <Edit3 className="w-5 h-5 text-indigo-600" />
                 <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
-                  Ubah Informasi Member
+                  Ubah Informasi & Foto Member
                 </h3>
               </div>
-              <button onClick={() => setEditModalUser(null)}>
-                <X className="w-5 h-5 text-gray-400" />
+              <button 
+                type="button"
+                onClick={() => setEditModalUser(null)}
+                className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-gray-400 hover:text-gray-200"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Role Notice Banner */}
-            <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
-              isAdmin 
-                ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-300' 
-                : 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-300'
-            }`}>
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            {/* Modal Scrollable Body */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+              {/* Role Notice Banner */}
+              <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
+                isAdmin 
+                  ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-300' 
+                  : 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-300'
+              }`}>
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong>{isAdmin ? 'Mode Administrator' : 'Mode Project Manager'}</strong>: {
+                      isAdmin 
+                        ? 'Anda memiliki hak akses penuh untuk mengubah foto profil, foto sampul, data personal, kontak, peran, dan perusahaan member.' 
+                        : 'Sesuai kebijakan keamanan, Project Manager hanya memiliki hak untuk mengubah Nama dan Peran (Role), serta mereset kata sandi.'
+                    }
+                  </div>
+                </div>
+              </div>
+
+              {editError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 text-rose-600 text-xs">
+                  {editError}
+                </div>
+              )}
+
+              {/* Cover & Avatar Customization (Admin Only) */}
+              {isAdmin && (
+                <div className="rounded-2xl border p-4 space-y-4 bg-slate-500/5" style={{ borderColor: 'var(--border-color)' }}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
+                      <ImageIcon className="w-4 h-4 text-indigo-500" />
+                      Kustomisasi Foto Sampul & Foto Profil
+                    </span>
+                    <span className="text-[10px] text-indigo-500 font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
+                      Khusus Administrator
+                    </span>
+                  </div>
+
+                  {/* Visual Preview Banner */}
+                  <div 
+                    className="relative h-28 w-full rounded-xl overflow-hidden border bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 bg-cover bg-center"
+                    style={{ 
+                      backgroundImage: editForm.coverPictureUrl ? `url(${editForm.coverPictureUrl})` : undefined,
+                      borderColor: 'var(--border-color)'
+                    }}
+                  >
+                    {/* Cover Upload Button Overlay */}
+                    <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                      <label className="cursor-pointer px-2.5 py-1 rounded-lg bg-black/60 hover:bg-black/80 text-white text-[11px] font-semibold backdrop-blur-sm transition-all flex items-center gap-1">
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>{uploadingCover ? 'Mengunggah...' : 'Upload Cover'}</span>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={handleAdminCoverUpload} 
+                          disabled={uploadingCover}
+                        />
+                      </label>
+                      {editForm.coverPictureUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setEditForm(prev => ({ ...prev, coverPictureUrl: '' }))}
+                          className="px-2 py-1 rounded-lg bg-rose-600/80 hover:bg-rose-600 text-white text-[11px] font-semibold backdrop-blur-sm transition-all"
+                          title="Hapus Cover"
+                        >
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Avatar Circle with Upload */}
+                    <div className="absolute bottom-2 left-3 flex items-end gap-3">
+                      <div className="relative group">
+                        <div 
+                          className="w-16 h-16 rounded-2xl border-2 shadow-lg flex items-center justify-center text-white font-black text-lg overflow-hidden bg-slate-800"
+                          style={{ 
+                            borderColor: '#fff',
+                            backgroundColor: editForm.avatarColor || '#6366F1'
+                          }}
+                        >
+                          {editForm.avatarUrl ? (
+                            <img src={editForm.avatarUrl} alt="Preview" className="w-full h-full object-cover" />
+                          ) : (
+                            getInitials(editForm.fullName || 'User')
+                          )}
+                        </div>
+                        <label className="absolute inset-0 bg-black/50 rounded-2xl flex flex-col items-center justify-center text-white text-[10px] font-semibold opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity backdrop-blur-xs">
+                          <Camera className="w-4 h-4 mb-0.5" />
+                          <span>{uploadingAvatar ? '...' : 'Ganti'}</span>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={handleAdminAvatarUpload}
+                            disabled={uploadingAvatar}
+                          />
+                        </label>
+                      </div>
+
+                      <div className="pb-1 text-white drop-shadow-md">
+                        <div className="font-bold text-sm leading-tight text-white drop-shadow-sm">{editForm.fullName || 'Nama Member'}</div>
+                        <div className="text-[11px] text-white/90 drop-shadow-sm">{editForm.jobTitle || 'Jabatan'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* URL Inputs & Color Picker */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>
+                        URL Foto Profil (Avatar)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={editForm.avatarUrl}
+                          onChange={(e) => setEditForm({ ...editForm, avatarUrl: e.target.value })}
+                          placeholder="https://... atau klik foto di atas"
+                          className="flex-1 px-3 py-1.5 rounded-xl border text-xs"
+                          style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                        />
+                        {editForm.avatarUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setEditForm({ ...editForm, avatarUrl: '' })}
+                            className="px-2 py-1 text-xs text-rose-500 hover:bg-rose-500/10 rounded-lg"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>
+                        URL Foto Cover (Sampul)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={editForm.coverPictureUrl}
+                          onChange={(e) => setEditForm({ ...editForm, coverPictureUrl: e.target.value })}
+                          placeholder="https://... atau klik upload di banner"
+                          className="flex-1 px-3 py-1.5 rounded-xl border text-xs"
+                          style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                        />
+                        {editForm.coverPictureUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setEditForm({ ...editForm, coverPictureUrl: '' })}
+                            className="px-2 py-1 text-xs text-rose-500 hover:bg-rose-500/10 rounded-lg"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Avatar Color Picker */}
+                  <div className="flex items-center gap-3 pt-1">
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                      Warna Background Avatar:
+                    </span>
+                    <input 
+                      type="color" 
+                      value={editForm.avatarColor || '#6366F1'} 
+                      onChange={(e) => setEditForm({ ...editForm, avatarColor: e.target.value })}
+                      className="w-7 h-7 rounded-lg border cursor-pointer p-0.5 bg-transparent"
+                    />
+                    <span className="text-[11px] font-mono text-slate-400">
+                      {editForm.avatarColor || '#6366F1'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <form id="edit-member-form" onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+                {/* Nama Lengkap (Editable by Admin & PM) */}
                 <div>
-                  <strong>{isAdmin ? 'Mode Administrator' : 'Mode Project Manager'}</strong>: {
-                    isAdmin 
-                      ? 'Anda memiliki hak akses penuh untuk mengubah nama, email, jabatan, nomor telepon, peran, dan perusahaan member.' 
-                      : 'Sesuai kebijakan keamanan, Project Manager hanya memiliki hak untuk mengubah Nama dan Peran (Role), serta mereset kata sandi.'
-                  }
-                </div>
-              </div>
-            </div>
-
-            {editError && (
-              <div className="p-3 rounded-xl bg-rose-500/10 text-rose-600 text-xs">
-                {editError}
-              </div>
-            )}
-
-            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
-              {/* Nama Lengkap (Editable by Admin & PM) */}
-              <div>
-                <label className="block font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
-                  Nama Lengkap *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editForm.fullName}
-                  onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
-                  placeholder="Nama lengkap member..."
-                  className="w-full px-3 py-2 rounded-xl border text-sm"
-                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-                />
-              </div>
-
-              {/* Peran / Role (Editable by Admin & PM) */}
-              <div>
-                <label className="block font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
-                  Peran Akun (Role) *
-                </label>
-                <select
-                  value={editForm.role}
-                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border text-sm"
-                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-                >
-                  {availableRoles
-                    .filter(r => isAdmin || r !== 'Admin') // PM cannot select Admin
-                    .map(roleName => (
-                      <option key={roleName} value={roleName}>
-                        {roleName}
-                      </option>
-                    ))}
-                </select>
-                {!isAdmin && (
-                  <p className="text-[11px] text-gray-400 mt-1">
-                    * Sebagai PM, Anda tidak dapat memberikan peran Administrator.
-                  </p>
-                )}
-              </div>
-
-              {/* Email (Admin Only) */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                    Alamat Email
+                  <label className="block font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    Nama Lengkap *
                   </label>
-                  {!isAdmin && (
-                    <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Terkunci (Khusus Admin)
-                    </span>
-                  )}
+                  <input
+                    type="text"
+                    required
+                    value={editForm.fullName}
+                    onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                    placeholder="Nama lengkap member..."
+                    className="w-full px-3 py-2 rounded-xl border text-sm"
+                    style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
                 </div>
-                <input
-                  type="email"
-                  disabled={!isAdmin}
-                  value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  className={`w-full px-3 py-2 rounded-xl border text-sm ${!isAdmin ? 'opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5' : ''}`}
-                  style={{ backgroundColor: isAdmin ? 'var(--input-bg)' : undefined, borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-                />
-              </div>
 
-              {/* Jabatan (Admin Only) */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                    Jabatan (Job Title)
+                {/* Peran / Role (Editable by Admin & PM) */}
+                <div>
+                  <label className="block font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    Peran Akun (Role) *
                   </label>
-                  {!isAdmin && (
-                    <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Terkunci (Khusus Admin)
-                    </span>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  disabled={!isAdmin}
-                  value={editForm.jobTitle}
-                  onChange={(e) => setEditForm({ ...editForm, jobTitle: e.target.value })}
-                  placeholder="Misal: Senior Backend Developer..."
-                  className={`w-full px-3 py-2 rounded-xl border text-sm ${!isAdmin ? 'opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5' : ''}`}
-                  style={{ backgroundColor: isAdmin ? 'var(--input-bg)' : undefined, borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-                />
-              </div>
-
-              {/* Nomor Telepon (Admin Only) */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                    Nomor Telepon
-                  </label>
-                  {!isAdmin && (
-                    <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Terkunci (Khusus Admin)
-                    </span>
-                  )}
-                </div>
-                <input
-                  type="tel"
-                  disabled={!isAdmin}
-                  value={editForm.phoneNumber}
-                  onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
-                  placeholder="Misal: 081234567890..."
-                  className={`w-full px-3 py-2 rounded-xl border text-sm ${!isAdmin ? 'opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5' : ''}`}
-                  style={{ backgroundColor: isAdmin ? 'var(--input-bg)' : undefined, borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-                />
-              </div>
-
-              {/* Perusahaan (Admin Only) */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                    Perusahaan / Organisasi
-                  </label>
-                  {!isAdmin && (
-                    <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Terkunci pada Perusahaan Anda
-                    </span>
-                  )}
-                </div>
-                {isAdmin ? (
                   <select
-                    value={editForm.companyId}
-                    onChange={(e) => setEditForm({ ...editForm, companyId: e.target.value })}
+                    value={editForm.role}
+                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border text-sm"
                     style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                   >
-                    {companies.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.code ? `(${c.code})` : ''}
-                      </option>
-                    ))}
+                    {availableRoles
+                      .filter(r => isAdmin || r !== 'Admin') // PM cannot select Admin
+                      .map(roleName => (
+                        <option key={roleName} value={roleName}>
+                          {roleName}
+                        </option>
+                      ))}
                   </select>
-                ) : (
+                  {!isAdmin && (
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      * Sebagai PM, Anda tidak dapat memberikan peran Administrator.
+                    </p>
+                  )}
+                </div>
+
+                {/* Email (Admin Only) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                      Alamat Email
+                    </label>
+                    {!isAdmin && (
+                      <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5" /> Terkunci (Khusus Admin)
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="email"
+                    disabled={!isAdmin}
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className={`w-full px-3 py-2 rounded-xl border text-sm ${!isAdmin ? 'opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5' : ''}`}
+                    style={{ backgroundColor: isAdmin ? 'var(--input-bg)' : undefined, borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+
+                {/* Jabatan (Admin Only) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                      Jabatan (Job Title)
+                    </label>
+                    {!isAdmin && (
+                      <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5" /> Terkunci (Khusus Admin)
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
-                    disabled
-                    value={editModalUser.companyName || 'Perusahaan Anda'}
-                    className="w-full px-3 py-2 rounded-xl border text-sm opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5"
-                    style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                    disabled={!isAdmin}
+                    value={editForm.jobTitle}
+                    onChange={(e) => setEditForm({ ...editForm, jobTitle: e.target.value })}
+                    placeholder="Misal: Senior Backend Developer..."
+                    className={`w-full px-3 py-2 rounded-xl border text-sm ${!isAdmin ? 'opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5' : ''}`}
+                    style={{ backgroundColor: isAdmin ? 'var(--input-bg)' : undefined, borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                   />
-                )}
-              </div>
+                </div>
 
-              <div className="flex justify-end space-x-2 pt-3 border-t" style={{ borderColor: 'var(--border-color)' }}>
-                <button
-                  type="button"
-                  onClick={() => setEditModalUser(null)}
-                  className="px-4 py-2 rounded-xl border font-semibold"
-                  style={{ borderColor: 'var(--border-color)' }}
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={editLoading}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{editLoading ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
-                </button>
-              </div>
-            </form>
+                {/* Nomor Telepon (Admin Only) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                      Nomor Telepon
+                    </label>
+                    {!isAdmin && (
+                      <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5" /> Terkunci (Khusus Admin)
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="tel"
+                    disabled={!isAdmin}
+                    value={editForm.phoneNumber}
+                    onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
+                    placeholder="Misal: 081234567890..."
+                    className={`w-full px-3 py-2 rounded-xl border text-sm ${!isAdmin ? 'opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5' : ''}`}
+                    style={{ backgroundColor: isAdmin ? 'var(--input-bg)' : undefined, borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+
+                {/* Perusahaan (Admin Only) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                      Perusahaan / Organisasi
+                    </label>
+                    {!isAdmin && (
+                      <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5" /> Terkunci pada Perusahaan Anda
+                      </span>
+                    )}
+                  </div>
+                  {isAdmin ? (
+                    <select
+                      value={editForm.companyId}
+                      onChange={(e) => setEditForm({ ...editForm, companyId: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border text-sm"
+                      style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                    >
+                      {companies.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.code ? `(${c.code})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      disabled
+                      value={editModalUser.companyName || 'Perusahaan Anda'}
+                      className="w-full px-3 py-2 rounded-xl border text-sm opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5"
+                      style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                    />
+                  )}
+                </div>
+              </form>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="flex justify-end space-x-2 p-5 border-t flex-shrink-0" style={{ borderColor: 'var(--border-color)' }}>
+              <button
+                type="button"
+                onClick={() => setEditModalUser(null)}
+                className="px-4 py-2 rounded-xl border font-semibold text-xs"
+                style={{ borderColor: 'var(--border-color)' }}
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                form="edit-member-form"
+                disabled={editLoading}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{editLoading ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

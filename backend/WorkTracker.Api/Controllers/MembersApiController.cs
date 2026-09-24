@@ -99,6 +99,7 @@ public class MembersApiController : ControllerBase
                 IsActive = u.IsApproved,
                 AvatarUrl = u.ProfilePictureUrl,
                 CoverPictureUrl = u.CoverPictureUrl,
+                AvatarColor = u.AvatarColor,
                 TotalTasksAssigned = taskCount,
                 TotalHoursLogged = Math.Round(totalSeconds / 3600.0, 1),
                 CreatedAt = u.CreatedAt
@@ -245,6 +246,13 @@ public class MembersApiController : ControllerBase
                     return BadRequest(ApiResponse<object>.Fail($"Peran '{dto.Role}' tidak valid."));
                 }
             }
+
+            if (dto.ProfilePictureUrl != null) targetUser.ProfilePictureUrl = string.IsNullOrWhiteSpace(dto.ProfilePictureUrl) ? null : dto.ProfilePictureUrl.Trim();
+            else if (dto.AvatarUrl != null) targetUser.ProfilePictureUrl = string.IsNullOrWhiteSpace(dto.AvatarUrl) ? null : dto.AvatarUrl.Trim();
+
+            if (dto.CoverPictureUrl != null) targetUser.CoverPictureUrl = string.IsNullOrWhiteSpace(dto.CoverPictureUrl) ? null : dto.CoverPictureUrl.Trim();
+
+            if (!string.IsNullOrWhiteSpace(dto.AvatarColor)) targetUser.AvatarColor = dto.AvatarColor.Trim();
         }
 
         var updateResult = await _userManager.UpdateAsync(targetUser);
@@ -393,7 +401,7 @@ public class MembersApiController : ControllerBase
     }
 
     [HttpPost("profile/cover")]
-    public async Task<IActionResult> UploadCoverPicture([FromForm] UploadCoverDto model)
+    public async Task<IActionResult> UploadCoverPicture([FromForm] UploadImageFileDto model)
     {
         var file = model.File;
         if (file == null || file.Length == 0)
@@ -420,11 +428,104 @@ public class MembersApiController : ControllerBase
         user.CoverPictureUrl = $"/uploads/covers/{fileName}";
         await _userManager.UpdateAsync(user);
 
-        return Ok(ApiResponse<object>.Success(new { coverPictureUrl = user.CoverPictureUrl }, "Gambar sampul profil berhasil diperbarui."));
+        return Ok(ApiResponse<object>.Success(new { coverPictureUrl = user.CoverPictureUrl }, "Foto sampul profil berhasil diperbarui."));
+    }
+
+    [HttpPost("profile/avatar")]
+    public async Task<IActionResult> UploadAvatarPicture([FromForm] UploadImageFileDto model)
+    {
+        var file = model.File;
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<object>.Fail("Berkas gambar tidak ditemukan."));
+
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var user = await _userManager.FindByIdAsync(currentUserId!);
+        if (user == null)
+            return NotFound(ApiResponse<object>.Fail("Pengguna tidak ditemukan."));
+
+        var avatarsDir = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "uploads", "avatars");
+        if (!Directory.Exists(avatarsDir))
+            Directory.CreateDirectory(avatarsDir);
+
+        var ext = Path.GetExtension(file.FileName);
+        var fileName = $"{user.UserName}_avatar_{DateTime.UtcNow:yyyyMMddHHmmss}{ext}";
+        var fullPath = Path.Combine(avatarsDir, fileName);
+
+        using (var stream = new FileStream(fullPath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        user.ProfilePictureUrl = $"/uploads/avatars/{fileName}";
+        await _userManager.UpdateAsync(user);
+
+        return Ok(ApiResponse<object>.Success(new { profilePictureUrl = user.ProfilePictureUrl }, "Foto profil berhasil diperbarui."));
+    }
+
+    [HttpPost("{id}/avatar")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UploadMemberAvatar(string id, [FromForm] UploadImageFileDto model)
+    {
+        var file = model.File;
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<object>.Fail("Berkas gambar tidak ditemukan."));
+
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+            return NotFound(ApiResponse<object>.Fail("Pengguna tidak ditemukan."));
+
+        var avatarsDir = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "uploads", "avatars");
+        if (!Directory.Exists(avatarsDir))
+            Directory.CreateDirectory(avatarsDir);
+
+        var ext = Path.GetExtension(file.FileName);
+        var fileName = $"{user.UserName}_avatar_{DateTime.UtcNow:yyyyMMddHHmmss}{ext}";
+        var fullPath = Path.Combine(avatarsDir, fileName);
+
+        using (var stream = new FileStream(fullPath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        user.ProfilePictureUrl = $"/uploads/avatars/{fileName}";
+        await _userManager.UpdateAsync(user);
+
+        return Ok(ApiResponse<object>.Success(new { profilePictureUrl = user.ProfilePictureUrl }, $"Foto profil {user.FullName} berhasil diperbarui."));
+    }
+
+    [HttpPost("{id}/cover")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UploadMemberCover(string id, [FromForm] UploadImageFileDto model)
+    {
+        var file = model.File;
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<object>.Fail("Berkas gambar tidak ditemukan."));
+
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+            return NotFound(ApiResponse<object>.Fail("Pengguna tidak ditemukan."));
+
+        var coversDir = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "uploads", "covers");
+        if (!Directory.Exists(coversDir))
+            Directory.CreateDirectory(coversDir);
+
+        var ext = Path.GetExtension(file.FileName);
+        var fileName = $"{user.UserName}_cover_{DateTime.UtcNow:yyyyMMddHHmmss}{ext}";
+        var fullPath = Path.Combine(coversDir, fileName);
+
+        using (var stream = new FileStream(fullPath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        user.CoverPictureUrl = $"/uploads/covers/{fileName}";
+        await _userManager.UpdateAsync(user);
+
+        return Ok(ApiResponse<object>.Success(new { coverPictureUrl = user.CoverPictureUrl }, $"Foto sampul {user.FullName} berhasil diperbarui."));
     }
 }
 
-public class UploadCoverDto
+public class UploadImageFileDto
 {
     public IFormFile? File { get; set; }
 }

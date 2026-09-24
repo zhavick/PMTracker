@@ -5,7 +5,7 @@ import {
   RefreshCw, Plus, Edit2, Trash2, Rocket, Bug, LifeBuoy,
   X, Save, AlertCircle, CheckCircle, Sparkles, BarChart2,
   Gift, Wallet, DollarSign, CheckCircle2, AlertTriangle,
-  ArrowRight, CreditCard, Utensils, Tag, ShieldCheck, HeartHandshake
+  ArrowRight, CreditCard, Utensils, Tag, ShieldCheck, HeartHandshake, Send
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
