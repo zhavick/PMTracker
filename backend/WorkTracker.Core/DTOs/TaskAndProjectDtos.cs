@@ -12,6 +12,7 @@ public class ProjectDto
     public DateTime? Deadline { get; set; }
     public ProjectStatus Status { get; set; } = ProjectStatus.Active;
     public int? CompanyId { get; set; }
+    public string? CompanyName { get; set; }
     public DateTime CreatedAt { get; set; }
     public int TotalTasks { get; set; }
     public int CompletedTasks { get; set; }
@@ -34,6 +35,7 @@ public class CreateProjectDto
 
     public DateTime? Deadline { get; set; }
     public ProjectStatus Status { get; set; } = ProjectStatus.Active;
+    public int? CompanyId { get; set; }
 }
 
 public class UpdateProjectDto
@@ -50,6 +52,7 @@ public class UpdateProjectDto
 
     public DateTime? Deadline { get; set; }
     public ProjectStatus Status { get; set; }
+    public int? CompanyId { get; set; }
 }
 
 public class WorkTaskDto

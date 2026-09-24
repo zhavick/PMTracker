@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FolderKanban, 
   Plus, 
@@ -13,10 +13,16 @@ import {
   ArrowRight,
   X,
   Save,
-  Layers
+  Layers,
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  LayoutGrid,
+  Filter
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
+import { useAuth } from '../context/AuthContext';
 
 const COLOR_PRESETS = [
   '#6366F1', // Indigo
@@ -43,10 +49,19 @@ function formatDate(dateStr) {
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+
   const [projects, setProjects] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
+  // Admin View & Grouping State
+  const [viewMode, setViewMode] = useState('grouped'); // 'grouped' | 'grid'
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState('all');
+  const [collapsedCompanies, setCollapsedCompanies] = useState({});
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState(null);
@@ -55,7 +70,8 @@ export default function ProjectsPage() {
     description: '',
     color: '#6366F1',
     deadline: '',
-    status: 0
+    status: 0,
+    companyId: ''
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
@@ -63,9 +79,13 @@ export default function ProjectsPage() {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const res = await axiosClient.get('/api/projects', {
-        params: search.trim() ? { search: search.trim() } : {}
-      });
+      const params = {};
+      if (search.trim()) params.search = search.trim();
+      if (isAdmin && selectedCompanyFilter !== 'all') {
+        params.companyId = selectedCompanyFilter;
+      }
+
+      const res = await axiosClient.get('/api/projects', { params });
       if (res.data?.data) {
         setProjects(res.data.data);
       }
@@ -76,9 +96,33 @@ export default function ProjectsPage() {
     }
   };
 
+  const fetchCompanies = async () => {
+    try {
+      const res = await axiosClient.get('/api/projects/companies');
+      if (res.data?.data) {
+        setCompanies(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load companies:', err);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
-  }, [search]);
+  }, [search, selectedCompanyFilter]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchCompanies();
+    }
+  }, [isAdmin]);
+
+  const toggleCompanyCollapse = (companyName) => {
+    setCollapsedCompanies(prev => ({
+      ...prev,
+      [companyName]: !prev[companyName]
+    }));
+  };
 
   const handleOpenCreate = () => {
     setProjectToEdit(null);
@@ -87,7 +131,8 @@ export default function ProjectsPage() {
       description: '',
       color: '#6366F1',
       deadline: '',
-      status: 0
+      status: 0,
+      companyId: companies.length > 0 ? companies[0].id : ''
     });
     setFormError(null);
     setIsModalOpen(true);
@@ -100,7 +145,8 @@ export default function ProjectsPage() {
       description: project.description || '',
       color: project.color || '#6366F1',
       deadline: project.deadline ? project.deadline.split('T')[0] : '',
-      status: project.status ?? 0
+      status: project.status ?? 0,
+      companyId: project.companyId || (companies.length > 0 ? companies[0].id : '')
     });
     setFormError(null);
     setIsModalOpen(true);
@@ -122,7 +168,8 @@ export default function ProjectsPage() {
         description: formData.description.trim() || null,
         color: formData.color,
         deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
-        status: parseInt(formData.status, 10)
+        status: parseInt(formData.status, 10),
+        companyId: isAdmin && formData.companyId ? parseInt(formData.companyId, 10) : undefined
       };
 
       if (projectToEdit) {
@@ -133,6 +180,7 @@ export default function ProjectsPage() {
 
       setIsModalOpen(false);
       fetchProjects();
+      if (isAdmin) fetchCompanies();
     } catch (err) {
       console.error('Failed to save project:', err);
       setFormError(err.response?.data?.message || 'Gagal menyimpan proyek.');
@@ -147,10 +195,150 @@ export default function ProjectsPage() {
       const res = await axiosClient.delete(`/api/projects/${project.id}`);
       alert(res.data?.message || 'Operasi berhasil.');
       fetchProjects();
+      if (isAdmin) fetchCompanies();
     } catch (err) {
       console.error('Failed to delete project:', err);
       alert('Gagal menghapus proyek.');
     }
+  };
+
+  // Group projects by company name
+  const groupedProjects = useMemo(() => {
+    const groups = {};
+    projects.forEach(p => {
+      const compName = p.companyName || 'Perusahaan Mandiri';
+      if (!groups[compName]) {
+        groups[compName] = [];
+      }
+      groups[compName].push(p);
+    });
+    return groups;
+  }, [projects]);
+
+  const renderProjectCard = (project) => {
+    const isOverdue = project.deadline && new Date(project.deadline) < new Date() && project.status !== 1;
+
+    return (
+      <div
+        key={project.id}
+        className="rounded-2xl border shadow-sm hover:shadow-lg transition-all flex flex-col overflow-hidden"
+        style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+      >
+        {/* Top Color Accent Line */}
+        <div 
+          className="h-1.5 w-full"
+          style={{ backgroundColor: project.color || '#6366F1' }}
+        />
+
+        <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+          {/* Title, Company & Status */}
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center space-x-2">
+                <span 
+                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: project.color || '#6366F1' }}
+                />
+                <h3 className="font-bold text-base line-clamp-1" style={{ color: 'var(--text-primary)' }}>
+                  {project.name}
+                </h3>
+              </div>
+
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                project.status === 1 
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+                  : project.status === 2 
+                  ? 'bg-gray-500/10 text-gray-500' 
+                  : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+              }`}>
+                {project.status === 1 ? 'Selesai' : project.status === 2 ? 'Arsip' : 'Aktif'}
+              </span>
+            </div>
+
+            {/* Company Badge for Admin / Quick Info */}
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                <Building2 className="w-3 h-3" />
+                {project.companyName || 'Perusahaan Mandiri'}
+              </span>
+            </div>
+
+            <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+              {project.description || 'Tidak ada deskripsi tambahan.'}
+            </p>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center text-xs font-semibold">
+              <span style={{ color: 'var(--text-secondary)' }}>Progres Tugas</span>
+              <span className="text-indigo-600 dark:text-indigo-400 font-bold">{project.progressPercent}%</span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 h-2 rounded-full overflow-hidden">
+              <div 
+                className="h-full rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${project.progressPercent}%`,
+                  backgroundColor: project.color || '#6366F1' 
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Metrics Footer */}
+          <div className="grid grid-cols-3 gap-2 py-2 border-y text-center" style={{ borderColor: 'var(--border-color)' }}>
+            <div>
+              <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Total Tugas</div>
+              <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{project.totalTasks}</div>
+            </div>
+            <div>
+              <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Selesai</div>
+              <div className="text-sm font-bold text-emerald-600">{project.completedTasks}</div>
+            </div>
+            <div>
+              <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Jam Kerja</div>
+              <div className="text-sm font-bold text-indigo-600">{formatSeconds(project.totalSecondsLogged)}</div>
+            </div>
+          </div>
+
+          {/* Deadline & Actions */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center space-x-1.5 text-xs">
+              <Calendar className="w-3.5 h-3.5 text-gray-400" />
+              <span className={isOverdue ? 'text-rose-500 font-bold' : ''} style={{ color: isOverdue ? undefined : 'var(--text-secondary)' }}>
+                {formatDate(project.deadline)}
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => handleOpenEdit(project)}
+                className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-gray-500 hover:text-indigo-600 transition-colors"
+                title="Edit Proyek"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => handleDelete(project)}
+                className="p-1.5 rounded-lg hover:bg-rose-500/10 text-gray-500 hover:text-rose-500 transition-colors"
+                title="Hapus / Arsipkan Proyek"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => navigate('/tasks')}
+                className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-indigo-600 transition-colors"
+                title="Lihat Tugas Proyek"
+              >
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -158,47 +346,135 @@ export default function ProjectsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
-            Manajemen Proyek
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              {isAdmin ? 'Manajemen Portofolio Proyek Enterprise' : `Portofolio Proyek - ${user?.companyName || 'Perusahaan Saya'}`}
+            </h1>
+            {isAdmin && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                Mode Administrator
+              </span>
+            )}
+          </div>
           <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Pantau seluruh portofolio proyek organisasi, progres kumulatif, dan alokasi jam kerja tim.
+            {isAdmin 
+              ? 'Pantau portofolio proyek terpusat yang dikelompokkan berdasarkan nama perusahaan dan klien mitra.' 
+              : `Daftar proyek resmi yang dialokasikan khusus untuk anggota tim ${user?.companyName || 'perusahaan Anda'}.`}
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreate}
-          className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all transform active:scale-95 w-max"
-          style={{ backgroundColor: 'var(--accent-primary)', boxShadow: 'var(--accent-glow)' }}
-        >
-          <Plus className="w-4 h-4" />
-          <span>Tambah Proyek Baru</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Admin View Mode Switcher */}
+          {isAdmin && (
+            <div 
+              className="flex items-center p-1 rounded-xl border bg-slate-500/5"
+              style={{ borderColor: 'var(--border-color)' }}
+            >
+              <button
+                onClick={() => setViewMode('grouped')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  viewMode === 'grouped'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Grup Perusahaan</span>
+              </button>
+
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  viewMode === 'grid'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Grid Bebas</span>
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={handleOpenCreate}
+            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all transform active:scale-95 w-max"
+            style={{ backgroundColor: 'var(--accent-primary)', boxShadow: 'var(--accent-glow)' }}
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tambah Proyek Baru</span>
+          </button>
+        </div>
       </div>
 
       {/* Search and Filters */}
       <div 
-        className="p-4 rounded-2xl border shadow-sm"
+        className="p-4 rounded-2xl border shadow-sm space-y-3"
         style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
       >
-        <div className="relative max-w-md">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Cari nama atau deskripsi proyek..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-          />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Cari nama atau deskripsi proyek..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+            />
+          </div>
+
+          <div className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+            Menampilkan <strong className="text-indigo-500">{projects.length}</strong> proyek
+            {isAdmin && ` dari ${Object.keys(groupedProjects).length} perusahaan`}
+          </div>
         </div>
+
+        {/* Admin Company Filter Pills */}
+        {isAdmin && companies.length > 0 && (
+          <div className="pt-2 border-t flex items-center gap-2 overflow-x-auto pb-1" style={{ borderColor: 'var(--border-color)' }}>
+            <span className="text-xs text-slate-400 flex items-center gap-1 font-semibold whitespace-nowrap mr-1">
+              <Filter className="w-3.5 h-3.5" /> Filter Perusahaan:
+            </span>
+
+            <button
+              onClick={() => setSelectedCompanyFilter('all')}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                selectedCompanyFilter === 'all'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-slate-500/10 text-slate-400 hover:bg-slate-500/20'
+              }`}
+            >
+              Semua ({projects.length})
+            </button>
+
+            {companies.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedCompanyFilter(c.id.toString())}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  selectedCompanyFilter === c.id.toString()
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-slate-500/10 text-slate-400 hover:bg-slate-500/20'
+                }`}
+              >
+                <Building2 className="w-3 h-3" />
+                <span>{c.name}</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/20 text-white">
+                  {c.projectCount}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Projects Grid */}
+      {/* Projects Display */}
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center space-y-3">
           <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Memuat daftar proyek...</p>
+          <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Memuat portofolio proyek...</p>
         </div>
       ) : projects.length === 0 ? (
         <div 
@@ -208,7 +484,9 @@ export default function ProjectsPage() {
           <FolderKanban className="w-12 h-12 mb-3 text-gray-400 opacity-60" />
           <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Belum Ada Proyek</h3>
           <p className="text-sm max-w-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
-            Mulai dengan menambahkan proyek pertama untuk mengelompokkan penugasan tim.
+            {isAdmin 
+              ? 'Belum ada proyek yang terdaftar pada sistem atau filter perusahaan yang dipilih.' 
+              : `Belum ada proyek terdaftar untuk ${user?.companyName || 'perusahaan Anda'}.`}
           </p>
           <button
             onClick={handleOpenCreate}
@@ -218,125 +496,99 @@ export default function ProjectsPage() {
             Tambah Proyek Sekarang
           </button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {projects.map((project) => {
-            const isOverdue = project.deadline && new Date(project.deadline) < new Date() && project.status !== 1;
+      ) : isAdmin && viewMode === 'grouped' ? (
+        /* Admin Grouped View by Company */
+        <div className="space-y-8">
+          {Object.entries(groupedProjects).map(([companyName, companyProjects]) => {
+            const isCollapsed = !!collapsedCompanies[companyName];
+            const totalTasks = companyProjects.reduce((s, p) => s + p.totalTasks, 0);
+            const completedTasks = companyProjects.reduce((s, p) => s + p.completedTasks, 0);
+            const avgProgress = companyProjects.length > 0 
+              ? Math.round(companyProjects.reduce((s, p) => s + p.progressPercent, 0) / companyProjects.length)
+              : 0;
 
             return (
-              <div
-                key={project.id}
-                className="rounded-2xl border shadow-sm hover:shadow-lg transition-all flex flex-col overflow-hidden"
-                style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+              <div 
+                key={companyName}
+                className="rounded-3xl border shadow-sm overflow-hidden space-y-4 p-5 transition-all"
+                style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
               >
-                {/* Top Color Accent Line */}
-                <div 
-                  className="h-1.5 w-full"
-                  style={{ backgroundColor: project.color || '#6366F1' }}
-                />
+                {/* Company Group Header Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="w-5 h-5" />
+                    </div>
 
-                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                  {/* Title & Status */}
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center space-x-2">
-                        <span 
-                          className="w-3 h-3 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: project.color || '#6366F1' }}
-                        />
-                        <h3 className="font-bold text-base line-clamp-1" style={{ color: 'var(--text-primary)' }}>
-                          {project.name}
-                        </h3>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                          {companyName}
+                        </h2>
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-500 border border-indigo-500/30">
+                          {companyProjects.length} Proyek
+                        </span>
                       </div>
-
-                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                        project.status === 1 
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
-                          : project.status === 2 
-                          ? 'bg-gray-500/10 text-gray-500' 
-                          : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                      }`}>
-                        {project.status === 1 ? 'Selesai' : project.status === 2 ? 'Arsip' : 'Aktif'}
-                      </span>
-                    </div>
-
-                    <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
-                      {project.description || 'Tidak ada deskripsi tambahan.'}
-                    </p>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center text-xs font-semibold">
-                      <span style={{ color: 'var(--text-secondary)' }}>Progres Tugas</span>
-                      <span className="text-indigo-600 dark:text-indigo-400 font-bold">{project.progressPercent}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 h-2 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{ 
-                          width: `${project.progressPercent}%`,
-                          backgroundColor: project.color || '#6366F1' 
-                        }}
-                      />
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Portofolio proyek resmi entitas {companyName}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Metrics Footer */}
-                  <div className="grid grid-cols-3 gap-2 py-2 border-y text-center" style={{ borderColor: 'var(--border-color)' }}>
-                    <div>
-                      <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Total Tugas</div>
-                      <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{project.totalTasks}</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Selesai</div>
-                      <div className="text-sm font-bold text-emerald-600">{project.completedTasks}</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Jam Kerja</div>
-                      <div className="text-sm font-bold text-indigo-600">{formatSeconds(project.totalSecondsLogged)}</div>
-                    </div>
-                  </div>
-
-                  {/* Deadline & Actions */}
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center space-x-1.5 text-xs">
-                      <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                      <span className={isOverdue ? 'text-rose-500 font-bold' : ''} style={{ color: isOverdue ? undefined : 'var(--text-secondary)' }}>
-                        {formatDate(project.deadline)}
-                      </span>
+                  {/* Summary Badges & Toggle Accordion */}
+                  <div className="flex items-center gap-3 self-end sm:self-auto">
+                    <div className="hidden md:flex items-center gap-4 text-xs font-semibold px-4 py-2 rounded-xl bg-slate-500/5 border border-slate-500/10">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase">Total Tugas</span>
+                        <span style={{ color: 'var(--text-primary)' }}>{totalTasks}</span>
+                      </div>
+                      <div className="w-px h-6 bg-slate-500/20" />
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase">Tugas Selesai</span>
+                        <span className="text-emerald-500">{completedTasks}</span>
+                      </div>
+                      <div className="w-px h-6 bg-slate-500/20" />
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase">Rata-rata Progres</span>
+                        <span className="text-indigo-400">{avgProgress}%</span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center space-x-1">
-                      <button
-                        onClick={() => handleOpenEdit(project)}
-                        className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-gray-500 hover:text-indigo-600 transition-colors"
-                        title="Edit Proyek"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={() => handleDelete(project)}
-                        className="p-1.5 rounded-lg hover:bg-rose-500/10 text-gray-500 hover:text-rose-500 transition-colors"
-                        title="Hapus / Arsipkan Proyek"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={() => navigate('/tasks')}
-                        className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-indigo-600 transition-colors"
-                        title="Lihat Tugas Proyek"
-                      >
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => toggleCompanyCollapse(companyName)}
+                      className="p-2 rounded-xl border hover:bg-slate-500/10 text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5 text-xs font-medium"
+                      style={{ borderColor: 'var(--border-color)' }}
+                      title={isCollapsed ? 'Buka grup' : 'Tutup grup'}
+                    >
+                      {isCollapsed ? (
+                        <>
+                          <span>Tampilkan</span>
+                          <ChevronDown className="w-4 h-4" />
+                        </>
+                      ) : (
+                        <>
+                          <span>Sembunyikan</span>
+                          <ChevronUp className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
+
+                {/* Company Projects Grid */}
+                {!isCollapsed && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-1">
+                    {companyProjects.map(renderProjectCard)}
+                  </div>
+                )}
               </div>
             );
           })}
+        </div>
+      ) : (
+        /* Regular User View / Flat Grid View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {projects.map(renderProjectCard)}
         </div>
       )}
 
@@ -372,6 +624,30 @@ export default function ProjectsPage() {
               {formError && (
                 <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-medium">
                   {formError}
+                </div>
+              )}
+
+              {/* Admin Company Selector */}
+              {isAdmin && (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    Alokasi Perusahaan Pemilik Proyek <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={formData.companyId}
+                    onChange={(e) => setFormData(prev => ({ ...prev, companyId: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
+                    style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  >
+                    {companies.map(c => (
+                      <option key={c.id} value={c.id}>
+                        🏢 {c.name} {c.code ? `(${c.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Sebagai Administrator, Anda dapat menentukan perusahaan mana yang memiliki proyek ini.
+                  </p>
                 </div>
               )}
 

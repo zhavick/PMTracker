@@ -6,7 +6,6 @@ using WorkTracker.Core.DTOs;
 using WorkTracker.Core.Entities;
 using WorkTracker.Core.Enums;
 using WorkTracker.Infrastructure.Data;
-
 using WorkTracker.Api.Extensions;
 
 namespace WorkTracker.Api.Controllers;
@@ -24,18 +23,35 @@ public class ProjectsApiController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetProjects([FromQuery] string? search, [FromQuery] ProjectStatus? status)
+    public async Task<IActionResult> GetProjects(
+        [FromQuery] string? search, 
+        [FromQuery] ProjectStatus? status,
+        [FromQuery] int? companyId)
     {
-        var companyId = await User.GetCompanyIdAsync(_context);
+        var isAdmin = User.IsInRole("Admin") || User.IsInRole("System Analyst");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
 
         var query = _context.Projects
+            .Include(p => p.Company)
             .Include(p => p.Tasks)
                 .ThenInclude(t => t.Sessions)
             .AsNoTracking();
 
-        if (companyId.HasValue)
+        if (isAdmin)
         {
-            query = query.Where(p => p.CompanyId == companyId.Value);
+            // Administrator can see all projects or filter by a specific company if provided
+            if (companyId.HasValue)
+            {
+                query = query.Where(p => p.CompanyId == companyId.Value);
+            }
+        }
+        else
+        {
+            // Regular user only sees projects from their registered company
+            if (userCompanyId.HasValue)
+            {
+                query = query.Where(p => p.CompanyId == userCompanyId.Value);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -49,7 +65,10 @@ public class ProjectsApiController : ControllerBase
             query = query.Where(p => p.Status == status.Value);
         }
 
-        var projects = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
+        var projects = await query
+            .OrderBy(p => p.Company != null ? p.Company.Name : string.Empty)
+            .ThenByDescending(p => p.CreatedAt)
+            .ToListAsync();
 
         var result = projects.Select(p =>
         {
@@ -70,6 +89,7 @@ public class ProjectsApiController : ControllerBase
                 Deadline = p.Deadline,
                 Status = p.Status,
                 CompanyId = p.CompanyId,
+                CompanyName = p.Company != null ? p.Company.Name : "Perusahaan Mandiri",
                 CreatedAt = p.CreatedAt,
                 TotalTasks = totalTasks,
                 CompletedTasks = completedTasks,
@@ -82,19 +102,47 @@ public class ProjectsApiController : ControllerBase
         return Ok(ApiResponse<List<ProjectDto>>.Success(result));
     }
 
+    [HttpGet("companies")]
+    public async Task<IActionResult> GetCompanies()
+    {
+        var isAdmin = User.IsInRole("Admin") || User.IsInRole("System Analyst");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
+
+        var query = _context.Companies.AsNoTracking();
+        if (!isAdmin && userCompanyId.HasValue)
+        {
+            query = query.Where(c => c.Id == userCompanyId.Value);
+        }
+
+        var list = await query
+            .Select(c => new
+            {
+                c.Id,
+                c.Name,
+                c.Code,
+                ProjectCount = c.Projects.Count
+            })
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+
+        return Ok(ApiResponse<object>.Success(list));
+    }
+
     [HttpGet("{id}")]
     public async Task<IActionResult> GetProjectById(int id)
     {
-        var companyId = await User.GetCompanyIdAsync(_context);
+        var isAdmin = User.IsInRole("Admin") || User.IsInRole("System Analyst");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
 
         var query = _context.Projects
+            .Include(x => x.Company)
             .Include(x => x.Tasks)
                 .ThenInclude(t => t.Sessions)
             .AsNoTracking();
 
-        if (companyId.HasValue)
+        if (!isAdmin && userCompanyId.HasValue)
         {
-            query = query.Where(p => p.CompanyId == companyId.Value);
+            query = query.Where(p => p.CompanyId == userCompanyId.Value);
         }
 
         var p = await query.FirstOrDefaultAsync(x => x.Id == id);
@@ -119,6 +167,7 @@ public class ProjectsApiController : ControllerBase
             Deadline = p.Deadline,
             Status = p.Status,
             CompanyId = p.CompanyId,
+            CompanyName = p.Company != null ? p.Company.Name : "Perusahaan Mandiri",
             CreatedAt = p.CreatedAt,
             TotalTasks = totalTasks,
             CompletedTasks = completedTasks,
@@ -136,7 +185,9 @@ public class ProjectsApiController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Fail("Data input tidak valid."));
 
-        var companyId = await User.GetCompanyIdAsync(_context);
+        var isAdmin = User.IsInRole("Admin") || User.IsInRole("System Analyst");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
+        var targetCompanyId = (isAdmin && dto.CompanyId.HasValue) ? dto.CompanyId.Value : userCompanyId;
 
         var project = new Project
         {
@@ -145,12 +196,14 @@ public class ProjectsApiController : ControllerBase
             Color = string.IsNullOrWhiteSpace(dto.Color) ? "#6366F1" : dto.Color.Trim(),
             Deadline = dto.Deadline,
             Status = dto.Status,
-            CompanyId = companyId,
+            CompanyId = targetCompanyId,
             CreatedAt = DateTime.UtcNow
         };
 
         _context.Projects.Add(project);
         await _context.SaveChangesAsync();
+
+        var comp = targetCompanyId.HasValue ? await _context.Companies.FindAsync(targetCompanyId.Value) : null;
 
         var resultDto = new ProjectDto
         {
@@ -161,6 +214,7 @@ public class ProjectsApiController : ControllerBase
             Deadline = project.Deadline,
             Status = project.Status,
             CompanyId = project.CompanyId,
+            CompanyName = comp?.Name ?? "Perusahaan Mandiri",
             CreatedAt = project.CreatedAt,
             TotalTasks = 0,
             CompletedTasks = 0,
@@ -178,9 +232,10 @@ public class ProjectsApiController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Fail("Data input tidak valid."));
 
-        var companyId = await User.GetCompanyIdAsync(_context);
+        var isAdmin = User.IsInRole("Admin") || User.IsInRole("System Analyst");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
         var project = await _context.Projects.FindAsync(id);
-        if (project == null || (companyId.HasValue && project.CompanyId != companyId.Value))
+        if (project == null || (!isAdmin && userCompanyId.HasValue && project.CompanyId != userCompanyId.Value))
             return NotFound(ApiResponse<object>.Fail("Proyek tidak ditemukan."));
 
         project.Name = dto.Name.Trim();
@@ -188,6 +243,10 @@ public class ProjectsApiController : ControllerBase
         project.Color = string.IsNullOrWhiteSpace(dto.Color) ? "#6366F1" : dto.Color.Trim();
         project.Deadline = dto.Deadline;
         project.Status = dto.Status;
+        if (isAdmin && dto.CompanyId.HasValue)
+        {
+            project.CompanyId = dto.CompanyId.Value;
+        }
 
         await _context.SaveChangesAsync();
 
@@ -197,12 +256,13 @@ public class ProjectsApiController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteProject(int id)
     {
-        var companyId = await User.GetCompanyIdAsync(_context);
+        var isAdmin = User.IsInRole("Admin") || User.IsInRole("System Analyst");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
         var project = await _context.Projects
             .Include(p => p.Tasks)
             .FirstOrDefaultAsync(p => p.Id == id);
 
-        if (project == null || (companyId.HasValue && project.CompanyId != companyId.Value))
+        if (project == null || (!isAdmin && userCompanyId.HasValue && project.CompanyId != userCompanyId.Value))
             return NotFound(ApiResponse<object>.Fail("Proyek tidak ditemukan."));
 
         if (project.Tasks.Any())
@@ -219,3 +279,4 @@ public class ProjectsApiController : ControllerBase
         return Ok(ApiResponse<object>.Success(new { id }, "Proyek berhasil dihapus."));
     }
 }
+
