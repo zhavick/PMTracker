@@ -42,3 +42,28 @@
 .pt-safe {
   padding-top: env(safe-area-inset-top, 16px);
 }
+
+@keyframes pulse-glow {
+  0% { transform: scale(1) translate(0, 0); opacity: 0.25; }
+  100% { transform: scale(1.15) translate(20px, -20px); opacity: 0.45; }
+}
+
+.ambient-sphere {
+  filter: blur(100px);
+  pointer-events: none;
+  position: absolute;
+  border-radius: 9999px;
+  animation: pulse-glow 8s ease-in-out infinite alternate;
+}
+
+.btn-gradient {
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #4F46E5 100%);
+  background-size: 200% 200%;
+  transition: all 0.3s ease;
+}
+
+.btn-gradient:hover {
+  background-position: right center;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 25px -4px rgba(99, 102, 241, 0.45);
+}
