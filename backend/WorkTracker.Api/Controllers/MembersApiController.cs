@@ -34,15 +34,23 @@ public class MembersApiController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetMembers([FromQuery] string? search, [FromQuery] bool? pendingOnly)
+    public async Task<IActionResult> GetMembers(
+        [FromQuery] string? search, 
+        [FromQuery] bool? pendingOnly,
+        [FromQuery] int? companyId)
     {
-        var companyId = await User.GetCompanyIdAsync(_context);
+        var isAdmin = User.IsInRole("Admin");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
 
         var usersQuery = _userManager.Users
             .Include(u => u.Company)
             .AsNoTracking();
 
-        if (companyId.HasValue)
+        if (!isAdmin && userCompanyId.HasValue)
+        {
+            usersQuery = usersQuery.Where(u => u.CompanyId == userCompanyId.Value);
+        }
+        else if (isAdmin && companyId.HasValue)
         {
             usersQuery = usersQuery.Where(u => u.CompanyId == companyId.Value);
         }
@@ -100,6 +108,155 @@ public class MembersApiController : ControllerBase
         return Ok(ApiResponse<List<MemberDto>>.Success(memberDtos));
     }
 
+    [HttpGet("companies")]
+    public async Task<IActionResult> GetCompanies()
+    {
+        var isAdmin = User.IsInRole("Admin");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
+
+        var query = _context.Companies.AsNoTracking();
+        if (!isAdmin && userCompanyId.HasValue)
+        {
+            query = query.Where(c => c.Id == userCompanyId.Value);
+        }
+
+        var list = await query
+            .Select(c => new
+            {
+                c.Id,
+                c.Name,
+                c.Code,
+                MemberCount = c.Users.Count
+            })
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+
+        return Ok(ApiResponse<object>.Success(list));
+    }
+
+    [HttpGet("roles")]
+    public async Task<IActionResult> GetRoles()
+    {
+        var roles = await _roleManager.Roles
+            .OrderBy(r => r.Name)
+            .Select(r => r.Name!)
+            .ToListAsync();
+        return Ok(ApiResponse<List<string>>.Success(roles));
+    }
+
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,PM,Project Manager,ProjectManager")]
+    public async Task<IActionResult> UpdateMember(string id, [FromBody] UpdateMemberProfileDto dto)
+    {
+        var targetUser = await _userManager.FindByIdAsync(id);
+        if (targetUser == null)
+            return NotFound(ApiResponse<object>.Fail("Pengguna tidak ditemukan."));
+
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUser = await _userManager.FindByIdAsync(currentUserId!);
+        if (currentUser == null)
+            return Unauthorized();
+
+        var currentRoles = await _userManager.GetRolesAsync(currentUser);
+        var isAdmin = currentRoles.Contains("Admin");
+        var isPM = currentRoles.Contains("PM") || currentRoles.Contains("Project Manager") || currentRoles.Contains("ProjectManager");
+
+        var targetRoles = await _userManager.GetRolesAsync(targetUser);
+
+        // Jika pemanggil adalah PM (bukan Admin)
+        if (!isAdmin && isPM)
+        {
+            // 1. Verifikasi isolasi perusahaan
+            if (targetUser.CompanyId != currentUser.CompanyId)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, 
+                    ApiResponse<object>.Fail("Project Manager hanya dapat mengubah informasi member pada perusahaan yang sama."));
+            }
+
+            // 2. PM tidak boleh mengubah user dengan peran Administrator
+            if (targetRoles.Contains("Admin"))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, 
+                    ApiResponse<object>.Fail("Project Manager tidak memiliki hak akses untuk mengubah akun Administrator."));
+            }
+
+            // 3. PM HANYA boleh mengubah Nama (FullName) dan Role
+            if (!string.IsNullOrWhiteSpace(dto.FullName))
+            {
+                targetUser.FullName = dto.FullName.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.Role))
+            {
+                // PM tidak boleh mempromosikan user menjadi Admin
+                if (dto.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, 
+                        ApiResponse<object>.Fail("Project Manager tidak diizinkan memberikan peran Administrator."));
+                }
+
+                if (await _roleManager.RoleExistsAsync(dto.Role))
+                {
+                    await _userManager.RemoveFromRolesAsync(targetUser, targetRoles);
+                    await _userManager.AddToRoleAsync(targetUser, dto.Role);
+                }
+                else
+                {
+                    return BadRequest(ApiResponse<object>.Fail($"Peran '{dto.Role}' tidak valid."));
+                }
+            }
+        }
+        else if (isAdmin)
+        {
+            // Admin memiliki akses penuh mengubah profil
+            if (!string.IsNullOrWhiteSpace(dto.FullName))
+                targetUser.FullName = dto.FullName.Trim();
+
+            if (dto.JobTitle != null)
+                targetUser.JobTitle = dto.JobTitle.Trim();
+
+            if (dto.PhoneNumber != null)
+                targetUser.PhoneNumber = dto.PhoneNumber.Trim();
+
+            if (dto.CompanyId.HasValue && dto.CompanyId.Value > 0)
+                targetUser.CompanyId = dto.CompanyId.Value;
+
+            if (!string.IsNullOrWhiteSpace(dto.Email) && dto.Email.Trim().ToLowerInvariant() != targetUser.Email?.ToLowerInvariant())
+            {
+                var cleanEmail = dto.Email.Trim();
+                var existing = await _userManager.FindByEmailAsync(cleanEmail);
+                if (existing != null && existing.Id != targetUser.Id)
+                {
+                    return BadRequest(ApiResponse<object>.Fail("Alamat email sudah digunakan oleh pengguna lain."));
+                }
+                targetUser.Email = cleanEmail;
+                targetUser.UserName = cleanEmail;
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.Role))
+            {
+                if (await _roleManager.RoleExistsAsync(dto.Role))
+                {
+                    await _userManager.RemoveFromRolesAsync(targetUser, targetRoles);
+                    await _userManager.AddToRoleAsync(targetUser, dto.Role);
+                }
+                else
+                {
+                    return BadRequest(ApiResponse<object>.Fail($"Peran '{dto.Role}' tidak valid."));
+                }
+            }
+        }
+
+        var updateResult = await _userManager.UpdateAsync(targetUser);
+        if (!updateResult.Succeeded)
+        {
+            var errors = updateResult.Errors.Select(e => e.Description).ToList();
+            return BadRequest(ApiResponse<object>.Fail("Gagal memperbarui informasi pengguna.", errors));
+        }
+
+        return Ok(ApiResponse<object>.Success(new { id = targetUser.Id, fullName = targetUser.FullName }, "Informasi member berhasil diperbarui."));
+    }
+
     [HttpPut("{id}/approval")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateApproval(string id, [FromBody] ApproveUserDto dto)
@@ -125,18 +282,44 @@ public class MembersApiController : ControllerBase
     }
 
     [HttpPost("{id}/reset-password")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,PM,Project Manager,ProjectManager")]
     public async Task<IActionResult> AdminResetPassword(string id, [FromBody] AdminResetPasswordDto dto)
     {
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Fail("Kata sandi baru tidak memenuhi syarat minimal 6 karakter."));
 
-        var user = await _userManager.FindByIdAsync(id);
-        if (user == null)
+        var targetUser = await _userManager.FindByIdAsync(id);
+        if (targetUser == null)
             return NotFound(ApiResponse<object>.Fail("Pengguna tidak ditemukan."));
 
-        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-        var result = await _userManager.ResetPasswordAsync(user, resetToken, dto.NewPassword);
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUser = await _userManager.FindByIdAsync(currentUserId!);
+        if (currentUser == null)
+            return Unauthorized();
+
+        var currentRoles = await _userManager.GetRolesAsync(currentUser);
+        var isAdmin = currentRoles.Contains("Admin");
+        var isPM = currentRoles.Contains("PM") || currentRoles.Contains("Project Manager") || currentRoles.Contains("ProjectManager");
+        var targetRoles = await _userManager.GetRolesAsync(targetUser);
+
+        // Jika pemanggil adalah PM (bukan Admin)
+        if (!isAdmin && isPM)
+        {
+            if (targetUser.CompanyId != currentUser.CompanyId)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, 
+                    ApiResponse<object>.Fail("Project Manager hanya dapat mereset kata sandi member di perusahaan yang sama."));
+            }
+
+            if (targetRoles.Contains("Admin"))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, 
+                    ApiResponse<object>.Fail("Project Manager tidak dapat mereset kata sandi Administrator."));
+            }
+        }
+
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(targetUser);
+        var result = await _userManager.ResetPasswordAsync(targetUser, resetToken, dto.NewPassword);
 
         if (!result.Succeeded)
         {
@@ -144,7 +327,7 @@ public class MembersApiController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail("Gagal mereset kata sandi pengguna.", errors));
         }
 
-        return Ok(ApiResponse<object>.Success(new { id = user.Id }, $"Kata sandi untuk pengguna {user.FullName} berhasil diperbarui oleh Administrator."));
+        return Ok(ApiResponse<object>.Success(new { id = targetUser.Id }, $"Kata sandi untuk pengguna {targetUser.FullName} berhasil diperbarui."));
     }
 
     [HttpDelete("{id}/permanent")]

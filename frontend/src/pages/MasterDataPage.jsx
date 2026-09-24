@@ -15,7 +15,10 @@ import {
   Hash,
   Clock,
   Globe,
-  ShieldCheck
+  ShieldCheck,
+  CalendarDays,
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
@@ -81,6 +84,8 @@ export default function MasterDataPage() {
   const [statuses, setStatuses] = useState([]);
   const [milestones, setMilestones] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [holidays, setHolidays] = useState([]);
+  const [holidayYear, setHolidayYear] = useState(new Date().getFullYear());
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -117,6 +122,9 @@ export default function MasterDataPage() {
       } else if (activeTab === 'categories') {
         const res = await axiosClient.get('/api/master-data/categories');
         setCategories(res.data?.data || []);
+      } else if (activeTab === 'holidays') {
+        const res = await axiosClient.get('/api/master-data/holidays', { params: { year: holidayYear } });
+        setHolidays(res.data?.data || []);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal memuat data.');
@@ -136,6 +144,9 @@ export default function MasterDataPage() {
       setFormData({ name: '', phase: 'Development', color: '#8B5CF6', icon: 'Code', orderIndex: milestones.length + 1, description: '', isDefault: false });
     } else if (activeTab === 'categories') {
       setFormData({ name: '', description: '', icon: 'Folder', color: '#EC4899' });
+    } else if (activeTab === 'holidays') {
+      const today = new Date().toISOString().slice(0, 10);
+      setFormData({ name: '', date: today, holidayType: 'National', color: '#EF4444', icon: 'Calendar', description: '', isRecurringYearly: false, isActive: true });
     }
     setIsModalOpen(true);
   };
@@ -143,7 +154,11 @@ export default function MasterDataPage() {
   const openEditModal = (item) => {
     setModalMode('edit');
     setCurrentEditId(item.id);
-    setFormData({ ...item });
+    const data = { ...item };
+    if (activeTab === 'holidays' && data.date) {
+      data.date = String(data.date).slice(0, 10);
+    }
+    setFormData(data);
     setIsModalOpen(true);
   };
 
@@ -152,11 +167,12 @@ export default function MasterDataPage() {
     setError(null);
     setSuccessMsg('');
     try {
+      const endpoint = activeTab === 'holidays' ? `/api/master-data/holidays` : `/api/master-data/${activeTab}`;
       if (modalMode === 'create') {
-        await axiosClient.post(`/api/master-data/${activeTab}`, formData);
+        await axiosClient.post(endpoint, formData);
         setSuccessMsg('Data master berhasil ditambahkan.');
       } else {
-        await axiosClient.put(`/api/master-data/${activeTab}/${currentEditId}`, formData);
+        await axiosClient.put(`${endpoint}/${currentEditId}`, formData);
         setSuccessMsg('Data master berhasil diperbarui.');
       }
       setIsModalOpen(false);
@@ -164,6 +180,18 @@ export default function MasterDataPage() {
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal menyimpan perubahan.');
+    }
+  };
+
+  const handleDeleteHoliday = async (id, name) => {
+    if (!confirm(`Hapus hari libur "${name}"?`)) return;
+    try {
+      await axiosClient.delete(`/api/master-data/holidays/${id}`);
+      setSuccessMsg('Hari libur berhasil dihapus.');
+      fetchActiveData();
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal menghapus.');
     }
   };
 
@@ -289,6 +317,20 @@ export default function MasterDataPage() {
         >
           <ShieldCheck className="w-4 h-4" />
           Identitas Aplikasi & Footer Panduan
+        </button>
+
+        <button
+          onClick={() => setActiveTab('holidays')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+            activeTab === 'holidays' ? 'text-white shadow-sm' : 'hover:bg-slate-500/10'
+          }`}
+          style={{
+            backgroundColor: activeTab === 'holidays' ? '#EF4444' : 'transparent',
+            color: activeTab === 'holidays' ? '#ffffff' : 'var(--text-secondary)'
+          }}
+        >
+          <CalendarDays className="w-4 h-4" />
+          Hari Libur {'&'} Cuti ({holidays.length})
         </button>
       </div>
 
@@ -710,6 +752,101 @@ export default function MasterDataPage() {
       )}
 
       {/* Modal CRUD */}
+
+      {/* Holiday Tab */}
+      {activeTab === 'holidays' && (
+        <div className="space-y-4">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Tahun:</label>
+              <select value={holidayYear} onChange={e => { setHolidayYear(+e.target.value); setTimeout(fetchActiveData, 50); }}
+                style={{ padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13 }}>
+                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <button onClick={fetchActiveData} style={{ padding: '6px 10px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                <RefreshCw size={14} />
+              </button>
+            </div>
+            {isAdmin && (
+              <button onClick={openCreateModal}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: '#EF4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                <Plus size={14} /> Tambah Hari Libur
+              </button>
+            )}
+          </div>
+
+          <div style={{ borderRadius: 16, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+            {loading ? (
+              <div style={{ padding: 48, textAlign: 'center' }}>
+                <div style={{ width: 28, height: 28, border: '3px solid var(--accent-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+              </div>
+            ) : holidays.length === 0 ? (
+              <div style={{ padding: 48, textAlign: 'center' }}>
+                <CalendarDays size={40} style={{ color: '#94A3B8', opacity: 0.4, margin: '0 auto 12px' }} />
+                <p style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 15 }}>Belum ada hari libur untuk tahun {holidayYear}</p>
+                <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>Klik tombol Tambah Hari Libur untuk menambahkan.</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.03)' }}>
+                      {['Tanggal', 'Nama Hari Libur', 'Jenis', 'Berulang Tiap Tahun', 'Status', 'Aksi'].map(h => (
+                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {holidays.map(h => (
+                      <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                          <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 8, background: h.color + '20', color: h.color, fontWeight: 700, fontSize: 13 }}>
+                            {h.date}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: h.color, flexShrink: 0 }} />
+                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{h.name}</span>
+                          </div>
+                          {h.description && <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{h.description}</p>}
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: h.holidayType === 'National' ? 'rgba(239,68,68,0.12)' : h.holidayType === 'Religious' ? 'rgba(139,92,246,0.12)' : h.holidayType === 'Company' ? 'rgba(59,130,246,0.12)' : 'rgba(100,116,139,0.12)', color: h.holidayType === 'National' ? '#F87171' : h.holidayType === 'Religious' ? '#A78BFA' : h.holidayType === 'Company' ? '#60A5FA' : '#94A3B8', fontWeight: 700 }}>
+                            {h.holidayType === 'National' ? 'Libur Nasional' : h.holidayType === 'Religious' ? 'Hari Besar Agama' : h.holidayType === 'Company' ? 'Cuti Perusahaan' : 'Opsional'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: h.isRecurringYearly ? '#34D399' : '#94A3B8' }}>
+                            {h.isRecurringYearly ? '? Ya' : '? Tidak'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: h.isActive ? '#34D399' : '#6B7280' }} />
+                          <span style={{ marginLeft: 6, fontSize: 12, color: h.isActive ? '#34D399' : '#6B7280' }}>{h.isActive ? 'Aktif' : 'Non-aktif'}</span>
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          {isAdmin && (
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button onClick={() => openEditModal(h)} style={{ padding: 6, borderRadius: 8, background: 'rgba(99,102,241,0.1)', border: 'none', cursor: 'pointer', color: '#818CF8' }}>
+                                <Edit2 size={14} />
+                              </button>
+                              <button onClick={() => handleDeleteHoliday(h.id, h.name)} style={{ padding: 6, borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: 'none', cursor: 'pointer', color: '#F87171' }}>
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
           <div 
@@ -731,7 +868,7 @@ export default function MasterDataPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                  Nama Label *
+                  {activeTab === 'holidays' ? 'Nama Hari Libur *' : 'Nama Label *'}
                 </label>
                 <input
                   type="text"
@@ -787,7 +924,7 @@ export default function MasterDataPage() {
                   </div>
                 </div>
 
-                {activeTab !== 'categories' && (
+                {activeTab !== 'categories' && activeTab !== 'holidays' && (
                   <div>
                     <label className="block text-xs font-semibold uppercase mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
                       <Hash className="w-3.5 h-3.5" /> Urutan (Index)
@@ -817,6 +954,58 @@ export default function MasterDataPage() {
                 />
               </div>
 
+
+              {activeTab === 'holidays' && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>Tanggal *</label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.date || ''}
+                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                        style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>Jenis Hari Libur</label>
+                      <select
+                        value={formData.holidayType || 'National'}
+                        onChange={(e) => setFormData({ ...formData, holidayType: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                        style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                      >
+                        <option value="National">Libur Nasional</option>
+                        <option value="Religious">Hari Besar Agama</option>
+                        <option value="Company">Cuti Perusahaan</option>
+                        <option value="Optional">Opsional</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-primary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.isRecurringYearly || false}
+                        onChange={(e) => setFormData({ ...formData, isRecurringYearly: e.target.checked })}
+                        className="w-4 h-4 accent-red-500"
+                      />
+                      Berulang setiap tahun
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-primary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.isActive !== false}
+                        onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                        className="w-4 h-4 accent-red-500"
+                      />
+                      Aktif
+                    </label>
+                  </div>
+                </div>
+              )}
               {activeTab === 'statuses' && (
                 <div className="flex items-center gap-2 pt-1">
                   <input
@@ -832,7 +1021,7 @@ export default function MasterDataPage() {
                 </div>
               )}
 
-              {activeTab !== 'categories' && (
+              {activeTab !== 'categories' && activeTab !== 'holidays' && (
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"

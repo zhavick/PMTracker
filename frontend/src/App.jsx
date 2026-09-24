@@ -20,6 +20,7 @@ import EmailSettingsPage from './pages/EmailSettingsPage';
 import SyncPage from './pages/SyncPage';
 import ProfilePage from './pages/ProfilePage';
 import UserGuidePage from './pages/UserGuidePage';
+import GamificationPage from './pages/GamificationPage';
 import { TimerProvider } from './context/TimerContext';
 
 // Protected Route Guard
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="sync" element={<SyncPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="user-guide" element={<UserGuidePage />} />
+          <Route path="gamification" element={<GamificationPage />} />
         </Route>
 
         {/* Catch-all */}

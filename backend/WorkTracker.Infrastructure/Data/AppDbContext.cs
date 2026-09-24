@@ -29,6 +29,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<ImportLog> ImportLogs => Set<ImportLog>();
     public DbSet<SqlHistory> SqlHistories => Set<SqlHistory>();
     public DbSet<JsonHistory> JsonHistories => Set<JsonHistory>();
+    public DbSet<MasterHoliday> MasterHolidays => Set<MasterHoliday>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -54,6 +55,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         builder.Entity<ImportLog>().ToTable("ImportLogs");
         builder.Entity<SqlHistory>().ToTable("SqlHistories");
         builder.Entity<JsonHistory>().ToTable("JsonHistories");
+        builder.Entity<MasterHoliday>().ToTable("MasterHolidays");
 
         // Relationships & Foreign Key Rules as per TSD Section 3.3
         builder.Entity<WorkTask>()
@@ -156,5 +158,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         builder.Entity<WorkSession>().HasIndex(s => s.UserId);
         builder.Entity<AttendanceRecord>().HasIndex(a => new { a.UserId, a.Date });
         builder.Entity<AuditLog>().HasIndex(a => a.Timestamp);
+        builder.Entity<MasterHoliday>().HasIndex(h => h.Date);
+        builder.Entity<MasterHoliday>().HasIndex(h => h.IsActive);
     }
 }

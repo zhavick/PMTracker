@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, CheckSquare, Briefcase, Clock, Calendar, 
   FileText, Database, Code, Users, Settings, ShieldAlert, 
-  Mail, RefreshCw, ChevronLeft, ChevronRight, ExternalLink, HelpCircle
+  Mail, RefreshCw, ChevronLeft, ChevronRight, ExternalLink, HelpCircle, Trophy
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -23,6 +23,7 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }) {
         { path: '/attendance', label: 'Presensi Kehadiran', icon: Calendar },
         { path: '/calendar', label: 'Kalender Kerja', icon: Calendar },
         { path: '/notes', label: 'Catatan & Dokumen', icon: FileText },
+        { path: '/gamification', label: 'Gamification & Badge', icon: Trophy },
       ]
     },
     {

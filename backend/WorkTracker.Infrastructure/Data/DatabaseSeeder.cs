@@ -27,7 +27,7 @@ public static class DatabaseSeeder
         }
 
         // 2. Ensure Roles
-        string[] roles = ["Admin", "User", "System Analyst", "Technical Writer"];
+        string[] roles = ["Admin", "PM", "Project Manager", "User", "System Analyst", "Technical Writer"];
         foreach (var roleName in roles)
         {
             if (!await roleManager.RoleExistsAsync(roleName))
@@ -117,9 +117,54 @@ public static class DatabaseSeeder
         if (!await context.MasterBadges.AnyAsync())
         {
             context.MasterBadges.AddRange(
-                new MasterBadge { Code = "TASK_FIRST", Name = "Langkah Pertama 🐾", Description = "Selesaikan tugas pertamamu di sistem", Points = 50, Rarity = BadgeRarity.Common, TriggerType = BadgeTriggerType.Auto_DoneTasks, TriggerThreshold = 1, Icon = "Award", Color = "#10B981" },
-                new MasterBadge { Code = "TASK_TEN", Name = "Pekerja Keras ⚡", Description = "Selesaikan 10 tugas kerja", Points = 100, Rarity = BadgeRarity.Rare, TriggerType = BadgeTriggerType.Auto_DoneTasks, TriggerThreshold = 10, Icon = "Zap", Color = "#3B82F6" },
-                new MasterBadge { Code = "HOURS_FORTY", Name = "Dedikasi Penuh ⏱️", Description = "Catat 40 jam kerja di timesheet", Points = 150, Rarity = BadgeRarity.Epic, TriggerType = BadgeTriggerType.Auto_WorkHours, TriggerThreshold = 40, Icon = "Clock", Color = "#8B5CF6" }
+                // Common Badges
+                new MasterBadge { Code = "TASK_FIRST",   Name = "Langkah Pertama 🐾",    Description = "Selesaikan tugas pertamamu di sistem",      Points = 50,  Rarity = BadgeRarity.Common,    TriggerType = BadgeTriggerType.Auto_DoneTasks,    TriggerThreshold = 1,   Icon = "Award",    Color = "#10B981", OrderIndex = 1 },
+                new MasterBadge { Code = "TASK_FIVE",    Name = "Mulai Produktif 🌱",     Description = "Selesaikan 5 tugas kerja",                  Points = 75,  Rarity = BadgeRarity.Common,    TriggerType = BadgeTriggerType.Auto_DoneTasks,    TriggerThreshold = 5,   Icon = "Target",   Color = "#22C55E", OrderIndex = 2 },
+                new MasterBadge { Code = "NOTE_FIRST",   Name = "Pencatat Aktif 📝",      Description = "Buat catatan pertama di sistem",            Points = 30,  Rarity = BadgeRarity.Common,    TriggerType = BadgeTriggerType.Auto_NotesCreated, TriggerThreshold = 1,   Icon = "BookOpen", Color = "#64748B", OrderIndex = 3 },
+
+                // Rare Badges
+                new MasterBadge { Code = "TASK_TEN",    Name = "Pekerja Keras ⚡",        Description = "Selesaikan 10 tugas kerja",                 Points = 100, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_DoneTasks,    TriggerThreshold = 10,  Icon = "Zap",      Color = "#3B82F6", OrderIndex = 4 },
+                new MasterBadge { Code = "TASK_25",     Name = "Tim Andalan 🔥",          Description = "Selesaikan 25 tugas — konsisten & andal",   Points = 150, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_DoneTasks,    TriggerThreshold = 25,  Icon = "Flame",    Color = "#F59E0B", OrderIndex = 5 },
+                new MasterBadge { Code = "HOURS_FORTY", Name = "Dedikasi Penuh ⏱️",      Description = "Catat 40 jam kerja di timesheet",           Points = 150, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_WorkHours,    TriggerThreshold = 40,  Icon = "Clock",    Color = "#8B5CF6", OrderIndex = 6 },
+                new MasterBadge { Code = "NOTE_TEN",    Name = "Dokumentator 📚",         Description = "Buat 10 catatan/dokumen penting",           Points = 100, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_NotesCreated, TriggerThreshold = 10,  Icon = "BookOpen", Color = "#06B6D4", OrderIndex = 7 },
+                new MasterBadge { Code = "OVERTIME_5",  Name = "Pejuang Lembur 🌙",      Description = "Catat 5 sesi kerja melebihi 8 jam/hari",    Points = 120, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_OvertimeHours,TriggerThreshold = 5,   Icon = "Moon",     Color = "#7C3AED", OrderIndex = 8 },
+
+                // Epic Badges
+                new MasterBadge { Code = "TASK_50",     Name = "Mesin Produktif 💎",      Description = "Selesaikan 50 tugas kerja",                 Points = 250, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_DoneTasks,    TriggerThreshold = 50,  Icon = "Shield",   Color = "#6366F1", OrderIndex = 9 },
+                new MasterBadge { Code = "HOURS_200",   Name = "Waktu Emas ⏰",           Description = "Catat 200 jam kerja total di timesheet",    Points = 300, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_WorkHours,    TriggerThreshold = 200, Icon = "Clock",    Color = "#EC4899", OrderIndex = 10 },
+                new MasterBadge { Code = "OVERTIME_20", Name = "Night Rider 🦇",          Description = "Lembur 20 kali atau lebih",                 Points = 200, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_OvertimeHours,TriggerThreshold = 20,  Icon = "Moon",     Color = "#4F46E5", OrderIndex = 11 },
+                new MasterBadge { Code = "MONTHLY_TOP", Name = "Juara Bulanan 🏆",        Description = "Menjadi penyelsai tugas terbanyak bulan ini",Points = 350, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_MonthlyTopTasks, TriggerThreshold = 0, Icon = "Trophy",   Color = "#F59E0B", OrderIndex = 12 },
+
+                // Legendary Badges
+                new MasterBadge { Code = "TASK_100",    Name = "Legenda Pekerjaan 🌟",    Description = "Selesaikan 100 tugas — pencapaian luar biasa!", Points = 500, Rarity = BadgeRarity.Legendary, TriggerType = BadgeTriggerType.Auto_TasksAbove100, TriggerThreshold = 100, Icon = "Star", Color = "#FBBF24", OrderIndex = 13 },
+                new MasterBadge { Code = "HOURS_500",   Name = "Pahlawan Waktu ⚔️",      Description = "Catat 500 jam kerja total — dedikasi sejati!", Points = 750, Rarity = BadgeRarity.Legendary, TriggerType = BadgeTriggerType.Auto_WorkHours,    TriggerThreshold = 500, Icon = "Crown",   Color = "#F97316", OrderIndex = 14 },
+                new MasterBadge { Code = "EARLY_BIRD",  Name = "Sang Fajar 🌅",           Description = "Check-in sebelum 07:30 selama 10 hari berturut", Points = 400, Rarity = BadgeRarity.Legendary, TriggerType = BadgeTriggerType.Auto_EarlyBird, TriggerThreshold = 10,  Icon = "Coffee",  Color = "#EAB308", OrderIndex = 15 }
+            );
+            await context.SaveChangesAsync();
+        }
+
+        // 8b. Ensure National Holidays (Indonesia 2026)
+        if (!await context.MasterHolidays.AnyAsync())
+        {
+            context.MasterHolidays.AddRange(
+                new MasterHoliday { Name = "Tahun Baru 2026",           Date = new DateOnly(2026, 1,  1),  HolidayType = "National",  Color = "#EF4444", IsRecurringYearly = true,  Description = "Libur resmi Tahun Baru Masehi" },
+                new MasterHoliday { Name = "Isra Mi'raj Nabi Muhammad", Date = new DateOnly(2026, 1,  27), HolidayType = "Religious", Color = "#8B5CF6", IsRecurringYearly = false, Description = "Peringatan Isra Mi'raj Nabi Muhammad SAW" },
+                new MasterHoliday { Name = "Hari Raya Nyepi",           Date = new DateOnly(2026, 3,  19), HolidayType = "Religious", Color = "#F59E0B", IsRecurringYearly = false, Description = "Tahun Baru Saka (Nyepi)" },
+                new MasterHoliday { Name = "Idul Fitri Hari 1",         Date = new DateOnly(2026, 3,  20), HolidayType = "Religious", Color = "#10B981", IsRecurringYearly = false, Description = "Lebaran — Hari Raya Idul Fitri 1447 H" },
+                new MasterHoliday { Name = "Idul Fitri Hari 2",         Date = new DateOnly(2026, 3,  21), HolidayType = "Religious", Color = "#10B981", IsRecurringYearly = false, Description = "Lebaran — Hari Raya Idul Fitri 1447 H (hari 2)" },
+                new MasterHoliday { Name = "Cuti Bersama Idul Fitri",   Date = new DateOnly(2026, 3,  18), HolidayType = "Company",   Color = "#3B82F6", IsRecurringYearly = false, Description = "Cuti bersama Lebaran" },
+                new MasterHoliday { Name = "Cuti Bersama Idul Fitri",   Date = new DateOnly(2026, 3,  23), HolidayType = "Company",   Color = "#3B82F6", IsRecurringYearly = false, Description = "Cuti bersama Lebaran" },
+                new MasterHoliday { Name = "Jumat Agung (Good Friday)", Date = new DateOnly(2026, 4,  3),  HolidayType = "Religious", Color = "#DC2626", IsRecurringYearly = false, Description = "Wafat Yesus Kristus" },
+                new MasterHoliday { Name = "Hari Buruh Internasional",  Date = new DateOnly(2026, 5,  1),  HolidayType = "National",  Color = "#EF4444", IsRecurringYearly = true,  Description = "May Day — International Workers Day" },
+                new MasterHoliday { Name = "Kenaikan Yesus Kristus",    Date = new DateOnly(2026, 5,  14), HolidayType = "Religious", Color = "#7C3AED", IsRecurringYearly = false, Description = "Kenaikan Isa Al-Masih" },
+                new MasterHoliday { Name = "Hari Raya Waisak",          Date = new DateOnly(2026, 5,  31), HolidayType = "Religious", Color = "#F59E0B", IsRecurringYearly = false, Description = "Hari Raya Waisak 2570 BE" },
+                new MasterHoliday { Name = "Hari Lahir Pancasila",      Date = new DateOnly(2026, 6,  1),  HolidayType = "National",  Color = "#EF4444", IsRecurringYearly = true,  Description = "Hari Lahir Pancasila" },
+                new MasterHoliday { Name = "Idul Adha",                 Date = new DateOnly(2026, 5,  27), HolidayType = "Religious", Color = "#10B981", IsRecurringYearly = false, Description = "Hari Raya Idul Adha 1447 H" },
+                new MasterHoliday { Name = "Tahun Baru Islam (1 Muharram)", Date = new DateOnly(2026, 6, 16), HolidayType = "Religious", Color = "#8B5CF6", IsRecurringYearly = false, Description = "Tahun Baru Hijriyah 1448 H" },
+                new MasterHoliday { Name = "Hari Kemerdekaan Indonesia",  Date = new DateOnly(2026, 8,  17), HolidayType = "National",  Color = "#EF4444", IsRecurringYearly = true,  Description = "HUT Kemerdekaan Republik Indonesia ke-81" },
+                new MasterHoliday { Name = "Maulid Nabi Muhammad SAW",   Date = new DateOnly(2026, 9,  4),  HolidayType = "Religious", Color = "#8B5CF6", IsRecurringYearly = false, Description = "Peringatan Kelahiran Nabi Muhammad SAW" },
+                new MasterHoliday { Name = "Hari Natal",                 Date = new DateOnly(2026, 12, 25), HolidayType = "Religious", Color = "#EF4444", IsRecurringYearly = true,  Description = "Natal — Hari Raya Kristen" },
+                new MasterHoliday { Name = "Cuti Bersama Natal",         Date = new DateOnly(2026, 12, 26), HolidayType = "Company",   Color = "#3B82F6", IsRecurringYearly = false, Description = "Cuti bersama Natal" }
             );
             await context.SaveChangesAsync();
         }

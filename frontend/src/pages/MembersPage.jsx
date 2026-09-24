@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, 
   Search, 
@@ -12,7 +12,19 @@ import {
   AlertTriangle, 
   X, 
   Save, 
-  UserCheck 
+  UserCheck,
+  Building2,
+  Building,
+  Layers,
+  LayoutGrid,
+  ChevronDown,
+  ChevronUp,
+  Edit3,
+  Lock,
+  Info,
+  Phone,
+  Mail,
+  Briefcase
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
@@ -27,18 +39,39 @@ function getInitials(name) {
 export default function MembersPage() {
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'Admin';
+  const isPM = currentUser?.role === 'PM' || currentUser?.role === 'Project Manager' || currentUser?.role === 'ProjectManager';
+  const canEdit = isAdmin || isPM;
 
   const [members, setMembers] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [availableRoles, setAvailableRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterPending, setFilterPending] = useState(false);
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState('ALL');
+  const [viewMode, setViewMode] = useState('grouped'); // 'grouped' | 'grid'
+  const [collapsedCompanies, setCollapsedCompanies] = useState({});
 
-  // Modals
+  // Edit Member Modal
+  const [editModalUser, setEditModalUser] = useState(null);
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    email: '',
+    jobTitle: '',
+    phoneNumber: '',
+    role: 'User',
+    companyId: ''
+  });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState(null);
+
+  // Reset Password Modal
   const [resetModalUser, setResetModalUser] = useState(null);
   const [newPassword, setNewPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState(null);
 
+  // Delete Modal
   const [deleteModalUser, setDeleteModalUser] = useState(null);
   const [confirmName, setConfirmName] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -51,7 +84,8 @@ export default function MembersPage() {
       const res = await axiosClient.get('/api/members', {
         params: {
           search: search.trim() || undefined,
-          pendingOnly: filterPending || undefined
+          pendingOnly: filterPending || undefined,
+          companyId: selectedCompanyFilter !== 'ALL' ? selectedCompanyFilter : undefined
         }
       });
       if (res.data?.data) {
@@ -64,9 +98,57 @@ export default function MembersPage() {
     }
   };
 
+  const fetchCompanies = async () => {
+    try {
+      const res = await axiosClient.get('/api/members/companies');
+      if (res.data?.data) {
+        setCompanies(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load companies:', err);
+    }
+  };
+
+  const fetchRoles = async () => {
+    try {
+      const res = await axiosClient.get('/api/members/roles');
+      if (res.data?.data) {
+        setAvailableRoles(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load roles:', err);
+      setAvailableRoles(['Admin', 'PM', 'Project Manager', 'User', 'System Analyst', 'Technical Writer']);
+    }
+  };
+
   useEffect(() => {
     fetchMembers();
-  }, [search, filterPending]);
+  }, [search, filterPending, selectedCompanyFilter]);
+
+  useEffect(() => {
+    fetchCompanies();
+    fetchRoles();
+  }, []);
+
+  const toggleCompanyCollapse = (companyName) => {
+    setCollapsedCompanies(prev => ({
+      ...prev,
+      [companyName]: !prev[companyName]
+    }));
+  };
+
+  // Group members by company name
+  const groupedMembers = useMemo(() => {
+    const groups = {};
+    members.forEach(member => {
+      const cName = member.companyName || 'Tanpa Perusahaan';
+      if (!groups[cName]) {
+        groups[cName] = [];
+      }
+      groups[cName].push(member);
+    });
+    return groups;
+  }, [members]);
 
   const handleApproval = async (memberId, isApproved) => {
     try {
@@ -75,6 +157,55 @@ export default function MembersPage() {
     } catch (err) {
       console.error('Approval update failed:', err);
       alert('Gagal memperbarui status approval.');
+    }
+  };
+
+  const handleOpenEdit = (member) => {
+    setEditModalUser(member);
+    setEditForm({
+      fullName: member.fullName || '',
+      email: member.email || '',
+      jobTitle: member.jobTitle || '',
+      phoneNumber: member.phoneNumber || '',
+      role: member.role || 'User',
+      companyId: member.companyId ? String(member.companyId) : (companies.length > 0 ? String(companies[0].id) : '')
+    });
+    setEditError(null);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editForm.fullName.trim()) {
+      setEditError('Nama lengkap pengguna wajib diisi.');
+      return;
+    }
+
+    setEditLoading(true);
+    setEditError(null);
+    try {
+      const payload = {
+        fullName: editForm.fullName.trim(),
+        role: editForm.role
+      };
+
+      if (isAdmin) {
+        payload.email = editForm.email.trim();
+        payload.jobTitle = editForm.jobTitle.trim();
+        payload.phoneNumber = editForm.phoneNumber.trim();
+        if (editForm.companyId) {
+          payload.companyId = parseInt(editForm.companyId, 10);
+        }
+      }
+
+      await axiosClient.put(`/api/members/${editModalUser.id}`, payload);
+      alert('Informasi pengguna berhasil diperbarui.');
+      setEditModalUser(null);
+      fetchMembers();
+    } catch (err) {
+      console.error('Failed to update member:', err);
+      setEditError(err.response?.data?.message || 'Gagal memperbarui informasi member.');
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -125,21 +256,201 @@ export default function MembersPage() {
     }
   };
 
+  const renderMemberCard = (member) => {
+    return (
+      <div
+        key={member.id}
+        className="rounded-3xl border shadow-sm hover:shadow-lg transition-all flex flex-col justify-between overflow-hidden relative"
+        style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+      >
+        {/* Cover Banner Mock / Color */}
+        <div 
+          className="h-16 w-full relative bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20"
+          style={{ 
+            backgroundImage: member.coverPictureUrl ? `url(${member.coverPictureUrl})` : undefined,
+            backgroundSize: 'cover'
+          }}
+        />
+
+        <div className="p-5 pt-0 flex-1 flex flex-col justify-between space-y-4">
+          {/* Avatar and Header */}
+          <div className="flex items-start justify-between -mt-8">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 border-4 shadow-md flex items-center justify-center text-white font-black text-lg flex-shrink-0" style={{ borderColor: 'var(--card-bg)' }}>
+              {getInitials(member.fullName)}
+            </div>
+
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-8 ${
+              member.isApproved 
+                ? 'bg-emerald-500/10 text-emerald-600' 
+                : 'bg-amber-500/10 text-amber-600 animate-pulse'
+            }`}>
+              {member.isApproved ? 'Approved' : 'Menunggu Approval'}
+            </span>
+          </div>
+
+          {/* User Info (Protected from Overflow) */}
+          <div className="space-y-1">
+            <h3 className="font-bold text-base line-clamp-1" style={{ color: 'var(--text-primary)' }} title={member.fullName}>
+              {member.fullName}
+            </h3>
+            <div className="text-xs text-indigo-500 font-semibold line-clamp-1">
+              {member.jobTitle}
+            </div>
+            <div className="text-xs line-clamp-1" style={{ color: 'var(--text-secondary)' }} title={member.email}>
+              {member.email}
+            </div>
+            {member.companyName && (
+              <div className="text-[11px] font-medium text-slate-400 flex items-center gap-1 line-clamp-1">
+                <Building className="w-3 h-3 text-slate-400" />
+                <span>{member.companyName}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Role Badge */}
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-black/5 dark:bg-white/5" style={{ color: 'var(--text-primary)' }}>
+              <Shield className="w-3 h-3 text-indigo-500" />
+              <span>{member.role}</span>
+            </span>
+
+            {member.phoneNumber && (
+              <span className="text-[11px] text-gray-400 flex items-center gap-1" title={member.phoneNumber}>
+                <Phone className="w-3 h-3" />
+                <span>{member.phoneNumber}</span>
+              </span>
+            )}
+          </div>
+
+          {/* Metrics */}
+          <div className="grid grid-cols-2 gap-2 py-2 border-y text-center text-xs" style={{ borderColor: 'var(--border-color)' }}>
+            <div>
+              <div className="text-gray-400">Tugas Ditugaskan</div>
+              <div className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{member.totalTasksAssigned}</div>
+            </div>
+            <div>
+              <div className="text-gray-400">Total Jam Kerja</div>
+              <div className="font-bold text-sm text-indigo-600">{member.totalHoursLogged} Jam</div>
+            </div>
+          </div>
+
+          {/* Actions for Admin / PM */}
+          <div className="pt-1">
+            {!member.isApproved && isAdmin ? (
+              <div className="flex items-center space-x-2 w-full">
+                <button
+                  onClick={() => handleApproval(member.id, true)}
+                  className="flex-1 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all"
+                >
+                  Setujui
+                </button>
+                <button
+                  onClick={() => handleApproval(member.id, false)}
+                  className="px-3 py-1.5 rounded-xl border border-rose-500/30 text-rose-500 text-xs font-semibold hover:bg-rose-500/10"
+                >
+                  Tolak
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center space-x-2">
+                  {canEdit && (
+                    <button
+                      onClick={() => handleOpenEdit(member)}
+                      className="flex items-center space-x-1 text-xs text-indigo-600 hover:underline font-semibold"
+                      title={isAdmin ? "Ubah Profil Member (Admin)" : "Ubah Nama & Role (PM)"}
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Edit Profil</span>
+                    </button>
+                  )}
+
+                  {canEdit && (
+                    <button
+                      onClick={() => setResetModalUser(member)}
+                      className="flex items-center space-x-1 text-xs text-amber-600 hover:underline font-semibold"
+                      title="Reset Kata Sandi"
+                    >
+                      <Key className="w-3.5 h-3.5" />
+                      <span>Reset PW</span>
+                    </button>
+                  )}
+                </div>
+
+                {isAdmin && member.id !== currentUser?.id && (
+                  <button
+                    onClick={() => setDeleteModalUser(member)}
+                    className="p-1 rounded text-rose-500 hover:bg-rose-500/10 transition-colors"
+                    title="Hapus Permanen Akun"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
-            Direktori Anggota Tim & Approval
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              Direktori Anggota Tim & Manajemen Pengguna
+            </h1>
+            {isAdmin && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                Mode Administrator
+              </span>
+            )}
+            {!isAdmin && isPM && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                Mode Project Manager
+              </span>
+            )}
+          </div>
           <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Tata letak Pure Grid Card, approval pengguna baru, dan kontrol hak akses tim (FSD 5.11).
+            Dikelompokkan berdasarkan nama perusahaan. Admin mengelola profil lengkap; Project Manager mengelola nama, peran, dan reset password.
           </p>
         </div>
 
-        {isAdmin && (
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* View Mode Switcher */}
+          <div 
+            className="flex items-center p-1 rounded-xl border bg-slate-500/5"
+            style={{ borderColor: 'var(--border-color)' }}
+          >
+            <button
+              onClick={() => setViewMode('grouped')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'grouped'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Grup Perusahaan</span>
+            </button>
+
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'grid'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Grid Bebas</span>
+            </button>
+          </div>
+
+          {isAdmin && (
             <button
               onClick={() => setFilterPending(!filterPending)}
               className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all ${
@@ -150,9 +461,60 @@ export default function MembersPage() {
               <UserCheck className="w-4 h-4" />
               <span>Menunggu Approval</span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {/* Filter Pills for Companies */}
+      {companies.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            onClick={() => setSelectedCompanyFilter('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              selectedCompanyFilter === 'ALL'
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                : 'hover:bg-black/5 dark:hover:bg-white/5'
+            }`}
+            style={{ 
+              borderColor: selectedCompanyFilter === 'ALL' ? undefined : 'var(--border-color)',
+              color: selectedCompanyFilter === 'ALL' ? '#fff' : 'var(--text-secondary)' 
+            }}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Semua Perusahaan</span>
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 dark:bg-white/10">
+              {members.length}
+            </span>
+          </button>
+
+          {companies.map(c => {
+            const isSelected = selectedCompanyFilter === String(c.id);
+            return (
+              <button
+                key={c.id}
+                onClick={() => setSelectedCompanyFilter(String(c.id))}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                    : 'hover:bg-black/5 dark:hover:bg-white/5'
+                }`}
+                style={{ 
+                  borderColor: isSelected ? undefined : 'var(--border-color)',
+                  color: isSelected ? '#fff' : 'var(--text-secondary)' 
+                }}
+              >
+                <Building className="w-3.5 h-3.5 text-indigo-400" />
+                <span>{c.name}</span>
+                {c.memberCount !== undefined && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-500/20 text-indigo-300">
+                    {c.memberCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Search Bar */}
       <div 
@@ -163,7 +525,7 @@ export default function MembersPage() {
           <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
           <input
             type="text"
-            placeholder="Cari nama, email, atau jabatan..."
+            placeholder="Cari nama, email, jabatan, atau perusahaan..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 rounded-xl border text-sm"
@@ -172,7 +534,7 @@ export default function MembersPage() {
         </div>
       </div>
 
-      {/* Pure Grid Card Directory (grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4) */}
+      {/* Main Content: Grouped by Company or Free Grid */}
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center space-y-3">
           <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
@@ -182,120 +544,300 @@ export default function MembersPage() {
         <div className="py-16 text-center text-sm text-gray-400">
           Tidak ada anggota tim yang ditemukan.
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {members.map((member) => (
-            <div
-              key={member.id}
-              className="rounded-3xl border shadow-sm hover:shadow-lg transition-all flex flex-col justify-between overflow-hidden relative"
-              style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
-            >
-              {/* Cover Banner Mock / Color */}
+      ) : viewMode === 'grouped' ? (
+        <div className="space-y-6">
+          {Object.entries(groupedMembers).map(([companyName, companyMembers]) => {
+            const isCollapsed = collapsedCompanies[companyName];
+            const approvedCount = companyMembers.filter(m => m.isApproved).length;
+            const pendingCount = companyMembers.filter(m => !m.isApproved).length;
+
+            return (
               <div 
-                className="h-16 w-full relative bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20"
-                style={{ 
-                  backgroundImage: member.coverPictureUrl ? `url(${member.coverPictureUrl})` : undefined,
-                  backgroundSize: 'cover'
-                }}
-              />
-
-              <div className="p-5 pt-0 flex-1 flex flex-col justify-between space-y-4">
-                {/* Avatar and Header */}
-                <div className="flex items-start justify-between -mt-8">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 border-4 shadow-md flex items-center justify-center text-white font-black text-lg flex-shrink-0" style={{ borderColor: 'var(--card-bg)' }}>
-                    {getInitials(member.fullName)}
-                  </div>
-
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-8 ${
-                    member.isApproved 
-                      ? 'bg-emerald-500/10 text-emerald-600' 
-                      : 'bg-amber-500/10 text-amber-600 animate-pulse'
-                  }`}>
-                    {member.isApproved ? 'Approved' : 'Menunggu Approval'}
-                  </span>
-                </div>
-
-                {/* User Info (Protected from Overflow) */}
-                <div className="space-y-1">
-                  <h3 className="font-bold text-base line-clamp-1" style={{ color: 'var(--text-primary)' }} title={member.fullName}>
-                    {member.fullName}
-                  </h3>
-                  <div className="text-xs text-indigo-500 font-semibold line-clamp-1">
-                    {member.jobTitle}
-                  </div>
-                  <div className="text-xs line-clamp-1" style={{ color: 'var(--text-secondary)' }} title={member.email}>
-                    {member.email}
-                  </div>
-                </div>
-
-                {/* Role Badge */}
-                <div>
-                  <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-black/5 dark:bg-white/5" style={{ color: 'var(--text-primary)' }}>
-                    <Shield className="w-3 h-3 text-indigo-500" />
-                    <span>{member.role}</span>
-                  </span>
-                </div>
-
-                {/* Metrics */}
-                <div className="grid grid-cols-2 gap-2 py-2 border-y text-center text-xs" style={{ borderColor: 'var(--border-color)' }}>
-                  <div>
-                    <div className="text-gray-400">Tugas Ditugaskan</div>
-                    <div className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{member.totalTasksAssigned}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-400">Total Jam Kerja</div>
-                    <div className="font-bold text-sm text-indigo-600">{member.totalHoursLogged} Jam</div>
-                  </div>
-                </div>
-
-                {/* Actions for Admin */}
-                {isAdmin && (
-                  <div className="flex items-center justify-between pt-1">
-                    {!member.isApproved ? (
-                      <div className="flex items-center space-x-2 w-full">
-                        <button
-                          onClick={() => handleApproval(member.id, true)}
-                          className="flex-1 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all"
-                        >
-                          Setujui
-                        </button>
-                        <button
-                          onClick={() => handleApproval(member.id, false)}
-                          className="px-3 py-1.5 rounded-xl border border-rose-500/30 text-rose-500 text-xs font-semibold hover:bg-rose-500/10"
-                        >
-                          Tolak
-                        </button>
+                key={companyName}
+                className="rounded-3xl border shadow-sm overflow-hidden transition-all"
+                style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+              >
+                {/* Company Group Accordion Header */}
+                <div 
+                  onClick={() => toggleCompanyCollapse(companyName)}
+                  className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b"
+                  style={{ borderColor: 'var(--border-color)' }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                          {companyName}
+                        </h2>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-between w-full">
-                        <button
-                          onClick={() => setResetModalUser(member)}
-                          className="flex items-center space-x-1 text-xs text-indigo-600 hover:underline font-semibold"
-                        >
-                          <Key className="w-3.5 h-3.5" />
-                          <span>Reset Password</span>
-                        </button>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                        Organisasi terafiliasi dengan {companyMembers.length} anggota terdaftar
+                      </p>
+                    </div>
+                  </div>
 
-                        {member.id !== currentUser.id && (
-                          <button
-                            onClick={() => setDeleteModalUser(member)}
-                            className="p-1 rounded text-rose-500 hover:bg-rose-500/10 transition-colors"
-                            title="Hapus Permanen Akun"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    )}
+                  {/* Summary Badges & Toggle */}
+                  <div className="flex items-center gap-3 self-end sm:self-auto">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                        {companyMembers.length} Anggota
+                      </span>
+                      <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                        {approvedCount} Aktif
+                      </span>
+                      {pendingCount > 0 && (
+                        <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+                          {pendingCount} Menunggu Approval
+                        </span>
+                      )}
+                    </div>
+
+                    <button 
+                      type="button"
+                      className="p-2 rounded-xl border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400"
+                      style={{ borderColor: 'var(--border-color)' }}
+                    >
+                      {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Company Members Grid */}
+                {!isCollapsed && (
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                      {companyMembers.map(member => renderMemberCard(member))}
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
+        </div>
+      ) : (
+        /* Flat Grid View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {members.map(member => renderMemberCard(member))}
         </div>
       )}
 
-      {/* Admin Reset Password Modal */}
+      {/* Edit Member Profile Modal (Admin full access, PM role & nama only) */}
+      {editModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div 
+            className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden p-6 space-y-4"
+            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Edit3 className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                  Ubah Informasi Member
+                </h3>
+              </div>
+              <button onClick={() => setEditModalUser(null)}>
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            {/* Role Notice Banner */}
+            <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
+              isAdmin 
+                ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-300' 
+                : 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-300'
+            }`}>
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <strong>{isAdmin ? 'Mode Administrator' : 'Mode Project Manager'}</strong>: {
+                    isAdmin 
+                      ? 'Anda memiliki hak akses penuh untuk mengubah nama, email, jabatan, nomor telepon, peran, dan perusahaan member.' 
+                      : 'Sesuai kebijakan keamanan, Project Manager hanya memiliki hak untuk mengubah Nama dan Peran (Role), serta mereset kata sandi.'
+                  }
+                </div>
+              </div>
+            </div>
+
+            {editError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 text-rose-600 text-xs">
+                {editError}
+              </div>
+            )}
+
+            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+              {/* Nama Lengkap (Editable by Admin & PM) */}
+              <div>
+                <label className="block font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
+                  Nama Lengkap *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.fullName}
+                  onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                  placeholder="Nama lengkap member..."
+                  className="w-full px-3 py-2 rounded-xl border text-sm"
+                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              {/* Peran / Role (Editable by Admin & PM) */}
+              <div>
+                <label className="block font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
+                  Peran Akun (Role) *
+                </label>
+                <select
+                  value={editForm.role}
+                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border text-sm"
+                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                >
+                  {availableRoles
+                    .filter(r => isAdmin || r !== 'Admin') // PM cannot select Admin
+                    .map(roleName => (
+                      <option key={roleName} value={roleName}>
+                        {roleName}
+                      </option>
+                    ))}
+                </select>
+                {!isAdmin && (
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    * Sebagai PM, Anda tidak dapat memberikan peran Administrator.
+                  </p>
+                )}
+              </div>
+
+              {/* Email (Admin Only) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                    Alamat Email
+                  </label>
+                  {!isAdmin && (
+                    <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Terkunci (Khusus Admin)
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="email"
+                  disabled={!isAdmin}
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-xl border text-sm ${!isAdmin ? 'opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5' : ''}`}
+                  style={{ backgroundColor: isAdmin ? 'var(--input-bg)' : undefined, borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              {/* Jabatan (Admin Only) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                    Jabatan (Job Title)
+                  </label>
+                  {!isAdmin && (
+                    <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Terkunci (Khusus Admin)
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  disabled={!isAdmin}
+                  value={editForm.jobTitle}
+                  onChange={(e) => setEditForm({ ...editForm, jobTitle: e.target.value })}
+                  placeholder="Misal: Senior Backend Developer..."
+                  className={`w-full px-3 py-2 rounded-xl border text-sm ${!isAdmin ? 'opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5' : ''}`}
+                  style={{ backgroundColor: isAdmin ? 'var(--input-bg)' : undefined, borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              {/* Nomor Telepon (Admin Only) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                    Nomor Telepon
+                  </label>
+                  {!isAdmin && (
+                    <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Terkunci (Khusus Admin)
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="tel"
+                  disabled={!isAdmin}
+                  value={editForm.phoneNumber}
+                  onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
+                  placeholder="Misal: 081234567890..."
+                  className={`w-full px-3 py-2 rounded-xl border text-sm ${!isAdmin ? 'opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5' : ''}`}
+                  style={{ backgroundColor: isAdmin ? 'var(--input-bg)' : undefined, borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              {/* Perusahaan (Admin Only) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                    Perusahaan / Organisasi
+                  </label>
+                  {!isAdmin && (
+                    <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Terkunci pada Perusahaan Anda
+                    </span>
+                  )}
+                </div>
+                {isAdmin ? (
+                  <select
+                    value={editForm.companyId}
+                    onChange={(e) => setEditForm({ ...editForm, companyId: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border text-sm"
+                    style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  >
+                    {companies.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.code ? `(${c.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    disabled
+                    value={editModalUser.companyName || 'Perusahaan Anda'}
+                    className="w-full px-3 py-2 rounded-xl border text-sm opacity-60 cursor-not-allowed bg-black/5 dark:bg-white/5"
+                    style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditModalUser(null)}
+                  className="px-4 py-2 rounded-xl border font-semibold"
+                  style={{ borderColor: 'var(--border-color)' }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLoading}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{editLoading ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin / PM Reset Password Modal */}
       {resetModalUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div 
@@ -362,8 +904,8 @@ export default function MembersPage() {
         </div>
       )}
 
-      {/* Double Confirmation Permanent Delete Modal (FSD 5.11) */}
-      {deleteModalUser && (
+      {/* Double Confirmation Permanent Delete Modal (Admin Only - FSD 5.11) */}
+      {deleteModalUser && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div 
             className="w-full max-w-lg rounded-2xl border border-rose-500/40 shadow-2xl overflow-hidden p-6 space-y-4"

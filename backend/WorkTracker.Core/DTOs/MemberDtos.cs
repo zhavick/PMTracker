@@ -29,6 +29,16 @@ public class UpdateMemberRoleDto
     public string Role { get; set; } = "User";
 }
 
+public class UpdateMemberProfileDto
+{
+    public string? FullName { get; set; }
+    public string? JobTitle { get; set; }
+    public string? Email { get; set; }
+    public string? PhoneNumber { get; set; }
+    public string? Role { get; set; }
+    public int? CompanyId { get; set; }
+}
+
 public class ApproveUserDto
 {
     public bool IsApproved { get; set; } = true;

@@ -72,3 +72,33 @@ public class MasterMilestone
 
     public bool IsDefault { get; set; } = false;
 }
+
+public class MasterHoliday
+{
+    public int Id { get; set; }
+
+    [Required]
+    [MaxLength(150)]
+    public string Name { get; set; } = string.Empty;
+
+    [Required]
+    public DateOnly Date { get; set; }
+
+    [MaxLength(50)]
+    public string HolidayType { get; set; } = "National"; // National, Company, Religious, Optional
+
+    [MaxLength(7)]
+    public string Color { get; set; } = "#EF4444";
+
+    [MaxLength(50)]
+    public string Icon { get; set; } = "Calendar";
+
+    [MaxLength(255)]
+    public string? Description { get; set; }
+
+    public bool IsRecurringYearly { get; set; } = false;
+
+    public bool IsActive { get; set; } = true;
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
