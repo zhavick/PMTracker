@@ -21,6 +21,7 @@ import SyncPage from './pages/SyncPage';
 import ProfilePage from './pages/ProfilePage';
 import UserGuidePage from './pages/UserGuidePage';
 import GamificationPage from './pages/GamificationPage';
+import TicketingPage from './pages/TicketingPage';
 import { TimerProvider } from './context/TimerContext';
 
 // Protected Route Guard
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="tasks" element={<TasksPage />} />
           <Route path="projects" element={<ProjectsPage />} />
+          <Route path="ticketing" element={<TicketingPage />} />
           <Route path="timesheet" element={<TimesheetPage />} />
 
           <Route path="attendance" element={<AttendancePage />} />

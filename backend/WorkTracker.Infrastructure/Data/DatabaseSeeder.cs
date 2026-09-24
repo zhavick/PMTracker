@@ -113,35 +113,52 @@ public static class DatabaseSeeder
             await context.SaveChangesAsync();
         }
 
-        // 8. Ensure Master Badges
-        if (!await context.MasterBadges.AnyAsync())
+        // 8. Ensure Master Badges (Creative & Gamified)
+        var initialBadges = new List<MasterBadge>
         {
-            context.MasterBadges.AddRange(
-                // Common Badges
-                new MasterBadge { Code = "TASK_FIRST",   Name = "Langkah Pertama 🐾",    Description = "Selesaikan tugas pertamamu di sistem",      Points = 50,  Rarity = BadgeRarity.Common,    TriggerType = BadgeTriggerType.Auto_DoneTasks,    TriggerThreshold = 1,   Icon = "Award",    Color = "#10B981", OrderIndex = 1 },
-                new MasterBadge { Code = "TASK_FIVE",    Name = "Mulai Produktif 🌱",     Description = "Selesaikan 5 tugas kerja",                  Points = 75,  Rarity = BadgeRarity.Common,    TriggerType = BadgeTriggerType.Auto_DoneTasks,    TriggerThreshold = 5,   Icon = "Target",   Color = "#22C55E", OrderIndex = 2 },
-                new MasterBadge { Code = "NOTE_FIRST",   Name = "Pencatat Aktif 📝",      Description = "Buat catatan pertama di sistem",            Points = 30,  Rarity = BadgeRarity.Common,    TriggerType = BadgeTriggerType.Auto_NotesCreated, TriggerThreshold = 1,   Icon = "BookOpen", Color = "#64748B", OrderIndex = 3 },
+            // Common Badges
+            new MasterBadge { Code = "TASK_FIRST",   Name = "Langkah Pertama 🐾",    Description = "Selesaikan tugas pertamamu di sistem",             Points = 50,  Rarity = BadgeRarity.Common,    TriggerType = BadgeTriggerType.Auto_DoneTasks,        TriggerThreshold = 1,   Icon = "Award",       Color = "#10B981", OrderIndex = 1 },
+            new MasterBadge { Code = "TASK_FIVE",    Name = "Mulai Produktif 🌱",     Description = "Selesaikan 5 tugas kerja",                         Points = 75,  Rarity = BadgeRarity.Common,    TriggerType = BadgeTriggerType.Auto_DoneTasks,        TriggerThreshold = 5,   Icon = "Target",      Color = "#22C55E", OrderIndex = 2 },
+            new MasterBadge { Code = "NOTE_FIRST",   Name = "Pencatat Aktif 📝",      Description = "Buat catatan pertama di sistem",                   Points = 30,  Rarity = BadgeRarity.Common,    TriggerType = BadgeTriggerType.Auto_NotesCreated,     TriggerThreshold = 1,   Icon = "BookOpen",    Color = "#64748B", OrderIndex = 3 },
+            new MasterBadge { Code = "ISSUE_SCOUT",  Name = "Mata Elang (Quality Scout) 👁️", Description = "Laporkan issue/kendala pertama untuk perbaikan", Points = 60,  Rarity = BadgeRarity.Common,    TriggerType = BadgeTriggerType.Auto_TicketsReported,  TriggerThreshold = 1,   Icon = "AlertCircle", Color = "#06B6D4", OrderIndex = 4 },
 
-                // Rare Badges
-                new MasterBadge { Code = "TASK_TEN",    Name = "Pekerja Keras ⚡",        Description = "Selesaikan 10 tugas kerja",                 Points = 100, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_DoneTasks,    TriggerThreshold = 10,  Icon = "Zap",      Color = "#3B82F6", OrderIndex = 4 },
-                new MasterBadge { Code = "TASK_25",     Name = "Tim Andalan 🔥",          Description = "Selesaikan 25 tugas — konsisten & andal",   Points = 150, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_DoneTasks,    TriggerThreshold = 25,  Icon = "Flame",    Color = "#F59E0B", OrderIndex = 5 },
-                new MasterBadge { Code = "HOURS_FORTY", Name = "Dedikasi Penuh ⏱️",      Description = "Catat 40 jam kerja di timesheet",           Points = 150, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_WorkHours,    TriggerThreshold = 40,  Icon = "Clock",    Color = "#8B5CF6", OrderIndex = 6 },
-                new MasterBadge { Code = "NOTE_TEN",    Name = "Dokumentator 📚",         Description = "Buat 10 catatan/dokumen penting",           Points = 100, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_NotesCreated, TriggerThreshold = 10,  Icon = "BookOpen", Color = "#06B6D4", OrderIndex = 7 },
-                new MasterBadge { Code = "OVERTIME_5",  Name = "Pejuang Lembur 🌙",      Description = "Catat 5 sesi kerja melebihi 8 jam/hari",    Points = 120, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_OvertimeHours,TriggerThreshold = 5,   Icon = "Moon",     Color = "#7C3AED", OrderIndex = 8 },
+            // Rare Badges
+            new MasterBadge { Code = "TASK_TEN",    Name = "Pekerja Keras ⚡",        Description = "Selesaikan 10 tugas kerja",                        Points = 100, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_DoneTasks,        TriggerThreshold = 10,  Icon = "Zap",         Color = "#3B82F6", OrderIndex = 5 },
+            new MasterBadge { Code = "TASK_25",     Name = "Tim Andalan 🔥",          Description = "Selesaikan 25 tugas — konsisten & andal",          Points = 150, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_DoneTasks,        TriggerThreshold = 25,  Icon = "Flame",       Color = "#F59E0B", OrderIndex = 6 },
+            new MasterBadge { Code = "HOURS_FORTY", Name = "Dedikasi Penuh ⏱️",      Description = "Catat 40 jam kerja di timesheet",                  Points = 150, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_WorkHours,        TriggerThreshold = 40,  Icon = "Clock",       Color = "#8B5CF6", OrderIndex = 7 },
+            new MasterBadge { Code = "NOTE_TEN",    Name = "Dokumentator 📚",         Description = "Buat 10 catatan/dokumen penting",                  Points = 100, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_NotesCreated,     TriggerThreshold = 10,  Icon = "BookOpen",    Color = "#06B6D4", OrderIndex = 8 },
+            new MasterBadge { Code = "OVERTIME_5",  Name = "Pejuang Lembur 🌙",      Description = "Catat 5 sesi kerja lembur melebihi 8 jam",         Points = 120, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_OvertimeHours,    TriggerThreshold = 5,   Icon = "Moon",        Color = "#7C3AED", OrderIndex = 9 },
+            new MasterBadge { Code = "NIGHT_OWL",   Name = "Ksatria Malam 🦉",        Description = "Check-out presensi setelah pukul 20:00 (5 kali)",  Points = 140, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_NightOwl,         TriggerThreshold = 5,   Icon = "Moon",        Color = "#6366F1", OrderIndex = 10 },
+            new MasterBadge { Code = "SPEED_DEMON", Name = "Kilat Produktivitas 🚀",  Description = "Selesaikan tugas dalam kecepatan tinggi (< 2 jam)",Points = 150, Rarity = BadgeRarity.Rare,      TriggerType = BadgeTriggerType.Auto_SpeedDemon,       TriggerThreshold = 3,   Icon = "Rocket",      Color = "#EC4899", OrderIndex = 11 },
+            new MasterBadge { Code = "BUG_SLAYER",  Name = "Pembasmi Eror (Bug Slayer) 🐛", Description = "Selesaikan 3 tiket issue atau kendala teknis", Points = 160, Rarity = BadgeRarity.Rare,    TriggerType = BadgeTriggerType.Auto_TicketsResolved,  TriggerThreshold = 3,   Icon = "Bug",         Color = "#EF4444", OrderIndex = 12 },
 
-                // Epic Badges
-                new MasterBadge { Code = "TASK_50",     Name = "Mesin Produktif 💎",      Description = "Selesaikan 50 tugas kerja",                 Points = 250, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_DoneTasks,    TriggerThreshold = 50,  Icon = "Shield",   Color = "#6366F1", OrderIndex = 9 },
-                new MasterBadge { Code = "HOURS_200",   Name = "Waktu Emas ⏰",           Description = "Catat 200 jam kerja total di timesheet",    Points = 300, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_WorkHours,    TriggerThreshold = 200, Icon = "Clock",    Color = "#EC4899", OrderIndex = 10 },
-                new MasterBadge { Code = "OVERTIME_20", Name = "Night Rider 🦇",          Description = "Lembur 20 kali atau lebih",                 Points = 200, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_OvertimeHours,TriggerThreshold = 20,  Icon = "Moon",     Color = "#4F46E5", OrderIndex = 11 },
-                new MasterBadge { Code = "MONTHLY_TOP", Name = "Juara Bulanan 🏆",        Description = "Menjadi penyelsai tugas terbanyak bulan ini",Points = 350, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_MonthlyTopTasks, TriggerThreshold = 0, Icon = "Trophy",   Color = "#F59E0B", OrderIndex = 12 },
+            // Epic Badges
+            new MasterBadge { Code = "TASK_50",     Name = "Mesin Produktif 💎",      Description = "Selesaikan 50 tugas kerja",                        Points = 250, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_DoneTasks,        TriggerThreshold = 50,  Icon = "Shield",      Color = "#6366F1", OrderIndex = 13 },
+            new MasterBadge { Code = "HOURS_200",   Name = "Waktu Emas ⏰",           Description = "Catat 200 jam kerja total di timesheet",           Points = 300, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_WorkHours,        TriggerThreshold = 200, Icon = "Clock",       Color = "#EC4899", OrderIndex = 14 },
+            new MasterBadge { Code = "OVERTIME_20", Name = "Night Rider 🦇",          Description = "Lembur 20 kali atau lebih dengan dedikasi tinggi", Points = 200, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_OvertimeHours,    TriggerThreshold = 20,  Icon = "Moon",        Color = "#4F46E5", OrderIndex = 15 },
+            new MasterBadge { Code = "MONTHLY_TOP", Name = "Juara Bulanan 🏆",        Description = "Penyelesai tugas terbanyak dalam kurun bulan ini", Points = 350, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_MonthlyTopTasks,  TriggerThreshold = 0,   Icon = "Trophy",      Color = "#F59E0B", OrderIndex = 16 },
+            new MasterBadge { Code = "WEEKEND_WARRIOR", Name = "Pejuang Akhir Pekan 🛡️", Description = "Selesaikan tugas atau jam kerja di akhir pekan",Points = 250, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_WeekendWarrior,    TriggerThreshold = 3,   Icon = "ShieldCheck", Color = "#8B5CF6", OrderIndex = 17 },
+            new MasterBadge { Code = "DOC_GURU",    Name = "Ensiklopedia Tim 📖",      Description = "Tulis 20 catatan teknis / dokumentasi arsitektur", Points = 220, Rarity = BadgeRarity.Epic,      TriggerType = BadgeTriggerType.Auto_NotesCreated,     TriggerThreshold = 20,  Icon = "FileText",    Color = "#14B8A6", OrderIndex = 18 },
+            new MasterBadge { Code = "TICKET_MAESTRO", Name = "Tech Support Maestro 🎧", Description = "Selesaikan 10 tiket issue untuk menjaga stabilitas", Points = 300, Rarity = BadgeRarity.Epic,   TriggerType = BadgeTriggerType.Auto_TicketsResolved,  TriggerThreshold = 10,  Icon = "LifeBuoy",    Color = "#0284C7", OrderIndex = 19 },
+            new MasterBadge { Code = "ATTEND_PERFECT", Name = "Presensi Disiplin Emas 🎖️", Description = "Presensi kerja 20 hari beruntun tanpa absen", Points = 280, Rarity = BadgeRarity.Epic,     TriggerType = BadgeTriggerType.Auto_AttendanceStreak, TriggerThreshold = 20,  Icon = "CheckCircle", Color = "#10B981", OrderIndex = 20 },
 
-                // Legendary Badges
-                new MasterBadge { Code = "TASK_100",    Name = "Legenda Pekerjaan 🌟",    Description = "Selesaikan 100 tugas — pencapaian luar biasa!", Points = 500, Rarity = BadgeRarity.Legendary, TriggerType = BadgeTriggerType.Auto_TasksAbove100, TriggerThreshold = 100, Icon = "Star", Color = "#FBBF24", OrderIndex = 13 },
-                new MasterBadge { Code = "HOURS_500",   Name = "Pahlawan Waktu ⚔️",      Description = "Catat 500 jam kerja total — dedikasi sejati!", Points = 750, Rarity = BadgeRarity.Legendary, TriggerType = BadgeTriggerType.Auto_WorkHours,    TriggerThreshold = 500, Icon = "Crown",   Color = "#F97316", OrderIndex = 14 },
-                new MasterBadge { Code = "EARLY_BIRD",  Name = "Sang Fajar 🌅",           Description = "Check-in sebelum 07:30 selama 10 hari berturut", Points = 400, Rarity = BadgeRarity.Legendary, TriggerType = BadgeTriggerType.Auto_EarlyBird, TriggerThreshold = 10,  Icon = "Coffee",  Color = "#EAB308", OrderIndex = 15 }
-            );
-            await context.SaveChangesAsync();
+            // Legendary Badges
+            new MasterBadge { Code = "TASK_100",    Name = "Legenda Pekerjaan 🌟",    Description = "Selesaikan 100 tugas — milestone spektakuler!",     Points = 500, Rarity = BadgeRarity.Legendary, TriggerType = BadgeTriggerType.Auto_TasksAbove100,    TriggerThreshold = 100, Icon = "Star",        Color = "#FBBF24", OrderIndex = 21 },
+            new MasterBadge { Code = "HOURS_500",   Name = "Pahlawan Waktu ⚔️",      Description = "Catat 500 jam kerja total — dedikasi tak tertandingi!", Points = 750, Rarity = BadgeRarity.Legendary, TriggerType = BadgeTriggerType.Auto_WorkHours,        TriggerThreshold = 500, Icon = "Crown",       Color = "#F97316", OrderIndex = 22 },
+            new MasterBadge { Code = "EARLY_BIRD",  Name = "Sang Fajar 🌅",           Description = "Check-in sebelum 07:30 selama 10 hari berturut-turut", Points = 400, Rarity = BadgeRarity.Legendary, TriggerType = BadgeTriggerType.Auto_EarlyBird,    TriggerThreshold = 10,  Icon = "Coffee",      Color = "#EAB308", OrderIndex = 23 },
+            new MasterBadge { Code = "ZERO_DEFECT", Name = "Master of Excellence 👑", Description = "Selesaikan 10 tugas Critical/High tanpa kendala", Points = 600, Rarity = BadgeRarity.Legendary, TriggerType = BadgeTriggerType.Auto_ZeroDefect,        TriggerThreshold = 10,  Icon = "Award",       Color = "#F43F5E", OrderIndex = 24 },
+            new MasterBadge { Code = "TASK_150",    Name = "Grandmaster Centurion 🔱", Description = "Menembus 150 tugas kerja — pengabdian tertinggi!", Points = 1000, Rarity = BadgeRarity.Legendary, TriggerType = BadgeTriggerType.Auto_TasksAbove100,    TriggerThreshold = 150, Icon = "Sparkles",    Color = "#A855F7", OrderIndex = 25 }
+        };
+
+        foreach (var b in initialBadges)
+        {
+            var exists = await context.MasterBadges.AnyAsync(x => x.Code == b.Code);
+            if (!exists)
+            {
+                context.MasterBadges.Add(b);
+            }
         }
+        await context.SaveChangesAsync();
 
         // 8b. Ensure National Holidays (Indonesia 2026)
         if (!await context.MasterHolidays.AnyAsync())

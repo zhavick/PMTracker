@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, CheckSquare, Briefcase, Clock, Calendar, 
   FileText, Database, Code, Users, Settings, ShieldAlert, 
-  Mail, RefreshCw, ChevronLeft, ChevronRight, ExternalLink, HelpCircle, Trophy
+  Mail, RefreshCw, ChevronLeft, ChevronRight, ExternalLink, HelpCircle, Trophy, LifeBuoy
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -19,6 +19,7 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }) {
         { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/tasks', label: 'Daftar Tugas', icon: CheckSquare },
         { path: '/projects', label: 'Proyek', icon: Briefcase },
+        { path: '/ticketing', label: 'Ticketing & Issue', icon: LifeBuoy },
         { path: '/timesheet', label: 'Timesheet & Timer', icon: Clock },
         { path: '/attendance', label: 'Presensi Kehadiran', icon: Calendar },
         { path: '/calendar', label: 'Kalender Kerja', icon: Calendar },

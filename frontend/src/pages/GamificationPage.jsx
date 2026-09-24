@@ -2,13 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Trophy, Star, Zap, Award, Crown, Flame, Target, Clock,
   TrendingUp, Users, Medal, Shield, BookOpen, Coffee, Moon,
-  RefreshCw, Plus, Edit2, Trash2,
-  X, Save, AlertCircle, CheckCircle, Sparkles, BarChart2
+  RefreshCw, Plus, Edit2, Trash2, Rocket, Bug, LifeBuoy,
+  X, Save, AlertCircle, CheckCircle, Sparkles, BarChart2,
+  Gift, Wallet, DollarSign, CheckCircle2, AlertTriangle,
+  ArrowRight, CreditCard, Utensils, Tag, ShieldCheck, HeartHandshake
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers & Constants ──────────────────────────────────────────────────────
+
+const POINT_TO_RUPIAH = 100; // 1 Poin = Rp 100
 
 const RARITY_META = {
   1: { label: 'Common',    bg: 'rgba(100,116,139,0.15)', border: 'rgba(100,116,139,0.4)', text: '#94A3B8', glow: 'none' },
@@ -21,17 +25,35 @@ const TRIGGER_LABELS = {
   0: 'Manual (Admin)',
   1: 'Task Selesai >= N',
   2: 'Jam Kerja >= N jam',
-  3: 'Kehadiran Beruntun',
-  4: 'Top Task Bulanan',
+  3: 'Kehadiran Beruntun >= N',
+  4: 'Top Task Bulanan (#1)',
   5: 'Task >= 100 Total',
   6: 'Lembur >= N Hari',
-  7: 'Catatan >= N',
-  8: 'Proyek >= N',
-  9: 'Early Bird Streak',
-  10: 'Night Owl >= N Hari',
+  7: 'Catatan/Dokumen >= N',
+  8: 'Proyek Dikelola >= N',
+  9: 'Early Bird Streak (<07:30)',
+  10: 'Night Owl (>20:00) >= N',
+  11: 'Tiket Issue Selesai >= N',
+  12: 'Tiket Dilaporkan >= N',
+  13: 'Kerja Akhir Pekan >= N',
+  14: 'Speed Demon (< 2 Jam) >= N',
+  15: 'Zero Defect (High/Crit) >= N'
 };
 
-const BADGE_ICON_MAP = { Award, Trophy, Star, Zap, Flame, Target, Clock, Shield, BookOpen, Coffee, Moon, Medal, Crown, TrendingUp, Users };
+const REWARD_TYPES = [
+  { value: 1, label: 'Transfer Bank (Uang Tunai)', icon: <CreditCard className="w-4 h-4 text-emerald-400" />, desc: 'BCA, Mandiri, BNI, BRI, Jago' },
+  { value: 2, label: 'E-Wallet', icon: <Wallet className="w-4 h-4 text-sky-400" />, desc: 'GoPay, OVO, Dana, ShopeePay' },
+  { value: 3, label: 'Traktir Makan Siang / Malam Bersama', icon: <Utensils className="w-4 h-4 text-amber-400" />, desc: 'Makan bersama tim / admin' },
+  { value: 4, label: 'Traktir Kopi / Snack Favorit', icon: <Coffee className="w-4 h-4 text-amber-500" />, desc: 'Kopi Kenangan, Fore, Starbucks, Boba' },
+  { value: 5, label: 'Voucher Belanja / Pulsa', icon: <Tag className="w-4 h-4 text-purple-400" />, desc: 'Indomaret, Alfamart, Tokopedia' },
+  { value: 6, label: 'Hadiah Khusus Lainnya', icon: <Gift className="w-4 h-4 text-rose-400" />, desc: 'Sesuai kesepakatan' }
+];
+
+const BADGE_ICON_MAP = { 
+  Award, Trophy, Star, Zap, Flame, Target, Clock, Shield, BookOpen, 
+  Coffee, Moon, Medal, Crown, TrendingUp, Users, Rocket, Bug, 
+  LifeBuoy, Sparkles, ShieldCheck 
+};
 
 function BadgeIcon({ name, size = 20, color }) {
   const Icon = BADGE_ICON_MAP[name] || Award;
@@ -46,10 +68,10 @@ function BadgeCard({ badge, unlocked, unlockedAt }) {
         background: unlocked ? rarity.bg : 'var(--bg-secondary)',
         border: `1.5px solid ${unlocked ? rarity.border : 'var(--border-color)'}`,
         boxShadow: unlocked ? rarity.glow : 'none',
-        opacity: unlocked ? 1 : 0.5,
+        opacity: unlocked ? 1 : 0.45,
         filter: unlocked ? 'none' : 'grayscale(80%)',
         borderRadius: '1rem',
-        padding: '1rem',
+        padding: '1.1rem',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -89,17 +111,18 @@ function BadgeCard({ badge, unlocked, unlockedAt }) {
 
       <p style={{ fontSize: 11, lineHeight: 1.4, color: 'var(--text-secondary)' }}>{badge.description}</p>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 'auto', paddingTop: 6 }}>
         <Star size={12} style={{ color: '#FBBF24' }} />
         <span style={{ fontSize: 12, fontWeight: 700, color: '#FBBF24' }}>{badge.points} pts</span>
+        <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>≈ Rp {(badge.points * POINT_TO_RUPIAH).toLocaleString('id-ID')}</span>
       </div>
 
       {unlocked && unlockedAt && (
         <p style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
-          {new Date(unlockedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+          Diperoleh: {new Date(unlockedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
         </p>
       )}
-      {!unlocked && <p style={{ fontSize: 10, color: '#6B7280', fontStyle: 'italic' }}>Belum terbuka</p>}
+      {!unlocked && <p style={{ fontSize: 10, color: '#6B7280', fontStyle: 'italic' }}>Terkunci</p>}
     </div>
   );
 }
@@ -110,7 +133,7 @@ function LeaderboardRow({ entry, isMe }) {
     <div
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '10px 12px',
+        padding: '10px 14px',
         borderRadius: 12,
         border: `1px solid ${isMe ? 'rgba(99,102,241,0.5)' : 'var(--border-color)'}`,
         background: isMe ? 'rgba(99,102,241,0.08)' : 'transparent',
@@ -130,7 +153,7 @@ function LeaderboardRow({ entry, isMe }) {
       <div style={{ display: 'flex', gap: 16, fontSize: 12, flexShrink: 0 }}>
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontWeight: 700, color: '#34D399' }}>{entry.monthlyTasksDone}</p>
-          <p style={{ color: 'var(--text-secondary)' }}>Task/bln</p>
+          <p style={{ color: 'var(--text-secondary)' }}>Task</p>
         </div>
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{entry.monthlyHours}j</p>
@@ -153,7 +176,7 @@ export default function GamificationPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
 
-  const [activeTab, setActiveTab] = useState('leaderboard');
+  const [activeTab, setActiveTab] = useState('leaderboard'); // leaderboard, my-badges, all-badges, claims, admin-claims, manage
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState('');
@@ -164,11 +187,44 @@ export default function GamificationPage() {
   const [myBadges, setMyBadges] = useState([]);
   const [myStats, setMyStats] = useState(null);
   const [allBadges, setAllBadges] = useState([]);
+  const [claims, setClaims] = useState([]);
 
+  // Modal Klaim Hadiah
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [claimForm, setClaimForm] = useState({
+    points: 100,
+    rewardType: 1,
+    accountOrContactInfo: '',
+    userNotes: ''
+  });
+  const [submittingClaim, setSubmittingClaim] = useState(false);
+
+  // Modal Review Klaim (Admin)
+  const [selectedClaimForReview, setSelectedClaimForReview] = useState(null);
+  const [adminProcessForm, setAdminProcessForm] = useState({
+    status: 2, // Approved
+    adminNotes: ''
+  });
+  const [submittingAdminProcess, setSubmittingAdminProcess] = useState(false);
+
+  // Modal Kelola Badge (Admin)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({ code: '', name: '', description: '', category: 'Productivity', icon: 'Award', color: '#10B981', points: 50, rarity: 1, triggerType: 0, triggerThreshold: 0, isActive: true, orderIndex: 0 });
+  const [form, setForm] = useState({
+    code: '',
+    name: '',
+    description: '',
+    category: 'Productivity',
+    icon: 'Award',
+    color: '#10B981',
+    points: 50,
+    rarity: 1,
+    triggerType: 0,
+    triggerThreshold: 0,
+    isActive: true,
+    orderIndex: 0
+  });
 
   const showSuccess = (msg) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(''), 5000); };
   const showError = (msg) => { setError(msg); setTimeout(() => setError(null), 6000); };
@@ -197,6 +253,15 @@ export default function GamificationPage() {
     finally { setLoading(false); }
   }, []);
 
+  const fetchClaims = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axiosClient.get('/api/gamification/claims');
+      setClaims(res.data?.data || []);
+    } catch { showError('Gagal memuat riwayat klaim.'); }
+    finally { setLoading(false); }
+  }, []);
+
   const fetchAllBadges = useCallback(async () => {
     setLoading(true);
     try {
@@ -209,7 +274,9 @@ export default function GamificationPage() {
   useEffect(() => {
     if (activeTab === 'leaderboard') fetchLeaderboard();
     else if (activeTab === 'my-badges') { fetchMyData(); }
-    else if (activeTab === 'all-badges' || activeTab === 'manage') fetchAllBadges();
+    else if (activeTab === 'all-badges') fetchAllBadges();
+    else if (activeTab === 'claims' || activeTab === 'admin-claims') fetchClaims();
+    else if (activeTab === 'manage') fetchAllBadges();
   }, [activeTab]);
 
   useEffect(() => {
@@ -222,6 +289,69 @@ export default function GamificationPage() {
       showSuccess(res.data?.message || 'Pengecekan selesai.');
       fetchMyData();
     } catch { showError('Gagal cek badge.'); }
+  };
+
+  const handleOpenClaimModal = () => {
+    const maxPoints = myStats?.availablePoints || 0;
+    setClaimForm({
+      points: maxPoints > 0 ? Math.min(100, maxPoints) : 50,
+      rewardType: 1,
+      accountOrContactInfo: '',
+      userNotes: ''
+    });
+    setIsClaimModalOpen(true);
+  };
+
+  const handleSubmitClaim = async (e) => {
+    e.preventDefault();
+    if (claimForm.points <= 0) {
+      showError('Jumlah poin harus lebih besar dari 0.');
+      return;
+    }
+    if (!claimForm.accountOrContactInfo.trim()) {
+      showError('Informasi akun / nomor rekening / kontak / tempat traktir wajib diisi.');
+      return;
+    }
+
+    setSubmittingClaim(true);
+    try {
+      const res = await axiosClient.post('/api/gamification/claim-reward', {
+        points: parseInt(claimForm.points),
+        rewardType: parseInt(claimForm.rewardType),
+        accountOrContactInfo: claimForm.accountOrContactInfo.trim(),
+        userNotes: claimForm.userNotes?.trim() || null
+      });
+
+      showSuccess(res.data?.message || 'Permohonan klaim berhasil dikirim!');
+      setIsClaimModalOpen(false);
+      fetchMyData();
+      if (activeTab === 'claims') fetchClaims();
+    } catch (err) {
+      showError(err.response?.data?.message || 'Gagal mengajukan klaim hadiah.');
+    } finally {
+      setSubmittingClaim(false);
+    }
+  };
+
+  const handleProcessClaim = async (e) => {
+    e.preventDefault();
+    if (!selectedClaimForReview) return;
+
+    setSubmittingAdminProcess(true);
+    try {
+      const res = await axiosClient.put(`/api/gamification/claims/${selectedClaimForReview.id}/process`, {
+        status: parseInt(adminProcessForm.status),
+        adminNotes: adminProcessForm.adminNotes?.trim() || null
+      });
+
+      showSuccess(res.data?.message || 'Klaim berhasil diproses.');
+      setSelectedClaimForReview(null);
+      fetchClaims();
+    } catch (err) {
+      showError(err.response?.data?.message || 'Gagal memproses klaim.');
+    } finally {
+      setSubmittingAdminProcess(false);
+    }
   };
 
   const openCreate = () => {
@@ -261,6 +391,21 @@ export default function GamificationPage() {
   const fieldStyle = { backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' };
   const inputCls = 'w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
 
+  const getClaimStatusBadge = (status) => {
+    switch (status) {
+      case 'Pending':
+        return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">Menunggu Admin</span>;
+      case 'Approved':
+        return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-500/15 text-sky-400 border border-sky-500/30">Disetujui</span>;
+      case 'PaidOrTreated':
+        return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Selesai Ditransfer / Ditraktir</span>;
+      case 'Rejected':
+        return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30">Ditolak</span>;
+      default:
+        return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-500/15 text-slate-400">{status}</span>;
+    }
+  };
+
   return (
     <div style={{ paddingBottom: 48 }} className="space-y-6 animate-fade-in">
       {/* ── Gradient Hero ── */}
@@ -270,24 +415,29 @@ export default function GamificationPage() {
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: 12 }}>
               <Trophy size={30} style={{ color: '#FCD34D' }} />
-              Gamification & Leaderboard
+              Gamification, Badge & Reward Center
             </h1>
-            <p style={{ color: '#C7D2FE', marginTop: 4, fontSize: 14 }}>Raih badge, kumpulkan poin, jadilah yang terbaik di tim</p>
+            <p style={{ color: '#C7D2FE', marginTop: 4, fontSize: 14 }}>
+              Raih badge, kumpulkan poin prestasi, dan klaim hadiah uang tunai atau traktiran (<strong>1 Poin = Rp 100</strong>)
+            </p>
           </div>
-          {myStats && (
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              {[
-                { label: 'Skor Badge', value: myStats.totalPoints, color: '#FCD34D' },
-                { label: 'Total Task', value: myStats.totalTasksDone, color: '#6EE7B7' },
-                { label: 'Badge', value: myStats.badgeCount, color: '#F9A8D4' },
-              ].map(s => (
-                <div key={s.label} style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', borderRadius: 14, padding: '10px 18px', textAlign: 'center' }}>
-                  <p style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</p>
-                  <p style={{ fontSize: 11, color: '#C7D2FE' }}>{s.label}</p>
-                </div>
-              ))}
-            </div>
-          )}
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            {myStats && (
+              <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', borderRadius: 14, padding: '10px 18px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.2)' }}>
+                <p style={{ fontSize: 22, fontWeight: 900, color: '#FCD34D' }}>{myStats.availablePoints || 0} pts</p>
+                <p style={{ fontSize: 11, color: '#C7D2FE' }}>Poin Siap Klaim (≈ Rp {((myStats.availablePoints || 0) * POINT_TO_RUPIAH).toLocaleString('id-ID')})</p>
+              </div>
+            )}
+
+            <button
+              onClick={handleOpenClaimModal}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm text-indigo-950 bg-amber-400 hover:bg-amber-300 shadow-xl transition-all transform hover:scale-105 active:scale-95"
+            >
+              <Gift className="w-5 h-5 text-indigo-950" />
+              Klaim Hadiah / Uang 🎁
+            </button>
+          </div>
         </div>
       </div>
 
@@ -300,11 +450,22 @@ export default function GamificationPage() {
         {[
           { id: 'leaderboard', label: 'Leaderboard', icon: <Crown size={15}/> },
           { id: 'my-badges',   label: 'Badge Saya',  icon: <Medal size={15}/> },
-          { id: 'all-badges',  label: 'Semua Badge', icon: <Trophy size={15}/> },
-          ...(isAdmin ? [{ id: 'manage', label: 'Kelola Badge', icon: <Shield size={15}/> }] : []),
+          { id: 'all-badges',  label: 'Semua Koleksi Badge', icon: <Trophy size={15}/> },
+          { id: 'claims',      label: 'Riwayat Klaim Hadiah', icon: <Gift size={15}/> },
+          ...(isAdmin ? [
+            { id: 'admin-claims', label: 'Kelola Klaim Tim (Admin)', icon: <Wallet size={15}/> },
+            { id: 'manage', label: 'Kelola Master Badge', icon: <Shield size={15}/> }
+          ] : []),
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', borderBottom: `2px solid ${activeTab === tab.id ? 'var(--accent-primary)' : 'transparent'}`, color: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--text-secondary)', background: 'none', border: 'none', borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.2s', marginBottom: -1 }}>
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', 
+              fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', 
+              borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent', 
+              color: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--text-secondary)', 
+              background: 'none', border: 'none', cursor: 'pointer', transition: 'all 0.2s', marginBottom: -1 
+            }}
+          >
             {tab.icon}{tab.label}
           </button>
         ))}
@@ -325,7 +486,9 @@ export default function GamificationPage() {
                 <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
               </button>
             </div>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>Skor = Task×10 + Jam×3 + Badge×5 + Hadir×2</p>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+              Kalkulasi Skor = Task×10 + Jam×3 + Badge×5 + Kehadiran×2
+            </p>
           </div>
 
           {/* Podium Top 3 */}
@@ -356,7 +519,7 @@ export default function GamificationPage() {
           <div style={{ borderRadius: 16, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-color)', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)' }}>
               <BarChart2 size={16} style={{ color: '#818CF8' }} />
-              Peringkat — {MONTHS_ID[lbMonth - 1]} {lbYear}
+              Peringkat Anggota — {MONTHS_ID[lbMonth - 1]} {lbYear}
             </div>
             {loading ? (
               <div style={{ padding: 40, textAlign: 'center' }}><div style={{ width: 32, height: 32, border: '3px solid var(--accent-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} /></div>
@@ -370,46 +533,227 @@ export default function GamificationPage() {
         </div>
       )}
 
-      {/* ─────── MY BADGES ─────── */}
+      {/* ─────── MY BADGES & REWARD STATUS ─────── */}
       {activeTab === 'my-badges' && (
-        <div className="space-y-5">
-          {myStats && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
-              {[
-                { label: 'Task Bulan ini', value: myStats.monthlyTasksDone, icon: <Target size={18}/>, color: '#34D399' },
-                { label: 'Total Task Selesai', value: myStats.totalTasksDone, icon: <CheckCircle size={18}/>, color: '#60A5FA' },
-                { label: 'Jam Bulan ini', value: `${myStats.monthlyHours}j`, icon: <Clock size={18}/>, color: '#A78BFA' },
-                { label: 'Hari Lembur', value: myStats.overtimeDays, icon: <Flame size={18}/>, color: '#FB923C' },
-              ].map(s => (
-                <div key={s.label} style={{ borderRadius: 14, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ color: s.color }}>{s.icon}</span>
-                  <div>
-                    <p style={{ fontSize: 22, fontWeight: 900, color: 'var(--text-primary)' }}>{s.value}</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{s.label}</p>
-                  </div>
-                </div>
-              ))}
+        <div className="space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+            <div className="p-4 rounded-2xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+              <span className="text-xs font-semibold text-slate-400">Total Poin Diperoleh</span>
+              <p className="text-2xl font-black mt-1 text-amber-400">{myStats?.totalPointsEarned || 0} pts</p>
+              <span className="text-xs text-slate-400">≈ Rp {((myStats?.totalPointsEarned || 0) * POINT_TO_RUPIAH).toLocaleString('id-ID')}</span>
             </div>
-          )}
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>Badge Anda ({myBadges.length}/{allBadges.length})</h2>
-            <button onClick={handleCheckBadges} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: 'var(--accent-primary)', color: '#fff', fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer' }}>
-              <Sparkles size={14} /> Cek Badge Baru
-            </button>
+            <div className="p-4 rounded-2xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+              <span className="text-xs font-semibold text-slate-400">Poin Siap Diklaim</span>
+              <p className="text-2xl font-black mt-1 text-emerald-400">{myStats?.availablePoints || 0} pts</p>
+              <span className="text-xs text-slate-400">≈ Rp {((myStats?.availablePoints || 0) * POINT_TO_RUPIAH).toLocaleString('id-ID')}</span>
+            </div>
+
+            <div className="p-4 rounded-2xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+              <span className="text-xs font-semibold text-slate-400">Poin Dicairkan</span>
+              <p className="text-2xl font-black mt-1 text-sky-400">{myStats?.pointsClaimed || 0} pts</p>
+              <span className="text-xs text-slate-400">Selesai/Diproses</span>
+            </div>
+
+            <div className="p-4 rounded-2xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+              <span className="text-xs font-semibold text-slate-400">Koleksi Badge</span>
+              <p className="text-2xl font-black mt-1 text-purple-400">{myBadges.length} / {allBadges.length}</p>
+              <span className="text-xs text-slate-400">Pencapaian Karier</span>
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 14 }}>
-            {allBadges.map(badge => <BadgeCard key={badge.id} badge={badge} unlocked={myBadgeIds.has(badge.id)} unlockedAt={myBadgeMap[badge.id]?.unlockedAt} />)}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>
+              Koleksi Badge Anda ({myBadges.length}/{allBadges.length})
+            </h2>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={handleOpenClaimModal}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 text-xs font-bold transition-all border border-amber-500/30"
+              >
+                <Gift size={14} /> Ajukan Klaim Hadiah
+              </button>
+              <button 
+                onClick={handleCheckBadges} 
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: 'var(--accent-primary)', color: '#fff', fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer' }}
+              >
+                <Sparkles size={14} /> Cek / Sinkronkan Badge
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 14 }}>
+            {allBadges.map(badge => (
+              <BadgeCard 
+                key={badge.id} 
+                badge={badge} 
+                unlocked={myBadgeIds.has(badge.id)} 
+                unlockedAt={myBadgeMap[badge.id]?.unlockedAt} 
+              />
+            ))}
           </div>
         </div>
       )}
 
-      {/* ─────── ALL BADGES ─────── */}
+      {/* ─────── ALL BADGES CATALOG ─────── */}
       {activeTab === 'all-badges' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 14 }}>
-          {allBadges.map(badge => <BadgeCard key={badge.id} badge={badge} unlocked={true} />)}
-          {!loading && allBadges.length === 0 && <p style={{ gridColumn: '1/-1', textAlign: 'center', padding: 40, color: 'var(--text-secondary)', fontSize: 14 }}>Belum ada badge.</p>}
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl border bg-slate-500/5 text-xs text-slate-400 flex items-center justify-between">
+            <span>Katalog seluruh badge yang dapat diperoleh melalui penyelesaian tugas, jam timesheet, tiket kendala, dan presensi.</span>
+            <span className="font-semibold text-amber-400">1 Poin = Rp 100</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 14 }}>
+            {allBadges.map(badge => <BadgeCard key={badge.id} badge={badge} unlocked={true} />)}
+            {!loading && allBadges.length === 0 && <p style={{ gridColumn: '1/-1', textAlign: 'center', padding: 40, color: 'var(--text-secondary)', fontSize: 14 }}>Belum ada badge.</p>}
+          </div>
+        </div>
+      )}
+
+      {/* ─────── CLAIMS HISTORY (USER) ─────── */}
+      {activeTab === 'claims' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Riwayat Klaim Hadiah Saya</h2>
+              <p className="text-xs text-slate-400">Pantau status pencairan uang tunai atau traktiran dari Administrator</p>
+            </div>
+            <button
+              onClick={handleOpenClaimModal}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-amber-400 text-indigo-950 hover:bg-amber-300 shadow-md"
+            >
+              <Plus className="w-4 h-4" /> Ajukan Klaim Baru
+            </button>
+          </div>
+
+          <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+            {claims.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 space-y-2">
+                <Gift className="w-10 h-10 mx-auto text-slate-500 opacity-60" />
+                <p className="text-sm font-semibold">Belum Ada Permohonan Klaim</p>
+                <p className="text-xs">Kumpulkan poin prestasi dari tugas dan badge untuk mengklaim hadiah uang atau traktir makan!</p>
+              </div>
+            ) : (
+              <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                {claims.map((c) => (
+                  <div key={c.id} className="p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {getClaimStatusBadge(c.status)}
+                        <span className="font-bold text-amber-400 text-sm">
+                          {c.pointsClaimed} Pts = Rp {c.rupiahAmount?.toLocaleString('id-ID')}
+                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-300 border border-slate-700/30">
+                          {c.rewardType}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 font-medium">
+                        Info Rekening / Kontak: <span className="text-slate-100">{c.accountOrContactInfo}</span>
+                      </p>
+                      {c.userNotes && (
+                        <p className="text-xs text-slate-400 italic">" {c.userNotes} "</p>
+                      )}
+                      {c.adminNotes && (
+                        <div className="mt-2 p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs text-sky-300 space-y-0.5">
+                          <strong>Catatan Administrator:</strong>
+                          <p>{c.adminNotes}</p>
+                          {c.processedByName && (
+                            <span className="text-[10px] text-sky-400/70 block">
+                              Diproses oleh {c.processedByName} pada {new Date(c.processedAt).toLocaleString('id-ID')}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-right text-xs text-slate-400 self-end md:self-auto">
+                      <span>Diajukan: {new Date(c.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─────── ADMIN CLAIMS MANAGEMENT ─────── */}
+      {activeTab === 'admin-claims' && isAdmin && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Kelola Permohonan Klaim Tim (Admin)</h2>
+              <p className="text-xs text-slate-400">Verifikasi, approve, atau konfirmasi transfer uang tunai dan traktiran anggota tim</p>
+            </div>
+            <button onClick={fetchClaims} className="p-2 rounded-xl border border-slate-700/40 hover:bg-slate-500/10 text-slate-300">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-500/10 text-slate-400 uppercase font-semibold border-b" style={{ borderColor: 'var(--border-color)' }}>
+                  <tr>
+                    <th className="p-3.5">Anggota Tim</th>
+                    <th className="p-3.5">Poin & Rupiah</th>
+                    <th className="p-3.5">Jenis Hadiah</th>
+                    <th className="p-3.5">Nomor Rekening / Info Traktiran</th>
+                    <th className="p-3.5">Status</th>
+                    <th className="p-3.5 text-right">Aksi Admin</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                  {claims.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-8 text-slate-400">Belum ada data klaim hadiah dari tim.</td>
+                    </tr>
+                  ) : (
+                    claims.map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-500/5 transition-colors">
+                        <td className="p-3.5 font-medium">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white font-bold" style={{ backgroundColor: c.userAvatarColor || '#6366F1' }}>
+                              {c.userName?.slice(0, 1)}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-200">{c.userName}</p>
+                              <p className="text-[10px] text-slate-400">{c.userEmail}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3.5">
+                          <strong className="text-amber-400 font-bold">{c.pointsClaimed} pts</strong>
+                          <span className="block text-[11px] text-emerald-400 font-semibold">Rp {c.rupiahAmount?.toLocaleString('id-ID')}</span>
+                        </td>
+                        <td className="p-3.5 text-slate-300 font-medium">{c.rewardType}</td>
+                        <td className="p-3.5">
+                          <p className="text-slate-200">{c.accountOrContactInfo}</p>
+                          {c.userNotes && <p className="text-[11px] text-slate-400 italic">"{c.userNotes}"</p>}
+                        </td>
+                        <td className="p-3.5">{getClaimStatusBadge(c.status)}</td>
+                        <td className="p-3.5 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedClaimForReview(c);
+                              setAdminProcessForm({
+                                status: c.status === 'Pending' ? 2 : (c.status === 'Approved' ? 3 : 2),
+                                adminNotes: c.adminNotes || ''
+                              });
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold transition-all text-xs"
+                          >
+                            Proses / Verifikasi
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
@@ -417,9 +761,9 @@ export default function GamificationPage() {
       {activeTab === 'manage' && isAdmin && (
         <div className="space-y-4">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>Kelola Master Badge</h2>
+            <h2 style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>Kelola Master Badge & Aturan Otomatis</h2>
             <button onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: 'var(--accent-primary)', color: '#fff', fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer' }}>
-              <Plus size={14} /> Tambah Badge
+              <Plus size={14} /> Tambah Badge Baru
             </button>
           </div>
           <div style={{ borderRadius: 16, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
@@ -427,8 +771,8 @@ export default function GamificationPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: 'rgba(0,0,0,0.03)', borderBottom: '1px solid var(--border-color)' }}>
-                    {['Badge', 'Trigger', 'Rarity', 'Poin', 'Aktif', 'Aksi'].map(h => (
-                      <th key={h} style={{ padding: '10px 14px', textAlign: h === 'Poin' || h === 'Aktif' ? 'center' : h === 'Aksi' ? 'right' : 'left', color: 'var(--text-secondary)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                    {['Badge', 'Trigger', 'Rarity', 'Poin', 'Nilai Rp', 'Aktif', 'Aksi'].map(h => (
+                      <th key={h} style={{ padding: '10px 14px', textAlign: h === 'Poin' || h === 'Nilai Rp' || h === 'Aktif' ? 'center' : h === 'Aksi' ? 'right' : 'left', color: 'var(--text-secondary)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -449,13 +793,14 @@ export default function GamificationPage() {
                           </div>
                         </td>
                         <td style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontSize: 12 }}>
-                          {TRIGGER_LABELS[badge.triggerType]}
+                          {TRIGGER_LABELS[badge.triggerType] || 'Manual'}
                           {badge.triggerThreshold > 0 && <span style={{ marginLeft: 4, fontWeight: 700, color: '#818CF8' }}>&ge;{badge.triggerThreshold}</span>}
                         </td>
                         <td style={{ padding: '10px 14px' }}>
                           <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: rarity.text }}>{rarity.label}</span>
                         </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, color: '#FBBF24' }}>{badge.points}</td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, color: '#FBBF24' }}>{badge.points} pts</td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 600, color: '#10B981', fontSize: 11 }}>Rp {(badge.points * POINT_TO_RUPIAH).toLocaleString('id-ID')}</td>
                         <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                           <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: badge.isActive ? '#34D399' : '#6B7280' }} />
                         </td>
@@ -476,7 +821,190 @@ export default function GamificationPage() {
         </div>
       )}
 
-      {/* ─────── BADGE MODAL ─────── */}
+      {/* ─────── MODAL AJUKAN KLAIM REWARD (USER) ─────── */}
+      {isClaimModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div style={{ borderRadius: 24, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', width: '100%', maxWidth: 540, boxShadow: '0 25px 60px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid var(--border-color)' }}>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                  <Gift size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontWeight: 800, fontSize: 17, color: 'var(--text-primary)' }}>Klaim Hadiah / Poin Prestasi</h3>
+                  <p className="text-xs text-slate-400">Nilai Konversi Resmi: <strong>1 Poin = Rp 100</strong></p>
+                </div>
+              </div>
+              <button onClick={() => setIsClaimModalOpen(false)} style={{ padding: 6, borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+            </div>
+
+            <form onSubmit={handleSubmitClaim} style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Point input & Rupiah calculator */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-300">Poin Anda Tersedia:</span>
+                  <strong className="text-amber-400">{myStats?.availablePoints || 0} pts</strong>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Jumlah Poin Diklaim *</label>
+                    <input
+                      type="number"
+                      required
+                      min={10}
+                      max={myStats?.availablePoints || 100000}
+                      value={claimForm.points}
+                      onChange={(e) => setClaimForm({ ...claimForm, points: e.target.value })}
+                      className={inputCls}
+                      style={fieldStyle}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Setara Uang Rupiah:</label>
+                    <div className="px-3.5 py-2 rounded-xl border text-sm font-bold text-emerald-400 bg-emerald-500/10 border-emerald-500/30">
+                      Rp {((parseInt(claimForm.points) || 0) * POINT_TO_RUPIAH).toLocaleString('id-ID')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">Pilih Bentuk Hadiah *</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {REWARD_TYPES.map((rt) => (
+                    <div
+                      key={rt.value}
+                      onClick={() => setClaimForm({ ...claimForm, rewardType: rt.value })}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${
+                        claimForm.rewardType === rt.value 
+                          ? 'border-amber-500 bg-amber-500/10 shadow-sm' 
+                          : 'border-slate-700/40 hover:bg-slate-500/5'
+                      }`}
+                    >
+                      <div className="mt-0.5">{rt.icon}</div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-200">{rt.label}</p>
+                        <p className="text-[10px] text-slate-400">{rt.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
+                  {claimForm.rewardType === 1 ? 'Nomor Rekening & Nama Bank / Pemilik *'
+                    : claimForm.rewardType === 2 ? 'Nomor HP & Jenis E-Wallet (GoPay/OVO/Dana) *'
+                    : claimForm.rewardType === 3 ? 'Nama Restoran / Tempat Makan Rekomendasi *'
+                    : claimForm.rewardType === 4 ? 'Nama Kedai Kopi / Menu Minuman Favorit *'
+                    : 'Nomor Kontak / Detail Informasi Penerima *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={claimForm.accountOrContactInfo}
+                  onChange={(e) => setClaimForm({ ...claimForm, accountOrContactInfo: e.target.value })}
+                  placeholder={
+                    claimForm.rewardType === 1 ? 'Contoh: BCA 1234567890 a/n Ahmad Fajar'
+                    : claimForm.rewardType === 2 ? 'Contoh: GoPay 081234567890 (Ahmad Fajar)'
+                    : claimForm.rewardType === 3 ? 'Contoh: Rumah Makan Padang Sederhana / Solaria'
+                    : claimForm.rewardType === 4 ? 'Contoh: Kopi Kenangan Mantan Large x2'
+                    : 'Masukkan detail akun / kontak...'
+                  }
+                  className={inputCls}
+                  style={fieldStyle}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">Pesan / Catatan ke Administrator (Opsional)</label>
+                <textarea
+                  rows={2}
+                  value={claimForm.userNotes}
+                  onChange={(e) => setClaimForm({ ...claimForm, userNotes: e.target.value })}
+                  placeholder="Catatan tambahan untuk admin (misal: jam makan siang yang luang, dll)..."
+                  className={inputCls}
+                  style={{ ...fieldStyle, resize: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, paddingTop: 10, borderTop: '1px solid var(--border-color)' }}>
+                <button type="button" onClick={() => setIsClaimModalOpen(false)} style={{ flex: 1, padding: '11px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>Batal</button>
+                <button
+                  type="submit"
+                  disabled={submittingClaim || (myStats?.availablePoints || 0) < 10}
+                  className="flex-1 px-5 py-2.5 rounded-xl font-bold text-sm text-indigo-950 bg-amber-400 hover:bg-amber-300 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {submittingClaim ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Ajukan Klaim Sekarang
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─────── MODAL REVIEW KLAIM (ADMIN) ─────── */}
+      {selectedClaimForReview && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div style={{ borderRadius: 24, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', width: '100%', maxWidth: 520, boxShadow: '0 25px 60px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid var(--border-color)' }}>
+              <h3 style={{ fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>Proses Klaim Hadiah Anggota</h3>
+              <button onClick={() => setSelectedClaimForReview(null)} style={{ padding: 6, borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+            </div>
+
+            <form onSubmit={handleProcessClaim} style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="p-3.5 rounded-xl bg-slate-500/10 border border-slate-700/30 text-xs space-y-1">
+                <p>Pemohon: <strong>{selectedClaimForReview.userName}</strong> ({selectedClaimForReview.userEmail})</p>
+                <p>Poin: <strong className="text-amber-400">{selectedClaimForReview.pointsClaimed} Pts</strong> (≈ <strong className="text-emerald-400">Rp {selectedClaimForReview.rupiahAmount?.toLocaleString('id-ID')}</strong>)</p>
+                <p>Tipe: <strong>{selectedClaimForReview.rewardType}</strong></p>
+                <p>Rekening / Kontak: <strong className="text-slate-200">{selectedClaimForReview.accountOrContactInfo}</strong></p>
+                {selectedClaimForReview.userNotes && <p className="italic">"{selectedClaimForReview.userNotes}"</p>}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">Status Permohonan *</label>
+                <select
+                  value={adminProcessForm.status}
+                  onChange={(e) => setAdminProcessForm({ ...adminProcessForm, status: e.target.value })}
+                  className={inputCls}
+                  style={fieldStyle}
+                >
+                  <option value={2}>Disetujui (Approved) - Masuk antrean transfer / traktir</option>
+                  <option value={3}>Selesai Ditransfer / Telah Ditraktir (Paid / Treated)</option>
+                  <option value={4}>Tolak (Rejected) - Kembalikan saldo poin ke user</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">Catatan Admin / Bukti Transfer / Info Traktir</label>
+                <textarea
+                  rows={3}
+                  value={adminProcessForm.adminNotes}
+                  onChange={(e) => setAdminProcessForm({ ...adminProcessForm, adminNotes: e.target.value })}
+                  placeholder="Contoh: Sudah ditransfer via BCA No Ref #TRX9988123 / Ditraktir makan siang bersama di Resto X..."
+                  className={inputCls}
+                  style={{ ...fieldStyle, resize: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, paddingTop: 10, borderTop: '1px solid var(--border-color)' }}>
+                <button type="button" onClick={() => setSelectedClaimForReview(null)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>Batal</button>
+                <button
+                  type="submit"
+                  disabled={submittingAdminProcess}
+                  className="flex-1 px-4 py-2 rounded-xl font-bold text-xs bg-sky-600 hover:bg-sky-500 text-white transition-all disabled:opacity-50"
+                >
+                  {submittingAdminProcess ? 'Menyimpan...' : 'Simpan Status Klaim'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─────── BADGE MODAL (ADMIN) ─────── */}
       {isModalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
           <div style={{ borderRadius: 20, border: '1px solid var(--border-color)', background: 'var(--bg-card)', width: '100%', maxWidth: 520, boxShadow: '0 25px 60px rgba(0,0,0,0.5)' }}>

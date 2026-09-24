@@ -30,6 +30,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<SqlHistory> SqlHistories => Set<SqlHistory>();
     public DbSet<JsonHistory> JsonHistories => Set<JsonHistory>();
     public DbSet<MasterHoliday> MasterHolidays => Set<MasterHoliday>();
+    public DbSet<RewardClaim> RewardClaims => Set<RewardClaim>();
+    public DbSet<Ticket> Tickets => Set<Ticket>();
+    public DbSet<TicketComment> TicketComments => Set<TicketComment>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -56,6 +59,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         builder.Entity<SqlHistory>().ToTable("SqlHistories");
         builder.Entity<JsonHistory>().ToTable("JsonHistories");
         builder.Entity<MasterHoliday>().ToTable("MasterHolidays");
+        builder.Entity<RewardClaim>().ToTable("RewardClaims");
+        builder.Entity<Ticket>().ToTable("Tickets");
+        builder.Entity<TicketComment>().ToTable("TicketComments");
 
         // Relationships & Foreign Key Rules as per TSD Section 3.3
         builder.Entity<WorkTask>()
@@ -148,6 +154,50 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .HasForeignKey(ub => ub.BadgeId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // RewardClaim relationships
+        builder.Entity<RewardClaim>()
+            .HasOne(r => r.User)
+            .WithMany()
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<RewardClaim>()
+            .HasOne(r => r.ProcessedByUser)
+            .WithMany()
+            .HasForeignKey(r => r.ProcessedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Ticket relationships
+        builder.Entity<Ticket>()
+            .HasOne(t => t.Project)
+            .WithMany()
+            .HasForeignKey(t => t.ProjectId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Entity<Ticket>()
+            .HasOne(t => t.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(t => t.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Ticket>()
+            .HasOne(t => t.AssignedToUser)
+            .WithMany()
+            .HasForeignKey(t => t.AssignedToUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Entity<TicketComment>()
+            .HasOne(c => c.Ticket)
+            .WithMany(t => t.Comments)
+            .HasForeignKey(c => c.TicketId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TicketComment>()
+            .HasOne(c => c.User)
+            .WithMany()
+            .HasForeignKey(c => c.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Indexes
         builder.Entity<WorkTask>().HasIndex(t => t.ProjectId);
         builder.Entity<WorkTask>().HasIndex(t => t.AssignedToUserId);
@@ -160,5 +210,12 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         builder.Entity<AuditLog>().HasIndex(a => a.Timestamp);
         builder.Entity<MasterHoliday>().HasIndex(h => h.Date);
         builder.Entity<MasterHoliday>().HasIndex(h => h.IsActive);
+        builder.Entity<Ticket>().HasIndex(t => t.TicketNumber).IsUnique();
+        builder.Entity<Ticket>().HasIndex(t => t.Status);
+        builder.Entity<Ticket>().HasIndex(t => t.Priority);
+        builder.Entity<Ticket>().HasIndex(t => t.CreatedByUserId);
+        builder.Entity<Ticket>().HasIndex(t => t.AssignedToUserId);
+        builder.Entity<RewardClaim>().HasIndex(r => r.UserId);
+        builder.Entity<RewardClaim>().HasIndex(r => r.Status);
     }
 }

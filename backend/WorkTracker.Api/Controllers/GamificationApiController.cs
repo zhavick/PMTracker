@@ -17,6 +17,7 @@ public class GamificationApiController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
+    private const decimal POINT_TO_RUPIAH_RATE = 100m; // 1 Point = 100 Rupiah
 
     public GamificationApiController(AppDbContext context, UserManager<ApplicationUser> userManager)
     {
@@ -155,7 +156,7 @@ public class GamificationApiController : ControllerBase
 
         var newlyAwarded = await ProcessBadgesForUser(userId);
         return Ok(ApiResponse<object>.Success(new { newBadges = newlyAwarded }, 
-            newlyAwarded.Count > 0 ? $"Selamat! Anda mendapatkan {newlyAwarded.Count} badge baru!" : "Tidak ada badge baru."));
+            newlyAwarded.Count > 0 ? $"Selamat! Anda mendapatkan {newlyAwarded.Count} badge baru!" : "Tidak ada badge baru. Terus tingkatkan performamu!"));
     }
 
     [HttpPost("check-badges-all")]
@@ -169,7 +170,7 @@ public class GamificationApiController : ControllerBase
             var awarded = await ProcessBadgesForUser(user.Id);
             totalAwarded += awarded.Count;
         }
-        return Ok(ApiResponse<object>.Success(new { totalAwarded }, $"Proses selesai. {totalAwarded} badge baru diberikan."));
+        return Ok(ApiResponse<object>.Success(new { totalAwarded }, $"Proses evaluasi badge selesai. {totalAwarded} badge baru berhasil diberikan."));
     }
 
     // ── Leaderboard ──────────────────────────────────────────────────────────
@@ -207,7 +208,7 @@ public class GamificationApiController : ControllerBase
             .Where(s => s.StartTime >= startDate && s.StartTime < endDate
                 && s.EndTime.HasValue && s.UserId != null)
             .GroupBy(s => s.UserId!)
-            .Select(g => new { UserId = g.Key, Hours = g.Sum(s => (double)(double)s.Duration / 3600.0) })
+            .Select(g => new { UserId = g.Key, Hours = g.Sum(s => (double)s.Duration / 3600.0) })
             .ToListAsync();
 
         // Badge points per user
@@ -307,12 +308,12 @@ public class GamificationApiController : ControllerBase
         var monthlyDone = await _context.Tasks.CountAsync(t => t.AssignedToUserId == userId && t.Status == WorkTaskStatus.Done && t.UpdatedAt >= startOfMonth && t.UpdatedAt < endOfMonth);
         var totalHours = await _context.Sessions
             .Where(s => s.UserId == userId && s.EndTime.HasValue)
-            .SumAsync(s => (double)(double)s.Duration / 3600.0);
+            .SumAsync(s => (double)s.Duration / 3600.0);
         var monthlyHours = await _context.Sessions
             .Where(s => s.UserId == userId && s.EndTime.HasValue && s.StartTime >= startOfMonth && s.StartTime < endOfMonth)
-            .SumAsync(s => (double)(double)s.Duration / 3600.0);
+            .SumAsync(s => (double)s.Duration / 3600.0);
 
-        // Overtime sessions > 8h per day
+        // Overtime sessions > 8h per day (duration in seconds > 28800)
         var overtimeDays = await _context.Sessions
             .Where(s => s.UserId == userId && s.EndTime.HasValue && s.Duration > 28800)
             .CountAsync();
@@ -323,7 +324,17 @@ public class GamificationApiController : ControllerBase
             .OrderByDescending(ub => ub.UnlockedAt)
             .ToListAsync();
 
-        var totalPoints = myBadges.Sum(ub => ub.Badge?.Points ?? 0);
+        var totalPointsEarned = myBadges.Sum(ub => ub.Badge?.Points ?? 0);
+
+        // Calculate points claimed (pending, approved, paid)
+        var claims = await _context.RewardClaims
+            .Where(r => r.UserId == userId && r.Status != ClaimStatus.Rejected)
+            .ToListAsync();
+
+        var pointsClaimedTotal = claims.Sum(r => r.PointsClaimed);
+        var pointsPaid = claims.Where(r => r.Status == ClaimStatus.PaidOrTreated).Sum(r => r.PointsClaimed);
+        var availablePoints = Math.Max(0, totalPointsEarned - pointsClaimedTotal);
+        var availableRupiah = availablePoints * POINT_TO_RUPIAH_RATE;
 
         return Ok(ApiResponse<object>.Success(new
         {
@@ -333,9 +344,145 @@ public class GamificationApiController : ControllerBase
             monthlyHours = Math.Round(monthlyHours, 1),
             overtimeDays,
             badgeCount = myBadges.Count,
-            totalPoints,
+            totalPoints = totalPointsEarned,
+            totalPointsEarned,
+            pointsClaimed = pointsClaimedTotal,
+            pointsPaid,
+            availablePoints,
+            pointToRupiahRate = POINT_TO_RUPIAH_RATE,
+            availableRupiah,
+            totalRupiahEquivalent = totalPointsEarned * POINT_TO_RUPIAH_RATE,
             badges = myBadges
         }));
+    }
+
+    // ── Reward Claiming System (1 Point = 100 Rupiah) ──────────────────────────
+
+    [HttpPost("claim-reward")]
+    public async Task<IActionResult> ClaimReward([FromBody] ClaimRewardRequest req)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+        if (req.Points <= 0)
+            return BadRequest(ApiResponse<object>.Fail("Jumlah poin yang diklaim harus lebih besar dari 0."));
+
+        // Calculate current available points
+        var totalPoints = await _context.UserBadges
+            .Where(ub => ub.UserId == userId)
+            .SumAsync(ub => ub.Badge != null ? ub.Badge.Points : 0);
+
+        var activeClaimedPoints = await _context.RewardClaims
+            .Where(r => r.UserId == userId && r.Status != ClaimStatus.Rejected)
+            .SumAsync(r => r.PointsClaimed);
+
+        var availablePoints = totalPoints - activeClaimedPoints;
+        if (req.Points > availablePoints)
+        {
+            return BadRequest(ApiResponse<object>.Fail($"Poin tidak mencukupi. Poin Anda yang tersedia untuk diklaim adalah {availablePoints} poin (Rp {(availablePoints * POINT_TO_RUPIAH_RATE):N0})."));
+        }
+
+        var rupiahAmount = req.Points * POINT_TO_RUPIAH_RATE;
+
+        var claim = new RewardClaim
+        {
+            UserId = userId,
+            PointsClaimed = req.Points,
+            RupiahAmount = rupiahAmount,
+            RewardType = req.RewardType,
+            AccountOrContactInfo = req.AccountOrContactInfo?.Trim() ?? string.Empty,
+            UserNotes = req.UserNotes?.Trim(),
+            Status = ClaimStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.RewardClaims.Add(claim);
+        await _context.SaveChangesAsync();
+
+        return Ok(ApiResponse<RewardClaim>.Success(claim, $"Permohonan klaim {req.Points} Poin (Rp {rupiahAmount:N0}) berhasil diajukan! Administrator akan segera memproses hadiah Anda."));
+    }
+
+    [HttpGet("claims")]
+    public async Task<IActionResult> GetClaims([FromQuery] ClaimStatus? status, [FromQuery] string? userId)
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var isAdmin = User.IsInRole("Admin");
+
+        var query = _context.RewardClaims
+            .Include(r => r.User)
+            .Include(r => r.ProcessedByUser)
+            .AsQueryable();
+
+        if (!isAdmin)
+        {
+            query = query.Where(r => r.UserId == currentUserId);
+        }
+        else if (!string.IsNullOrEmpty(userId))
+        {
+            query = query.Where(r => r.UserId == userId);
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(r => r.Status == status.Value);
+        }
+
+        var claims = await query
+            .OrderByDescending(r => r.CreatedAt)
+            .Select(r => new
+            {
+                r.Id,
+                r.UserId,
+                UserName = r.User != null ? (r.User.FullName ?? r.User.UserName) : "Pengguna",
+                UserEmail = r.User != null ? r.User.Email : "",
+                UserAvatarColor = r.User != null ? r.User.AvatarColor : "#6366F1",
+                r.PointsClaimed,
+                r.RupiahAmount,
+                RewardType = r.RewardType.ToString(),
+                r.AccountOrContactInfo,
+                r.UserNotes,
+                Status = r.Status.ToString(),
+                r.AdminNotes,
+                r.ProcessedByUserId,
+                ProcessedByName = r.ProcessedByUser != null ? (r.ProcessedByUser.FullName ?? r.ProcessedByUser.UserName) : null,
+                r.ProcessedAt,
+                r.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(ApiResponse<object>.Success(claims));
+    }
+
+    [HttpPut("claims/{id}/process")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ProcessClaim(int id, [FromBody] ProcessClaimRequest req)
+    {
+        var claim = await _context.RewardClaims
+            .Include(r => r.User)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        if (claim == null)
+            return NotFound(ApiResponse<object>.Fail("Data klaim tidak ditemukan."));
+
+        var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        claim.Status = req.Status;
+        claim.AdminNotes = req.AdminNotes?.Trim();
+        claim.ProcessedByUserId = adminId;
+        claim.ProcessedAt = DateTime.UtcNow;
+        claim.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        var statusLabel = req.Status switch
+        {
+            ClaimStatus.Approved => "Disetujui",
+            ClaimStatus.PaidOrTreated => "Telah Ditransfer / Selesai Ditraktir",
+            ClaimStatus.Rejected => "Ditolak",
+            _ => "Diperbarui"
+        };
+
+        return Ok(ApiResponse<object>.Success(claim, $"Permohonan klaim berhasil diproses dengan status: {statusLabel}."));
     }
 
     // ── Private badge processing ──────────────────────────────────────────────
@@ -347,9 +494,26 @@ public class GamificationApiController : ControllerBase
         var existingBadgeIds = await _context.UserBadges.Where(ub => ub.UserId == userId).Select(ub => ub.BadgeId).ToListAsync();
 
         var totalDone = await _context.Tasks.CountAsync(t => t.AssignedToUserId == userId && t.Status == WorkTaskStatus.Done);
-        var totalHours = await _context.Sessions.Where(s => s.UserId == userId && s.EndTime.HasValue).SumAsync(s => (double)(double)s.Duration / 3600.0);
+        var totalHours = await _context.Sessions.Where(s => s.UserId == userId && s.EndTime.HasValue).SumAsync(s => (double)s.Duration / 3600.0);
         var totalNotes = await _context.Notes.CountAsync(n => n.AuthorUserId == userId);
         var overtimeDays = await _context.Sessions.Where(s => s.UserId == userId && s.EndTime.HasValue && s.Duration > 28800).CountAsync();
+
+        // Tickets resolved by user
+        var ticketsResolved = await _context.Tickets.CountAsync(t => t.AssignedToUserId == userId && (t.Status == TicketStatus.Resolved || t.Status == TicketStatus.Closed));
+        // Tickets reported by user
+        var ticketsReported = await _context.Tickets.CountAsync(t => t.CreatedByUserId == userId);
+
+        // Night owl sessions (end time after 20:00 local time approx)
+        var nightOwlCount = await _context.Sessions.CountAsync(s => s.UserId == userId && s.EndTime.HasValue && s.EndTime.Value.Hour >= 13); // 13 UTC = 20 WIB
+
+        // Fast completed tasks (< 2 hours or completed same day)
+        var fastTasks = await _context.Tasks.CountAsync(t => t.AssignedToUserId == userId && t.Status == WorkTaskStatus.Done && t.CreatedAt >= t.UpdatedAt.AddHours(-2));
+
+        // Critical tasks done
+        var criticalTasksDone = await _context.Tasks.CountAsync(t => t.AssignedToUserId == userId && t.Status == WorkTaskStatus.Done && (t.Priority == TaskPriority.Critical || t.Priority == TaskPriority.High));
+
+        // Weekend activity (Saturday = 6, Sunday = 0)
+        var weekendTasks = await _context.Sessions.CountAsync(s => s.UserId == userId && (s.StartTime.DayOfWeek == DayOfWeek.Saturday || s.StartTime.DayOfWeek == DayOfWeek.Sunday));
 
         // Monthly top - check if user is #1 this month
         var now = DateTime.UtcNow;
@@ -369,10 +533,16 @@ public class GamificationApiController : ControllerBase
             {
                 BadgeTriggerType.Auto_DoneTasks => totalDone >= badge.TriggerThreshold,
                 BadgeTriggerType.Auto_WorkHours => totalHours >= badge.TriggerThreshold,
-                BadgeTriggerType.Auto_TasksAbove100 => totalDone >= 100,
+                BadgeTriggerType.Auto_TasksAbove100 => totalDone >= (badge.TriggerThreshold > 0 ? badge.TriggerThreshold : 100),
                 BadgeTriggerType.Auto_OvertimeHours => overtimeDays >= badge.TriggerThreshold,
                 BadgeTriggerType.Auto_NotesCreated => totalNotes >= badge.TriggerThreshold,
                 BadgeTriggerType.Auto_MonthlyTopTasks => monthlyTopUserId == userId,
+                BadgeTriggerType.Auto_TicketsResolved => ticketsResolved >= badge.TriggerThreshold,
+                BadgeTriggerType.Auto_TicketsReported => ticketsReported >= badge.TriggerThreshold,
+                BadgeTriggerType.Auto_NightOwl => nightOwlCount >= badge.TriggerThreshold,
+                BadgeTriggerType.Auto_SpeedDemon => fastTasks >= badge.TriggerThreshold,
+                BadgeTriggerType.Auto_ZeroDefect => criticalTasksDone >= badge.TriggerThreshold,
+                BadgeTriggerType.Auto_WeekendWarrior => weekendTasks >= badge.TriggerThreshold,
                 _ => false
             };
 
@@ -401,4 +571,18 @@ public class AwardBadgeRequest
 {
     public string UserId { get; set; } = string.Empty;
     public int BadgeId { get; set; }
+}
+
+public class ClaimRewardRequest
+{
+    public int Points { get; set; }
+    public RewardType RewardType { get; set; } = RewardType.CashTransfer;
+    public string AccountOrContactInfo { get; set; } = string.Empty;
+    public string? UserNotes { get; set; }
+}
+
+public class ProcessClaimRequest
+{
+    public ClaimStatus Status { get; set; }
+    public string? AdminNotes { get; set; }
 }
