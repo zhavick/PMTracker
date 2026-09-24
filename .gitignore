@@ -40,3 +40,6 @@ uploads/
 .env
 .env.local
 .env.*.local
+
+# Scratch / Local test scripts
+scratch/

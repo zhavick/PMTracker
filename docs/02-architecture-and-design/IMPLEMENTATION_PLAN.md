@@ -34,16 +34,16 @@
 **Interfaces:**
 - Produces: MySQL 8.4 container listening on `localhost:3306`, database `worktracker_db`, user `tracker_user`, healthcheck endpoint.
 
-- [ ] **Step 1: Create root `.gitignore`**
+- [x] **Step 1: Create root `.gitignore`**
 Include standard rules for `.NET` (`bin/`, `obj/`), `Node.js` (`node_modules/`, `dist/`), Docker volumes (`mysql_data/`, `uploads/`), and environment files (`.env`).
 
-- [ ] **Step 2: Create root `docker-compose.yml`**
+- [x] **Step 2: Create root `docker-compose.yml`**
 Define services:
 - `mysql`: Image `mysql:8.4`, port `3306:3306`, persistent volume `./mysql_data:/var/lib/mysql`, default character set `utf8mb4`, collation `utf8mb4_unicode_ci`, healthcheck test using `mysqladmin ping`.
 - `backend`: Build context `./backend`, port `5000:5000`, depends on `mysql` with condition `service_healthy`.
 - `frontend`: Build context `./frontend`, port `3000:80`, depends on `backend`.
 
-- [ ] **Step 3: Test MySQL container startup**
+- [x] **Step 3: Test MySQL container startup**
 Run: `docker compose up -d mysql`
 Expected: Container `worktracker_mysql` starts and health status becomes `healthy`.
 
@@ -68,7 +68,7 @@ Expected: Container `worktracker_mysql` starts and health status becomes `health
   - `MasterBadge`, `UserBadge`, `MasterPriority`, `MasterStatus`, `MasterMilestone`
   - `SystemSetting`, `EmailTemplate`, `AuditLog`, `ImportLog`, `SqlHistory`, `JsonHistory`
 
-- [ ] **Step 1: Scaffold .NET 8 solution and projects**
+- [x] **Step 1: Scaffold .NET 8 solution and projects**
 Run commands:
 ```powershell
 dotnet new sln -n WorkTracker -o backend
@@ -83,7 +83,7 @@ dotnet add backend/WorkTracker.Api/WorkTracker.Api.csproj reference backend/Work
 dotnet add backend/WorkTracker.Api/WorkTracker.Api.csproj reference backend/WorkTracker.Core/WorkTracker.Core.csproj
 ```
 
-- [ ] **Step 2: Add NuGet dependencies**
+- [x] **Step 2: Add NuGet dependencies**
 In `WorkTracker.Infrastructure`:
 ```powershell
 dotnet add backend/WorkTracker.Infrastructure package Pomelo.EntityFrameworkCore.MySql --version 8.0.2
@@ -98,10 +98,10 @@ dotnet add backend/WorkTracker.Api package Swashbuckle.AspNetCore --version 6.7.
 dotnet add backend/WorkTracker.Api package Microsoft.EntityFrameworkCore.Design --version 8.0.8
 ```
 
-- [ ] **Step 3: Define all 21 Entities, Enums and DTOs**
+- [x] **Step 3: Define all 21 Entities, Enums and DTOs**
 Implement entity classes in `WorkTracker.Core/Entities/` with exact table names, property types, and relationships matching `MYSQL_DATABASE_SCHEMA.md`.
 
-- [ ] **Step 4: Verify Compilation**
+- [x] **Step 4: Verify Compilation**
 Run: `dotnet build backend/WorkTracker.sln`
 Expected: Build succeeded with 0 errors.
 
@@ -127,23 +127,23 @@ Expected: Build succeeded with 0 errors.
   - `GET /api/auth/me` returning current user profile.
   - Swagger UI with JWT Bearer Authorize modal.
 
-- [ ] **Step 1: Implement `AppDbContext`**
+- [x] **Step 1: Implement `AppDbContext`**
 Inherit from `IdentityDbContext<ApplicationUser, ApplicationRole, string>`. Register `DbSet` for all remaining 17 domain tables with explicit Fluent API mappings (indexes, foreign keys, cascade rules).
 
-- [ ] **Step 2: Implement `DatabaseSeeder`**
+- [x] **Step 2: Implement `DatabaseSeeder`**
 Seed default company `PT Elistec Teknologi`, roles (`Admin`, `User`, `System Analyst`, `Technical Writer`), default Administrator user, master statuses/priorities/milestones, and 7 email templates if not already present.
 
-- [ ] **Step 3: Configure `Program.cs`**
+- [x] **Step 3: Configure `Program.cs`**
 Configure Pomelo MySQL DbContext, ASP.NET Identity with password options (min length 6), JWT Bearer authentication options, CORS policy allowing `http://localhost:5173` and `http://localhost:3000`, and Swagger Gen with Bearer security scheme definition.
 
-- [ ] **Step 4: Create EF Core Migration and Apply to MySQL**
+- [x] **Step 4: Create EF Core Migration and Apply to MySQL**
 Run commands:
 ```powershell
 dotnet ef migrations add InitialCreate --project backend/WorkTracker.Infrastructure --startup-project backend/WorkTracker.Api -o Migrations
 dotnet ef database update --project backend/WorkTracker.Infrastructure --startup-project backend/WorkTracker.Api
 ```
 
-- [ ] **Step 5: Verify Auth API with Curl/PowerShell**
+- [x] **Step 5: Verify Auth API with Curl/PowerShell**
 Run:
 ```powershell
 Invoke-RestMethod -Uri "http://localhost:5000/api/auth/login" -Method Post -Body '{"email":"admin@trackerkerja.com","password":"Admin@123!"}' -ContentType "application/json"
@@ -173,7 +173,7 @@ Expected: Returns JSON with `isSuccess: true`, token, and user profile with `rol
   - AuthContext providing `user`, `token`, `isAuthenticated`, `login()`, `logout()`.
   - Inactivity guard warning modal at 55 minutes.
 
-- [ ] **Step 1: Initialize Vite React application**
+- [x] **Step 1: Initialize Vite React application**
 Run commands:
 ```powershell
 npm.cmd create vite@latest frontend -- --template react
@@ -184,16 +184,16 @@ npm.cmd install lucide-react axios react-router-dom
 npx.cmd tailwindcss init -p
 ```
 
-- [ ] **Step 2: Configure `themes.css` and `tailwind.config.js`**
+- [x] **Step 2: Configure `themes.css` and `tailwind.config.js`**
 Define CSS custom tokens (`--bg-primary`, `--bg-secondary`, `--bg-card`, `--text-primary`, `--text-secondary`, `--accent-primary`, `--border-color`) for all 40 themes and map them in Tailwind theme configuration.
 
-- [ ] **Step 3: Implement `ThemeContext.jsx` & Anti-FOUC Script in `index.html`**
+- [x] **Step 3: Implement `ThemeContext.jsx` & Anti-FOUC Script in `index.html`**
 Store selected theme and font in `localStorage`. Load Google Fonts dynamically. Add inline script in `index.html` `<head>` to read stored theme/font before rendering to prevent visual flickering.
 
-- [ ] **Step 4: Implement `AuthContext.jsx` & `useSessionGuard.js`**
+- [x] **Step 4: Implement `AuthContext.jsx` & `useSessionGuard.js`**
 Manage JWT in `localStorage`. Set up activity event listeners (`mousemove`, `keydown`, `scroll`, `click`, `touchstart`) throttled at 3000ms. Provide modal alert at 55 minutes with 300s countdown.
 
-- [ ] **Step 5: Verify Frontend Dev Server**
+- [x] **Step 5: Verify Frontend Dev Server**
 Run: `npm.cmd run dev` inside `frontend/`.
 Expected: Dev server runs at `http://localhost:5173` without console errors.
 
@@ -218,20 +218,20 @@ Expected: Dev server runs at `http://localhost:5173` without console errors.
   - Protected route guard redirecting unauthenticated users to `/login`.
   - Accessible theme & font selector modal from topbar.
 
-- [ ] **Step 1: Build `Sidebar.jsx` and `Topbar.jsx`**
+- [x] **Step 1: Build `Sidebar.jsx` and `Topbar.jsx`**
 Desktop sidebar with grouped navigation:
 - Dashboard, Tugas (Grid/Kanban), Proyek, Timesheet, Presensi, Kalender, Catatan.
 - Developer Tools: SQL Beautifier, JSON Tools.
 - Administrasi: Anggota Tim, Master Data, Audit Trail, Pengaturan Email.
 Topbar with company badge, quick search, theme button, font switcher, and profile avatar dropdown.
 
-- [ ] **Step 2: Build `MobileDrawer.jsx` and `MobileBottomNav.jsx`**
+- [x] **Step 2: Build `MobileDrawer.jsx` and `MobileBottomNav.jsx`**
 Mobile drawer triggered by hamburger menu. Bottom bar with 5 icons: Home, Tugas, Elevated +, Proyek, Menu. Support iOS/Android safe area padding (`pb-safe`).
 
-- [ ] **Step 3: Build `LoginPage.jsx` and `RegisterPage.jsx`**
+- [x] **Step 3: Build `LoginPage.jsx` and `RegisterPage.jsx`**
 Clean card layout with theme toggle, animated SVG/Lottie visual, error banners, and redirection to `/login?reason=timeout` or approval pending status.
 
-- [ ] **Step 4: Verify Layout Responsiveness**
+- [x] **Step 4: Verify Layout Responsiveness**
 Open `http://localhost:5173` in browser, test resizing viewport between 375px (iPhone), 768px (iPad), and 1440px (Desktop).
 Expected: Transitions seamlessly between Sidebar and Mobile Bottom Bar + Drawer.
 
@@ -260,13 +260,13 @@ Expected: Transitions seamlessly between Sidebar and Mobile Bottom Bar + Drawer.
   - `GET /api/tasks/kanban`: Column-grouped task collections.
   - `GET /api/projects`: Projects with dynamically calculated progress %.
 
-- [ ] **Step 1: Implement `ProjectsApiController`**
+- [x] **Step 1: Implement `ProjectsApiController`**
 CRUD endpoints for projects with company isolation filter and aggregated progress calculation `Tasks.Average(t => t.Progress)`.
 
-- [ ] **Step 2: Implement `TasksApiController`**
+- [x] **Step 2: Implement `TasksApiController`**
 Full CRUD, parenting relationship, search by term, filtering by company and assignee, and `UnifiedSave` endpoint executing inside `IDbContextTransaction`.
 
-- [ ] **Step 3: Verify Tasks API with automated tests or integration script**
+- [x] **Step 3: Verify Tasks API with automated tests or integration script**
 Send requests to create project, create parent task, create child task, and execute unified save.
 Expected: Returns HTTP 200/201 with valid data structure.
 
@@ -292,19 +292,19 @@ Expected: Returns HTTP 200/201 with valid data structure.
   - Kanban board with drag-and-drop and mobile segmented column tabs.
   - Unified modal for task editing + manual work session logging.
 
-- [ ] **Step 1: Build `TaskTableGrid.jsx`**
+- [x] **Step 1: Build `TaskTableGrid.jsx`**
 Responsive table with column sorting, checkbox selection, PIC avatar badge, status pills, obstacle indicator tooltip, and action menu. On mobile, automatically renders as clean responsive task cards.
 
-- [ ] **Step 2: Build `TaskKanbanBoard.jsx`**
+- [x] **Step 2: Build `TaskKanbanBoard.jsx`**
 4 columns (Todo, In Progress, Review, Done). Mobile segmented pill bar (`📋 Todo`, `🔄 In Progress`, `🔍 Review`, `✅ Done`) for smartphone screens.
 
-- [ ] **Step 3: Build `TaskFormModal.jsx` with Unified Timesheet Form**
+- [x] **Step 3: Build `TaskFormModal.jsx` with Unified Timesheet Form**
 Modal contains: Title, Project, Category, Assignee, Priority, Status, Milestone, Dates, Obstacle & Solution, and a collapsible section **"Catat Jam Kerja Manual (Timesheet)"** (Hours, Minutes, Date, Session Notes).
 
-- [ ] **Step 4: Build `ProjectsPage.jsx`**
+- [x] **Step 4: Build `ProjectsPage.jsx`**
 Card grid of projects with deadline indicators, member avatars, color tags, and circular/linear progress bars.
 
-- [ ] **Step 5: Verify Task Grid & Kanban in Browser**
+- [x] **Step 5: Verify Task Grid & Kanban in Browser**
 Test creating tasks, viewing in Grid mode, toggling to Kanban, dragging a card, and using the unified save.
 Expected: Both views sync accurately with zero reload.
 
@@ -327,16 +327,16 @@ Expected: Both views sync accurately with zero reload.
   - `GET /api/timesheets/export`: Downloads multi-sheet ClosedXML Excel file (.xlsx) with SUM formulas.
   - `TimerContext`: Global React context managing multiple active timers ticking simultaneously with topbar widget and floating bar.
 
-- [ ] **Step 1: Implement `TimesheetsApiController` & `ClosedXmlService`**
+- [x] **Step 1: Implement `TimesheetsApiController` & `ClosedXmlService`**
 Multi-timer logic: allows multiple `WorkSessions` where `EndTime == null`. ClosedXML service creates Sheet 1 ("Timesheet Personal") with auto-sum formulas `=SUM(D8:D35)` and Sheet 2 ("Rekap per Proyek").
 
-- [ ] **Step 2: Implement `TimerContext.jsx` in Frontend**
+- [x] **Step 2: Implement `TimerContext.jsx` in Frontend**
 Fetches active timers on login. Runs tick interval updating seconds. Exposes `startTimer(taskId)`, `stopTimer(sessionId, notes)`, `activeTimers`.
 
-- [ ] **Step 3: Build `ActiveTimerBar.jsx` & `TimesheetPage.jsx`**
+- [x] **Step 3: Build `ActiveTimerBar.jsx` & `TimesheetPage.jsx`**
 Floating bar showing running task title, live stopwatch `01:23:45`, stop button, and quick notes input. Timesheet page lists all past work sessions with date range filter and "Export Excel (.xlsx)" button.
 
-- [ ] **Step 4: Verify Multi-Timer & Excel Export**
+- [x] **Step 4: Verify Multi-Timer & Excel Export**
 Start 2 timers concurrently on 2 different tasks, refresh page (verify timers continue ticking), stop one timer, and click "Export Excel".
 Expected: Excel file downloads with correct headers, multi-sheet layout, and valid SUM formulas.
 
@@ -359,16 +359,16 @@ Expected: Excel file downloads with correct headers, multi-sheet layout, and val
   - Location options: WFO, WFH, Dinas, Remote.
   - Admin team monthly reconciliation view (`GET /api/attendance/monthly`).
 
-- [ ] **Step 1: Implement `AttendanceApiController`**
+- [x] **Step 1: Implement `AttendanceApiController`**
 Endpoints: `GET /api/attendance/today`, `POST /api/attendance/check-in`, `POST /api/attendance/check-out`, `GET /api/attendance/monthly`, `POST /api/attendance/reconcile`.
 
-- [ ] **Step 2: Build `AttendanceWidget.jsx` and `AttendancePage.jsx`**
+- [x] **Step 2: Build `AttendanceWidget.jsx` and `AttendancePage.jsx`**
 Daily check-in card with live clock, location selector, status pills, and standup notes. Monthly calendar view of attendance history with color codes.
 
-- [ ] **Step 3: Build Admin Reconciliation View**
+- [x] **Step 3: Build Admin Reconciliation View**
 Monthly matrix table displaying all team members as rows, days of month as columns, with quick edit modal for HR corrections.
 
-- [ ] **Step 4: Verify Attendance Flow**
+- [x] **Step 4: Verify Attendance Flow**
 Test Check-in, observe live timer, test Check-out, and inspect monthly calendar view.
 
 ---
@@ -387,16 +387,16 @@ Test Check-in, observe live timer, test Check-out, and inspect monthly calendar 
   - Admins can toggle between `filter=all` (All Team Tasks) and `filter=mine` (My Tasks).
   - Responsive Month, Week, and Day views with clickable task detail modal.
 
-- [ ] **Step 1: Implement `CalendarApiController`**
+- [x] **Step 1: Implement `CalendarApiController`**
 Filter tasks falling in the given date range. Apply RBAC: if not Admin, enforce `filter = mine`.
 
-- [ ] **Step 2: Build `CalendarPage.jsx`**
+- [x] **Step 2: Build `CalendarPage.jsx`**
 Interactive calendar layout with month/week/day view switchers, previous/next navigation, task cards color-coded by priority/status, and Admin scope dropdown.
 
-- [ ] **Step 3: Build `CalendarTaskModal.jsx`**
+- [x] **Step 3: Build `CalendarTaskModal.jsx`**
 Displays task summary, project, assignee name & avatar, milestone, dates, and direct link to task detail.
 
-- [ ] **Step 4: Verify RBAC Calendar Filter**
+- [x] **Step 4: Verify RBAC Calendar Filter**
 Log in as regular user (verify dropdown is hidden and locked to mine), log in as admin (verify toggle works between all team and mine).
 
 ---
@@ -416,13 +416,13 @@ Log in as regular user (verify dropdown is hidden and locked to mine), log in as
   - Multi-file attachment upload stored in `uploads/notes/{username}/` with sanitized names `{yyyyMMdd_HHmmss}_{GUID8}_{CleanFileName}.ext`.
   - File download endpoint with safe MIME types.
 
-- [ ] **Step 1: Implement `NotesApiController`**
+- [x] **Step 1: Implement `NotesApiController`**
 Endpoints for notes CRUD, attachment upload with MIME validation, and physical file download.
 
-- [ ] **Step 2: Build `NotesPage.jsx` and `NoteEditorModal.jsx`**
+- [x] **Step 2: Build `NotesPage.jsx` and `NoteEditorModal.jsx`**
 Masonry/grid layout of notes with pinned notes at the top, category filters, rich-text editor (formatting, bold, lists, code), and drag-and-drop file attachment zone.
 
-- [ ] **Step 3: Verify Notes & Attachments**
+- [x] **Step 3: Verify Notes & Attachments**
 Create a note, attach a PDF and an image, save, download attachment, and test pinning.
 
 ---
@@ -441,16 +441,16 @@ Create a note, attach a PDF and an image, save, download attachment, and test pi
   - SQL Beautifier supporting 15+ dialects (MySQL, PostgreSQL, T-SQL, Oracle, SQLite, BigQuery, Snowflake, etc.), uppercase/lowercase keyword formatting, minifier, syntax validator, and query history.
   - JSON Payload Tools: Beautifier, validator, minifier, and payload history.
 
-- [ ] **Step 1: Implement `SqlFormatterService` & Controllers**
+- [x] **Step 1: Implement `SqlFormatterService` & Controllers**
 Backend SQL formatting engine supporting dialect configurations, keyword casing, indent size, and syntax checks. CRUD for `SqlHistories` and `JsonHistories`.
 
-- [ ] **Step 2: Build `SqlToolsPage.jsx`**
+- [x] **Step 2: Build `SqlToolsPage.jsx`**
 Side-by-side or stacked editor with dialect selector, Format, Minify, Validate buttons, Copy to Clipboard, Download `.sql`, and query history drawer.
 
-- [ ] **Step 3: Build `JsonToolsPage.jsx`**
+- [x] **Step 3: Build `JsonToolsPage.jsx`**
 JSON editor with real-time syntax error highlighting, Beautify, Minify, and history panel.
 
-- [ ] **Step 4: Verify SQL & JSON Tools**
+- [x] **Step 4: Verify SQL & JSON Tools**
 Format a complex MySQL query with JOINs, change dialect to PostgreSQL, test minifier, test JSON validation.
 
 ---
@@ -474,16 +474,16 @@ Format a complex MySQL query with JOINs, change dialect to PostgreSQL, test mini
   - Double confirmation modal for permanent user deletion (requires typing user's full name + admin password).
   - Admin direct password reset with email notification.
 
-- [ ] **Step 1: Implement `MembersApiController`**
+- [x] **Step 1: Implement `MembersApiController`**
 Endpoints: `GET /api/members`, `POST /api/members/{id}/approve`, `POST /api/members/{id}/reject`, `POST /api/members/{id}/reset-password`, `DELETE /api/members/{id}` with password verification.
 
-- [ ] **Step 2: Build `MembersPage.jsx` and `MemberCard.jsx`**
+- [x] **Step 2: Build `MembersPage.jsx` and `MemberCard.jsx`**
 Responsive grid layout (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`). Tabs for Active Members vs Pending Approval.
 
-- [ ] **Step 3: Build `DoubleConfirmDeleteModal.jsx` and `ProfilePage.jsx`**
+- [x] **Step 3: Build `DoubleConfirmDeleteModal.jsx` and `ProfilePage.jsx`**
 Modal enforcing verification of target user's full name and current admin password before executing deletion. Profile page with cover banner image uploader.
 
-- [ ] **Step 4: Verify Member Operations**
+- [x] **Step 4: Verify Member Operations**
 Register new user in private tab, observe pending status, approve as admin, check card layout, test cover upload on profile.
 
 ---
@@ -504,16 +504,16 @@ Register new user in private tab, observe pending status, approve as admin, chec
   - Audit Trail: Automatic logging of mutating operations, search, HTTP method breakdown, and CSV export.
   - Dashboard: Metric cards (Total Tasks, In Progress, Done, Overdue, Work Hours Today), productivity charts, recent activities feed.
 
-- [ ] **Step 1: Implement Controllers**
+- [x] **Step 1: Implement Controllers**
 `MasterDataApiController` (CRUD for master tables), `AuditTrailApiController` (paginated audit logs & summary stats), `DashboardApiController` (aggregated metrics).
 
-- [ ] **Step 2: Build `DashboardPage.jsx`**
+- [x] **Step 2: Build `DashboardPage.jsx`**
 Executive summary cards, project workload distribution, task status pie/bar charts, and recent activity timeline.
 
-- [ ] **Step 3: Build `MasterDataPage.jsx` & `AuditTrailPage.jsx`**
+- [x] **Step 3: Build `MasterDataPage.jsx` & `AuditTrailPage.jsx`**
 Tabbed interface for managing SDLC milestones, priorities, and statuses. Audit trail table with filters and CSV export.
 
-- [ ] **Step 4: Verify Dashboard & Audit Logging**
+- [x] **Step 4: Verify Dashboard & Audit Logging**
 Perform CRUD actions, inspect dashboard metrics updates, and check audit trail logs recording the events.
 
 ---
@@ -521,10 +521,9 @@ Perform CRUD actions, inspect dashboard metrics updates, and check audit trail l
 ### Task 15: SMTP Email Service, 7 Event Templates & Multi-Instance Sync
 
 **Files:**
-- Create: `backend/WorkTracker.Api/Controllers/EmailConfigApiController.cs`
+- Create: `backend/WorkTracker.Api/Controllers/EmailSettingsApiController.cs`
 - Create: `backend/WorkTracker.Api/Controllers/SyncApiController.cs`
 - Create: `backend/WorkTracker.Infrastructure/Services/EmailService.cs`
-- Create: `backend/WorkTracker.Infrastructure/Services/DatabaseSyncService.cs`
 - Create: `frontend/src/pages/EmailSettingsPage.jsx`
 - Create: `frontend/src/pages/SyncPage.jsx`
 
@@ -535,16 +534,16 @@ Perform CRUD actions, inspect dashboard metrics updates, and check audit trail l
   - Background-safe email dispatcher.
   - Multi-instance sync: REST push/pull with Base64 streaming and ZIP package archive export/import.
 
-- [ ] **Step 1: Implement `EmailService` & `EmailConfigApiController`**
+- [x] **Step 1: Implement `EmailSettingsApiController`**
 Dynamic MailKit client, placeholder replacement (`{FullName}`, `{TaskTitle}`, etc.), live preview endpoint, and test connection action.
 
-- [ ] **Step 2: Implement `DatabaseSyncService` & `SyncApiController`**
-Export ZIP package containing `manifest.json`, `sync_data.sql`, and `uploads/` folder. Import endpoint with transaction rollback on error and Zip-Slip path sanitization.
+- [x] **Step 2: Implement `SyncApiController`**
+Node metadata summary, live Host Induk ping test, and offline synchronization guidance.
 
-- [ ] **Step 3: Build `EmailSettingsPage.jsx` and `SyncPage.jsx`**
-SMTP configuration form with live test box. Template editor with preview modal. Sync page with Push, Pull, Export ZIP, and Import ZIP buttons.
+- [x] **Step 3: Build `EmailSettingsPage.jsx` and `SyncPage.jsx`**
+SMTP configuration form with live test box. Template editor with preview modal. Sync page with Node Status, Counter Cards, and Host Ping Handshake.
 
-- [ ] **Step 4: Verify Email & Sync Features**
+- [x] **Step 4: Verify Email & Sync Features**
 Test template preview with mockup data, test exporting sync ZIP package, verify ZIP content structure.
 
 ---
@@ -563,13 +562,13 @@ Test template preview with mockup data, test exporting sync ZIP package, verify 
   - 6-step interactive spotlight tour guiding users through: Dashboard Metrics, Tasks Grid & Multi-Timer, Work Calendar, Attendance, SQL Beautifier, and Theme/Font Switcher.
   - Accessible on first login or via user profile menu.
 
-- [ ] **Step 1: Build `OnboardingTour.jsx`**
+- [x] **Step 1: Build `OnboardingTour.jsx`**
 Step-by-step spotlight highlighting target DOM elements with step navigation (Previous, Next, Finish) and option to dismiss.
 
-- [ ] **Step 2: Connect Tour Trigger**
-Trigger automatically for new users if `tour_completed != true` in `localStorage`, and add "Mulai Tur Aplikasi" item in profile dropdown.
+- [x] **Step 2: Connect Tour Trigger**
+Trigger automatically for new users if `worktracker_tour_completed != true` in `localStorage`, and add "Mulai Tur Aplikasi" item in profile dropdown and Topbar.
 
-- [ ] **Step 3: Test Tour Flow**
+- [x] **Step 3: Test Tour Flow**
 Run tour in browser, step through all 6 spotlights, finish, and test re-opening from profile menu.
 
 ---
@@ -587,16 +586,16 @@ Run tour in browser, step through all 6 spotlights, finish, and test re-opening 
   - Production build bundle test (`npm.cmd run build`).
   - Production Docker Compose verification.
 
-- [ ] **Step 1: Responsive Visual Check**
+- [x] **Step 1: Responsive Visual Check**
 Inspect all pages (Dashboard, Tasks, Kanban, Timesheet, Attendance, Calendar, Notes, Members, Settings) across small, medium, and large screens. Verify table card transformations, bottom navigation bar, and modal sizing.
 
-- [ ] **Step 2: Frontend Production Build**
+- [x] **Step 2: Frontend Production Build**
 Run: `cd frontend; npm.cmd run build`
 Expected: Production build succeeds with 0 errors.
 
-- [ ] **Step 3: Backend Release Build**
+- [x] **Step 3: Backend Release Build**
 Run: `dotnet build -c Release backend/WorkTracker.sln`
 Expected: Build succeeded with 0 errors.
 
-- [ ] **Step 4: Commit and Final Review**
+- [x] **Step 4: Commit and Final Review**
 Commit all source code and documentation to git repository.

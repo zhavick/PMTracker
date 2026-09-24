@@ -191,4 +191,29 @@ public class AuthApiController : ControllerBase
         await _userManager.UpdateAsync(user);
         return Ok(ApiResponse<object>.Success(null, "Profil berhasil diperbarui."));
     }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto model)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Fail("Data kata sandi baru tidak valid."));
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized(ApiResponse<object>.Fail("Pengguna tidak terautentikasi."));
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+            return NotFound(ApiResponse<object>.Fail("Data pengguna tidak ditemukan."));
+
+        var result = await _userManager.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors.Select(e => e.Description).ToList();
+            return BadRequest(ApiResponse<object>.Fail("Gagal mengubah kata sandi. Pastikan kata sandi lama Anda benar.", errors));
+        }
+
+        return Ok(ApiResponse<object>.Success(null, "Kata sandi Anda berhasil diperbarui."));
+    }
 }

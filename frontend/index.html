@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="id" data-theme="indigo-nebula" data-font="inter">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Work Tracker Pro - Enterprise Work Management & Timesheet</title>
+    
+    <!-- Google Fonts Preconnect -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- 5 Google Fonts: Inter, Plus Jakarta Sans, Outfit, Poppins, Roboto -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Anti-FOUC Inline Script: Instantly applies cached theme and font before DOM render -->
+    <script>
+      (function() {
+        try {
+          var savedTheme = localStorage.getItem('wt_theme') || 'indigo-nebula';
+          var savedFont = localStorage.getItem('wt_font') || 'inter';
+          document.documentElement.setAttribute('data-theme', savedTheme);
+          document.documentElement.setAttribute('data-font', savedFont);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

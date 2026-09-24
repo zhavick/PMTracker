@@ -38,6 +38,8 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 
 // 3. Register Domain Services
 builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<ClosedXmlService>();
+builder.Services.AddScoped<TaskExcelImportService>();
 builder.Services.AddScoped<AuditLogActionFilter>();
 
 // 4. JWT Bearer Authentication
