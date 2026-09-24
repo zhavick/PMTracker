@@ -174,6 +174,9 @@ Pada bagian ini dijabarkan secara rinci modul per modul mengenai:
 | **API** | `GET /api/tasks/summary` | `TasksApiController` | `Task<IActionResult> GetSummary(...)` | Rekapitulasi metrik tugas (Total, Selesai, InProgress, Terlambat) |
 | **API** | `GET /api/tasks/kanban` | `TasksApiController` | `Task<IActionResult> GetKanbanTasks(...)` | Mengambil kumpulan tugas terformat per kolom Kanban |
 | **API** | `PUT /api/tasks/{id}/status` | `TasksApiController` | `Task<IActionResult> UpdateStatus(int id, ...)` | Mengubah status tugas via drag & drop Kanban |
+| **API** | `POST /api/tasks/bulk-update`| `TasksApiController` | `Task<IActionResult> BulkUpdateTasks(...)` | Operasi batch perbaruan status, prioritas, PIC, dan progress |
+| **API** | `POST /api/tasks/bulk-delete`| `TasksApiController` | `Task<IActionResult> BulkDeleteTasks(...)` | Operasi batch penghapusan serentak tugas-tugas terpilih |
+| **API** | `GET /api/tasks/export-excel`| `TasksApiController` | `Task<IActionResult> ExportExcel(...)` | Streaming file Excel (.xlsx) tugas terpilih via ClosedXML |
 
 #### B. Rincian Teknis Prosedur Pengambilan Data
 
@@ -197,7 +200,7 @@ public async Task<IActionResult> GetAll(
     [FromQuery] int page = 1,
     [FromQuery] int pageSize = 10)
 ```
-- **Alur Kueri LINQ ke Database:**
+- **Alur Kueri LINQ ke Database & Multi-Tenancy Scoping:**
   ```csharp
   var query = _db.Tasks
       .Include(t => t.Project)
@@ -209,7 +212,7 @@ public async Task<IActionResult> GetAll(
       .AsNoTracking()
       .AsQueryable();
 
-  // Multi-Tenancy Filter
+  // Multi-Tenancy Filter (Non-Admin terkunci pada CompanyId sendiri)
   if (!isAdmin && currentUser != null)
       query = query.Where(t => t.CompanyId == userCompanyId || (t.Project != null && t.Project.CompanyId == userCompanyId));
   else if (companyId.HasValue)
@@ -236,39 +239,61 @@ public async Task<IActionResult> GetAll(
       .Select(t => TaskResponseDto.FromEntity(t))
       .ToListAsync();
   ```
-- **Format Output JSON:**
-  ```json
-  {
-    "success": true,
-    "message": "Data tugas berhasil diambil.",
-    "data": {
-      "items": [
-        {
-          "id": 422,
-          "taskCode": "TSK-0422",
-          "title": "Perancangan Solusi Integrasi TCES - TCIS",
-          "description": "Dokumentasi pemetaan payload API",
-          "status": "InProgress",
-          "priority": "Medium",
-          "progress": 50,
-          "milestone": "Implementation",
-          "projectId": 4,
-          "projectName": "Integrasi TCES TICS",
-          "assignedToUserId": "5e5f22d2-b7a6-4af1-b85c-564a52655b75",
-          "assignedToUserName": "Administrator Pro",
-          "totalDurationSeconds": 14400,
-          "totalDurationFormatted": "04:00:00"
-        }
-      ],
-      "page": 1,
-      "pageSize": 10,
-      "totalItems": 1,
-      "totalPages": 1
-    }
-  }
-  ```
 
-##### 2. `TaskController.Edit(...)` (Unified Save Architecture)
+##### 2. `TasksApiController.BulkUpdateTasks(...)` & `BulkDeleteTasks(...)`
+```csharp
+[HttpPost("bulk-update")]
+public async Task<IActionResult> BulkUpdateTasks([FromBody] BulkUpdateTasksDto dto)
+{
+    if (dto.TaskIds == null || !dto.TaskIds.Any())
+        return BadRequest(ApiResponse<object>.FailureResult("Tidak ada tugas yang dipilih"));
+
+    var tasks = await _db.Tasks.Where(t => dto.TaskIds.Contains(t.Id)).ToListAsync();
+    // Validasi isolasi tenant jika non-admin
+    if (!User.IsInRole("Admin"))
+    {
+        var userCompanyId = User.GetCompanyId();
+        tasks = tasks.Where(t => t.CompanyId == userCompanyId).ToList();
+    }
+
+    foreach (var task in tasks)
+    {
+        if (dto.Status.HasValue) task.Status = dto.Status.Value;
+        if (dto.Priority.HasValue) task.Priority = dto.Priority.Value;
+        if (dto.Progress.HasValue) task.Progress = dto.Progress.Value;
+        if (!string.IsNullOrEmpty(dto.AssignedToUserId)) task.AssignedToUserId = dto.AssignedToUserId;
+        task.UpdatedAt = DateTimeHelper.Now;
+    }
+
+    await _db.SaveChangesAsync();
+    return Ok(ApiResponse<object>.SuccessResult(null, $"{tasks.Count} tugas berhasil diperbarui"));
+}
+
+[HttpPost("bulk-delete")]
+public async Task<IActionResult> BulkDeleteTasks([FromBody] BulkDeleteTasksDto dto)
+{
+    if (dto.TaskIds == null || !dto.TaskIds.Any())
+        return BadRequest(ApiResponse<object>.FailureResult("Tidak ada tugas yang dipilih"));
+
+    var tasks = await _db.Tasks.Where(t => dto.TaskIds.Contains(t.Id)).ToListAsync();
+    if (!User.IsInRole("Admin"))
+    {
+        var userCompanyId = User.GetCompanyId();
+        tasks = tasks.Where(t => t.CompanyId == userCompanyId).ToList();
+    }
+
+    _db.Tasks.RemoveRange(tasks);
+    await _db.SaveChangesAsync();
+    return Ok(ApiResponse<object>.SuccessResult(null, $"{tasks.Count} tugas berhasil dihapus"));
+}
+```
+
+##### 3. Ergonomi Antarmuka Grid Tugas (Dynamic Text-Wrapping)
+Pada antarmuka frontend (komponen tabel tugas):
+- Sel kolom judul tugas menerapkan styling CSS `whitespace-normal break-words` dengan batas lebar fleksibel `max-w-md` atau `w-auto`.
+- Hal ini memastikan seluruh teks judul yang panjang terbungkus rapi ke baris berikutnya (*multi-line text wrapping*), sehingga pengguna dapat membaca keseluruhan nama tugas tanpa terpotong tanda elipsis (`...`).
+
+##### 4. `TaskController.Edit(...)` (Unified Save Architecture)
 ```csharp
 [HttpPost]
 [ValidateAntiForgeryToken]
@@ -300,8 +325,9 @@ public async Task<IActionResult> Edit(
 | **API** | `GET /api/projects/{id}` | `ProjectsApiController` | `Task<IActionResult> GetById(int id)` | Mengambil detail proyek beserta ringkasan progres tugas |
 | **API** | `GET /api/projects/{id}/tasks`| `ProjectsApiController` | `Task<IActionResult> GetProjectTasks(...)`| Mengambil daftar seluruh tugas milik proyek tertentu |
 | **API** | `GET /api/projects/{id}/analytics`| `ProjectsApiController` | `Task<IActionResult> GetProjectAnalytics(...)`| Menghitung rekapitulasi waktu kerja dan status tugas |
+| **API** | `GET /api/projects/companies`| `ProjectsApiController` | `Task<IActionResult> GetCompanies()` | Mengambil daftar perusahaan yang memiliki proyek aktif |
 
-#### B. Logika Pengambilan Data Proyek & Perhitungan Progres
+#### B. Logika Pengambilan Data Proyek, Scoping & Grouping View
 Pada `ProjectsApiController.GetAll(...)`:
 ```csharp
 var query = _db.Projects
@@ -311,7 +337,18 @@ var query = _db.Projects
     .AsNoTracking()
     .AsQueryable();
 
-// Proyeksi ke DTO dan kalkulasi agregasi
+// Multi-Tenancy Scoping: Non-Admin hanya dapat melihat proyek perusahaannya sendiri
+if (!User.IsInRole("Admin"))
+{
+    var userCompanyId = User.GetCompanyId();
+    query = query.Where(p => p.CompanyId == userCompanyId);
+}
+else if (companyId.HasValue)
+{
+    query = query.Where(p => p.CompanyId == companyId.Value);
+}
+
+// Proyeksi ke DTO dan kalkulasi agregasi progres
 var result = await query.Select(p => new ProjectResponseDto
 {
     Id = p.Id,
@@ -321,13 +358,21 @@ var result = await query.Select(p => new ProjectResponseDto
     Deadline = p.Deadline,
     Status = p.Status.ToString(),
     CompanyId = p.CompanyId,
-    CompanyName = p.Company != null ? p.Company.Name : "-",
+    CompanyName = p.Company != null ? p.Company.Name : "Perusahaan Tidak Terdaftar",
     TotalTasks = p.Tasks.Count,
     CompletedTasks = p.Tasks.Count(t => t.Status == TaskStatus.Done),
     ProgressPercent = p.Tasks.Any() ? (int)Math.Round(p.Tasks.Average(t => (double)t.Progress)) : 0,
     TotalDurationSeconds = p.Tasks.SelectMany(t => t.Sessions).Sum(s => s.Duration)
 }).ToListAsync();
 ```
+
+##### Arsitektur Antarmuka Dual-View Proyek
+1. **Tampilan Pengguna Biasa**: Grid kartu proyek standar yang hanya menampilkan proyek-proyek milik perusahaan terdaftar pengguna.
+2. **Tampilan Administrator (`viewMode: 'grouped'`)**:
+   - Proyek dikelompokkan berdasarkan `CompanyName` dalam bentuk kartu akordeon (*collapsible accordion*).
+   - Setiap grup perusahaan menampilkan header dengan nama perusahaan, lencana total proyek, lencana total tugas, tugas selesai, dan bar progress rata-rata.
+   - Bilah navigasi atas menyediakan *filter pills* untuk menyaring tampilan ke satu perusahaan tertentu atau melihat semua kelompok secara bersamaan.
+   - Modal pembuatan/pengubahan proyek menyertakan dropdown `CompanyId` untuk menetapkan perusahaan pemilik proyek.
 
 ---
 
@@ -382,10 +427,13 @@ var sessions = await _db.Sessions
 | **API** | `GET /api/attendance/today` | `AttendanceApiController` | `Task<IActionResult> GetToday()` | Mengambil status Clock-In/Clock-Out hari ini |
 | **API** | `GET /api/attendance/summary` | `AttendanceApiController` | `Task<IActionResult> GetMonthlySummary(...)`| Rekapitulasi hari hadir, WFO, WFH, Cuti, Sakit, Izin |
 | **API** | `POST /api/attendance/approve/{id}`| `AttendanceApiController` | `Task<IActionResult> Approve(int id)` | Menyetujui pengajuan izin/cuti oleh Admin |
+| **API** | `POST /api/attendance/manual` | `AttendanceApiController` | `Task<IActionResult> CreateManual(...)` | Pencatatan presensi manual lengkap dengan jam & kalkulasi |
 
-#### B. Logika Perhitungan Presensi & Zona Waktu GMT+7
-Sistem menggunakan `DateTimeHelper.Today` dan `DateTimeHelper.Now` yang terstandarisasi pada waktu lokal Indonesia Barat (GMT+7 / Asia/Jakarta).
+#### B. Logika Perhitungan Presensi, Input Manual & Zona Waktu GMT+7
+Sistem menggunakan `DateTimeHelper.Today` dan `DateTimeHelper.Now` yang terstandarisasi pada waktu lokal Indonesia Barat (**GMT+7 / Asia/Jakarta** atau dikonfigurasi melalui `SystemSettings["App:Timezone"]`):
+
 ```csharp
+// Standardisasi Zona Waktu GMT+7
 var today = DateTimeHelper.Today;
 var todayRecord = await _db.Attendances
     .Include(a => a.User)
@@ -395,6 +443,41 @@ var todayRecord = await _db.Attendances
 todayRecord.ClockOut = DateTimeHelper.Now;
 todayRecord.TotalHours = Math.Round((todayRecord.ClockOut.Value - todayRecord.ClockIn.Value).TotalHours, 2);
 await _db.SaveChangesAsync();
+```
+
+##### Prosedur Input Presensi Manual (`AttendanceApiController.CreateManual`)
+```csharp
+[HttpPost("manual")]
+public async Task<IActionResult> CreateManual([FromBody] ManualAttendanceDto dto)
+{
+    var targetUserId = User.IsInRole("Admin") && !string.IsNullOrEmpty(dto.UserId)
+        ? dto.UserId
+        : User.GetUserId();
+
+    double totalHours = 0;
+    if (dto.ClockIn.HasValue && dto.ClockOut.HasValue && dto.ClockOut > dto.ClockIn)
+    {
+        totalHours = Math.Round((dto.ClockOut.Value - dto.ClockIn.Value).TotalHours, 2);
+    }
+
+    var record = new AttendanceRecord
+    {
+        UserId = targetUserId,
+        Date = dto.Date.Date,
+        ClockIn = dto.ClockIn,
+        ClockOut = dto.ClockOut,
+        TotalHours = totalHours,
+        Status = dto.Status ?? "Hadir",
+        Notes = dto.Notes,
+        Location = dto.Location ?? "Office",
+        IsApproved = User.IsInRole("Admin"),
+        CreatedAt = DateTimeHelper.Now
+    };
+
+    _db.Attendances.Add(record);
+    await _db.SaveChangesAsync();
+    return Ok(ApiResponse<AttendanceRecord>.SuccessResult(record, "Presensi manual berhasil disimpan"));
+}
 ```
 
 ---
@@ -576,6 +659,17 @@ Setiap request HTTP yang mengubah data (`POST`, `PUT`, `DELETE`, `PATCH`) secara
 | **API** | `GET /api/masterdata/milestones` | `MasterDataApiController` | `Task<IActionResult> GetMilestones()` | Mengambil data dari tabel `MasterMilestones` |
 | **API** | `GET /api/masterdata/categories` | `MasterDataApiController` | `Task<IActionResult> GetCategories()` | Mengambil data dari tabel `Categories` |
 | **API** | `GET /api/configuration/settings`| `ConfigurationApiController`| `Task<IActionResult> GetSettings()` | Mengambil konfigurasi dinamis `SystemSettings` |
+| **API** | `GET /api/app-settings` | `AppSettingsApiController` | `Task<IActionResult> GetSettings()` | Mengambil identitas aplikasi (Nama, Perusahaan, Timezone) |
+| **API** | `PUT /api/app-settings` | `AppSettingsApiController` | `Task<IActionResult> UpdateSettings(...)`| Memperbarui identitas aplikasi dan nama perusahaan footer |
+
+#### B. Mekanisme Penyimpanan Identitas Aplikasi Dinamis (`SystemSettings`)
+Pengaturan identitas aplikasi disimpan dalam pasangan *Key-Value* pada tabel `SystemSettings`:
+- `App:Name`: Nama aplikasi (Default: `Work Tracker Pro v3.6 • Enterprise Edition`).
+- `App:CompanyName`: Nama perusahaan pengembang (Default: `PT Elistec Teknologi`).
+- `App:Description`: Deskripsi platform enterprise.
+- `App:Timezone`: Zona waktu operasional (Default: `GMT+7` / `Asia/Jakarta`).
+
+Saat endpoint `PUT /api/app-settings` dieksekusi oleh Administrator, sistem memperbarui rekaman di database tanpa me-restart server. Nilai ini langsung dikonsumsi oleh peramban web untuk memperbarui header dan footer halaman panduan pengguna (`/guide` dan `USER_GUIDE.md`) secara dinamis.
 
 ---
 
@@ -587,8 +681,26 @@ Setiap request HTTP yang mengubah data (`POST`, `PUT`, `DELETE`, `PATCH`) secara
 | :--- | :--- | :--- | :--- | :--- |
 | **MVC** | `GET /Home/Index` | `HomeController` | `Task<IActionResult> Index(...)` | Merender dashboard utama dengan ringkasan metrik |
 | **API** | `GET /api/dashboard/stats` | `DashboardApiController` | `Task<IActionResult> GetStats(...)` | Agregasi total tugas, proyek, jam kerja, anggota |
+| **API** | `GET /api/dashboard/workload` | `DashboardApiController` | `Task<IActionResult> GetTeamWorkload(...)`| Data beban kerja tim dalam format Vertical Bar Chart |
 | **API** | `GET /api/dashboard/productivity`| `DashboardApiController`| `Task<IActionResult> GetProductivityChart(...)`| Mengambil tren jam kerja harian/mingguan (Chart.js) |
 | **API** | `GET /api/dashboard/activities`| `DashboardApiController` | `Task<IActionResult> GetRecentActivities(...)`| Feed aktivitas terbaru dari sesi dan tugas |
+
+#### B. Logika Agregasi Beban Kerja Tim & Pengecualian Akun Administrator
+1. **Multi-Tenancy Filtering**: Seluruh kueri statistik pada `DashboardApiController` difilter berdasarkan `CompanyId` milik pengguna yang sedang aktif, sehingga data operasional antar perusahaan tidak saling tumpang tindih.
+2. **Pengecualian Akun Administrator**:
+   ```csharp
+   // Mengecualikan akun dengan role Admin/Administrator dari beban kerja tim operasional
+   var adminUserIds = await _userManager.GetUsersInRoleAsync("Admin");
+   var adminIds = adminUserIds.Select(u => u.Id).ToHashSet();
+
+   var workloadQuery = _db.Tasks
+       .Include(t => t.AssignedToUser)
+       .Where(t => t.AssignedToUserId != null && !adminIds.Contains(t.AssignedToUserId))
+       .Where(t => t.Status != TaskStatus.Done);
+   ```
+3. **Konfigurasi Vertical Bar Chart (Chart.js)**:
+   - Sumbu Y dikonfigurasi dengan `beginAtZero: true` dan interval bilangan bulat `ticks: { stepSize: 1, precision: 0 }`.
+   - Hal ini memberikan informasi visual tinggi rendahnya grafik batang secara presisi, memudahkan evaluasi komparatif beban tugas anggota tim.
 
 ---
 
@@ -1352,14 +1464,52 @@ catch (Exception)
 2. Pada fitur eksekusi skrip sinkronisasi atau pemulihan database, parser melakukan sanitasi perintah berbahaya dan memvalidasi tipe sintaks sebelum diteruskan ke `ExecuteSqlRawAsync`.
 
 ### 4.3 Isolasi Multi-Tenancy Berbasis `CompanyId`
-Setiap request yang dieksekusi oleh pengguna non-Admin secara ketat dibatasi oleh filter klausa LINQ:
+Setiap request yang dieksekusi oleh pengguna non-Admin secara ketat dibatasi oleh filter klausa LINQ berbasis ekstensi konteks pengguna (`User.GetCompanyId()`):
+
 ```csharp
-if (!User.IsInRole("Admin"))
+// Helper Ekstensi Klaim Identitas Pengguna
+public static int? GetCompanyId(this ClaimsPrincipal user)
 {
-    query = query.Where(x => x.CompanyId == currentUser.CompanyId);
+    var claim = user.FindFirst("companyId") ?? user.FindFirst("CompanyId");
+    if (claim != null && int.TryParse(claim.Value, out int id)) return id;
+    return null;
 }
 ```
-Hal ini mencegah celah kebocoran data antar perusahaan (*cross-tenant data leakage*) baik pada antarmuka web maupun endpoint RESTful API.
+
+#### Aturan Scoping Data Per-Modul:
+1. **Modul Tugas (`TasksApiController`)**:
+   ```csharp
+   if (!User.IsInRole("Admin"))
+   {
+       var userCompanyId = User.GetCompanyId();
+       query = query.Where(t => t.CompanyId == userCompanyId || 
+                                (t.Project != null && t.Project.CompanyId == userCompanyId));
+   }
+   ```
+2. **Modul Proyek (`ProjectsApiController`)**:
+   ```csharp
+   if (!User.IsInRole("Admin"))
+   {
+       var userCompanyId = User.GetCompanyId();
+       query = query.Where(p => p.CompanyId == userCompanyId);
+   }
+   ```
+   *Catatan*: Administrator dapat melihat seluruh proyek dan mengaktifkan mode pengelompokan (*grouped view*) berdasarkan nama perusahaan.
+3. **Modul Anggota Tim (`MembersApiController`)**:
+   ```csharp
+   if (!User.IsInRole("Admin"))
+   {
+       var userCompanyId = User.GetCompanyId();
+       query = query.Where(u => u.CompanyId == userCompanyId);
+   }
+   ```
+   Menjamin pengguna hanya dapat melihat rekan kerja yang berada dalam satu organisasi.
+4. **Modul Timesheet & Absensi (`TimesheetsApiController` & `AttendanceApiController`)**:
+   Sesi jam kerja dan rekaman absensi pengguna non-Admin hanya dibatasi untuk entitas yang terafiliasi dengan perusahaan pengguna.
+5. **Dashboard & Analitik (`DashboardApiController`)**:
+   Metrik agregat, status tugas, dan grafik beban kerja tim otomatis disaring hanya untuk perusahaan pengguna aktif, serta mengecualikan akun Administrator dari penghitungan beban kerja.
+
+Penerapan filter deklaratif ini di tingkat kueri LINQ EF Core mengeliminasi celah kebocoran data antar organisasi (*zero cross-tenant data leakage*), baik melalui antarmuka web Razor/React maupun endpoint RESTful API.
 
 ### 4.4 Keamanan File Upload & MIME Whitelisting
 Pada modul `NoteController` dan `NotesApiController`:

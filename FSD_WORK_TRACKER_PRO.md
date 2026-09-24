@@ -38,7 +38,7 @@
    - [5.10 Modul Import & Export Excel (Filter Periode, Format Standar, Format ARMS)](#510-modul-import--export-excel-filter-periode-format-standar-format-arms)
    - [5.11 Modul Anggota Tim (Member), Direktori Pure Grid Card, Banner Profil & Hapus Permanen Akun](#511-modul-anggota-tim-member-direktori-pure-grid-card-banner-profil--hapus-permanen-akun)
    - [5.12 Modul Audit Trail & Aktivitas Sistem](#512-modul-audit-trail--aktivitas-sistem)
-   - [5.13 Modul Master Data (Prioritas, Status & Milestone SDLC)](#513-modul-master-data-prioritas-status--milestone-sdlc)
+   - [5.13 Modul Master Data, Identitas Aplikasi & Footer Panduan](#513-modul-master-data-identitas-aplikasi--footer-panduan)
    - [5.14 Modul Kalender Tugas Interaktif & Role-Based Scope Filter](#514-modul-kalender-tugas-interaktif--role-based-scope-filter)
    - [5.15 Modul SQL Beautifier & Query Tools](#515-modul-sql-beautifier--query-tools)
    - [5.16 Modul Multi-Instance Synchronization & File Attachment Sync (Host Induk Sync)](#516-modul-multi-instance-synchronization--file-attachment-sync-host-induk-sync)
@@ -334,13 +334,16 @@ erDiagram
 | Modul / Operasi | Administrator | System Analyst | Technical Writer | User Biasa |
 | :--- | :---: | :---: | :---: | :---: |
 | **Login, Profil & Dashboard** | ✅ Akses Penuh | ✅ Akses | ✅ Akses | ✅ Akses |
+| **Isolasi Data Antar Perusahaan (Multi-Tenant)** | 🌐 Seluruh Perusahaan | 🏢 Perusahaan Sendiri | 🏢 Perusahaan Sendiri | 🏢 Perusahaan Sendiri |
+| **Mode Tampilan Proyek Grouping per Perusahaan** | ✅ Akses Penuh (Accordion Grouping) | ❌ Terkunci Perusahaan Sendiri | ❌ Terkunci Perusahaan Sendiri | ❌ Terkunci Perusahaan Sendiri |
 | **Buat & Ubah Tugas Sendiri** | ✅ Akses Penuh | ✅ Akses | ✅ Akses | ✅ Akses |
-| **Ubah Tugas Anggota Lain** | ✅ Akses Penuh | ✅ Akses *(Elevated)* | ✅ Akses *(Elevated)* | ❌ Dilarang |
+| **Ubah Tugas Anggota Lain (Satu Perusahaan)** | ✅ Akses Penuh | ✅ Akses *(Elevated)* | ✅ Akses *(Elevated)* | ❌ Dilarang |
+| **Operasi Batch Tugas (Checklist, Bulk Update & Delete)** | ✅ Akses Penuh | ✅ Akses *(Elevated)* | ✅ Akses *(Elevated)* | ✅ *(Tugas Sendiri)* |
 | **Penyatuan Edit Tugas & Jam Kerja**| ✅ Akses Penuh | ✅ Akses *(Elevated)* | ✅ Akses *(Elevated)* | ✅ Akses *(Tugas Sendiri)* |
 | **Mulai Timer pada Tugas Lain**| ✅ Akses Penuh | ✅ Akses *(Elevated)* | ✅ Akses *(Elevated)* | ❌ Dilarang |
 | **Multi-Timer Serentak Sendiri**| ✅ Akses Penuh | ✅ Akses | ✅ Akses | ✅ Akses |
-| **Presensi Mandiri (Check-in/out)**| ✅ Akses Penuh | ✅ Akses | ✅ Akses | ✅ Akses |
-| **Rekonsiliasi Presensi Tim**| ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
+| **Presensi Mandiri (Check-in/out - GMT+7)**| ✅ Akses Penuh | ✅ Akses | ✅ Akses | ✅ Akses |
+| **Input Presensi Manual & Rekonsiliasi Tim**| ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
 | **Filter Kalender: Semua Tim**| ✅ Akses Penuh | ❌ Terkunci Mandiri | ❌ Terkunci Mandiri | ❌ Terkunci Mandiri |
 | **Filter Kalender: Tugas Sendiri**| ✅ Akses Penuh | ✅ Akses | ✅ Akses | ✅ Akses |
 | **SQL Beautifier & Query Tools**| ✅ Akses Penuh | ✅ Akses | ✅ Akses | ✅ Akses |
@@ -349,12 +352,12 @@ erDiagram
 | **Ekspor Timesheet Personal** | ✅ Akses Penuh | ✅ Akses | ✅ Akses | ✅ Akses |
 | **Hapus Tugas Sendiri** | ✅ Akses Penuh | ✅ Akses | ✅ Akses | ✅ Akses |
 | **Hapus Tugas Orang Lain** | ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
-| **Ekspor Excel (Standard & ARMS)**| ✅ Akses Penuh | ✅ Akses | ✅ Akses | ✅ Akses |
-| **Manajemen Proyek (CRUD)** | ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
+| **Ekspor Excel (Standard, ARMS & Terpilih)**| ✅ Akses Penuh | ✅ Akses | ✅ Akses | ✅ Akses |
+| **Manajemen Proyek (CRUD & Penetapan Perusahaan)**| ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
 | **Import Tugas Excel** | ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
 | **Manajemen Member & Reset Password**| ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
 | **Hapus Permanen Anggota (Permanent Delete)**| ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
-| **Master Data (Prioritas, Status, SDLC)**| ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
+| **Master Data & Konfigurasi Identitas Aplikasi**| ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
 | **Konfigurasi & Audit Trail**| ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
 | **Pengaturan SMTP & Email Templates**| ✅ Akses Penuh | ❌ Dilarang | ❌ Dilarang | ❌ Dilarang |
 
@@ -400,9 +403,15 @@ erDiagram
   - **Penolakan (Reject)**: Admin dapat menolak pendaftaran disertai catatan alasan penolakan (`RejectionReason`) melalui Web UI atau API `POST /api/members/{id}/reject`. Sistem mengirimkan email pemberitahuan penolakan `USER_REJECTED` dan menghapus rekaman registrasi akun.
 
 #### 5.1.4 Modul Multi-Tenancy Organisasi & Perusahaan (Company Isolation)
-- Setiap pengguna, proyek, tugas, dan catatan kerja terhubung ke entitas Perusahaan/Organisasi (`CompanyId`).
+- Setiap pengguna, proyek, tugas, sesi kerja (*timesheet*), presensi kehadiran (*attendance*), dan catatan kerja terhubung ke entitas Perusahaan/Organisasi (`CompanyId`).
 - Pada saat pendaftaran, pengguna dapat memilih untuk bergabung dengan perusahaan yang sudah ada (`CompanyOption = existing`) atau mendaftarkan nama/kode perusahaan baru (`CompanyOption = new`).
-- **Isolasi Data**: Pengguna reguler hanya dapat melihat dan mengakses proyek, tugas, dan catatan yang berada dalam lingkup perusahaan yang sama. Administrator memiliki visibilitas penuh terhadap seluruh entitas untuk keperluan audit dan pengawasan lintas tim.
+- **Isolasi Data Ketat (Cross-Tenant Data Isolation)**:
+  - Pengguna reguler (non-Admin) secara otomatis dibatasi hanya dapat melihat dan mengakses proyek, tugas, anggota tim (*members*), sesi timesheet, dan rekaman presensi yang berada dalam lingkup perusahaan yang sama (`currentUser.CompanyId`).
+  - API dan antarmuka web memvalidasi klaim `CompanyId` pada setiap request guna mencegah kebocoran data antar organisasi (*zero cross-tenant data leakage*).
+  - Administrator memiliki visibilitas lintas perusahaan untuk keperluan tata kelola sistem, audit, dan pengawasan terpusat.
+- **Dashboard & Analitik Beban Kerja Tim**:
+  - Visualisasi beban kerja tim pada Dashboard disajikan dalam bentuk **Grafik Batang Vertikal (*Vertical Bar Chart*)** bertenaga Chart.js dengan label sumbu Y eksplisit (0, 1, 2, 3...) yang menunjukkan tinggi rendahnya beban tugas secara akurat.
+  - Akun dengan peran **Administrator** secara otomatis dikecualikan (*excluded*) dari metrik beban kerja tim dan ringkasan tugas operasional, sehingga grafik dan statistik murni mencerminkan kapasitas operasional staf dan pelaksana teknis.
 
 ### 5.2 Modul Sistem Desain Responsif & Mobile Navigation
 - **Off-Canvas Drawer Navigation**: Menggantikan sidebar pada layar `< 1024px` dengan transisi halus dan latar belakang *backdrop blur*.
@@ -426,15 +435,28 @@ erDiagram
 ### 5.4 Modul Manajemen Proyek & Kategori
 - Pengelompokan tugas berdasarkan proyek multi-bulan dan kategori pekerjaan teknis.
 - Perhitungan agregasi progress penyelesaian proyek secara dinamis.
+- **Dual-View Arsitektur Proyek (Admin Grouping vs Regular User)**:
+  - **Tampilan Pengguna Biasa (Member Scoped View)**: Pengguna reguler hanya dapat melihat proyek-proyek yang terdaftar di bawah perusahaannya sendiri.
+  - **Tampilan Administrator (Company Grouping View - `viewMode: 'grouped'`)**:
+    - Administrator disajikan dengan tampilan yang mengelompokkan proyek berdasarkan nama perusahaan yang telah terdaftar dalam sistem.
+    - Disajikan dalam bentuk kartu akordeon (*collapsible accordion cards*) per perusahaan, lengkap dengan metrik agregasi: Total Proyek, Total Tugas, Tugas Selesai, dan Rata-rata Progres Proyek.
+    - Dilengkapi dengan *filter pills* perusahaan di bagian atas halaman untuk navigasi cepat dan penyaringan satu klik.
+    - Pengaturan perusahaan pemilik proyek pada modal pembuatan (*Create*) dan pengeditan (*Edit*) proyek untuk memudahkan pengalokasian proyek baru.
 
 ### 5.5 Modul Manajemen Tugas, Struktur Parenting & Penyatuan Timesheet Manual
 - **Parent-Child Hierarchy**: Kemampuan menghubungkan sub-tugas ke tugas induk.
 - **Log Kendala & Solusi**: Kolom `Obstacle` dan `Solution` untuk dokumentasi teknis hambatan kerja.
 - **Progress Slider (0–100%)**: Tombol cepat (0%, 25%, 50%, 75%, 100%) dengan auto-sync status *Done*.
-- **Filter Periode Ekspor**: Ekspor tugas berdasarkan rentang waktu fleksibel (*Today, Yesterday, Last 7 Days, Last 30 Days, This Month, Last Month, Custom*).
 - **Penyatuan Formulir Edit Tugas & Pengisian Jam Kerja Manual (`SaveTaskAndSession`)**:
   - Form pada `Views/Task/Edit.cshtml` mengintegrasikan kolom input pencatatan jam kerja manual: *Durasi Jam*, *Durasi Menit*, *Tanggal Sesi Kerja*, dan *Catatan Sesi*.
-  - Aksi simpan tunggal mengeksekusi method `Edit` pada `TaskController.cs` yang memvalidasi dan memperbarui data tugas sekaligus mencatat entitas `WorkSessions` baru secara atomik dalam satu request transaksi database, mengeliminasi kebutuhan navigasi ganda ke menu timesheet terpisah.
+  - Aksi simpan tunggal mengeksekusi method `Edit` pada `TaskController.cs` yang memvalidasi dan memperbarui data tugas sekaligus mencatat entitas `WorkSessions` baru secara atomik dalam satu request transaksi database.
+- **Ergonomi Grid Data Tugas, Text Wrapping & Operasi Batch (Bulk Actions)**:
+  - **Wrapping Nama Tugas (Dynamic Text Wrapping)**: Baris grid data tugas tidak diwajibkan seragam tingginya. Kolom judul tugas mengaktifkan *text wrapping* fleksibel sehingga nama tugas yang panjang tampil secara utuh tanpa terpotong (*no ellipsis truncation*).
+  - **Checklist Baris & Checkbox Select All**: Setiap baris tugas dilengkapi kotak centang (*row checkbox*), didukung oleh checkbox induk di header tabel (*Select All*) untuk menandai seluruh tugas pada halaman aktif.
+  - **Floating Bulk Action Bar**: Saat satu atau lebih tugas dicentang, bar aksi mengambang muncul di bagian bawah layar menyediakan 3 operasi massal:
+    1. **Bulk Update**: Membuka modal untuk mengubah Status, Prioritas, Penugasan PIC, atau Progres (0–100%) secara serentak untuk seluruh tugas yang dipilih.
+    2. **Bulk Delete**: Menghapus seluruh tugas yang dipilih secara bersamaan dengan konfirmasi modal demi keamanan data.
+    3. **Export Selected**: Mengekspor baris tugas yang dicentang secara langsung ke berkas spreadsheet Excel `.xlsx` menggunakan ClosedXML.
 
 ### 5.6 Modul Kanban Board Interaktif & Mobile Segmented Switcher
 - Papan visual bertenaga **SortableJS** dengan drag-and-drop kartu real-time.
@@ -452,10 +474,16 @@ erDiagram
   - Tombol **Check In** dan **Check Out** dengan live timer durasi kerja harian.
   - Pilihan status kehadiran: `Hadir`, `WFH (Work From Home)`, `Sakit`, `Izin`, `Cuti`, `Libur`, dan `Terlambat`.
   - Input catatan aktivitas harian dan informasi lokasi kerja.
+- **Pencatatan Presensi Manual (Manual Attendance Entry)**:
+  - Tersedia modal input manual bagi pengguna dan Administrator untuk mencatat atau mengoreksi data presensi yang terlewat.
+  - Input mencakup: Tanggal Kehadiran, Pemilihan Karyawan (khusus Admin), Status Kehadiran, Jam Masuk (*Clock-In*), Jam Keluar (*Clock-Out*), Total Jam Kerja yang dikalkulasi otomatis dalam satuan jam desimal, Catatan Kerja, dan Status Persetujuan (*Approved / Pending*).
+- **Zona Waktu Operasional Terstandarisasi GMT+7 (WIB)**:
+  - Seluruh pencatatan presensi, clocker waktu nyata, dan kalkulasi jam kerja berjalan menggunakan zona waktu Indonesia Barat (**GMT+7 / Asia/Jakarta**).
+  - Zona waktu ini juga dapat disesuaikan secara dinamis melalui halaman konfigurasi aplikasi (`App:Timezone`).
 - **Rekonsiliasi Tim untuk Administrator**:
   - Tampilan kalender kehadiran bulanan per anggota tim.
-  - Form koreksi jam kerja, status absensi, dan penambahan rekaman presensi manual.
-  - REST API endpoint terpadu: `GET/POST /api/attendance/today`, `POST /api/attendance/check-in`, `POST /api/attendance/check-out`, `GET /api/attendance/monthly`.
+  - Form koreksi jam kerja, status absensi, dan approval rekaman presensi.
+  - REST API endpoint terpadu: `GET/POST /api/attendance/today`, `POST /api/attendance/check-in`, `POST /api/attendance/check-out`, `POST /api/attendance/manual`, `GET /api/attendance/monthly`.
 
 ### 5.9 Modul Catatan & Multi-File Upload Terorganisir Folder Pengguna
 - Editor teks kaya WYSIWYG bertenaga **Quill.js**.
@@ -465,10 +493,12 @@ erDiagram
 ### 5.10 Modul Import & Export Excel (Filter Periode, Format Standar, Format ARMS)
 - **Format Standar (9 Kolom)**: Fitur wizard preview interaktif dan penugasan PIC massal (*Bulk Assign*).
 - **Format ARMS Enterprise (21 Kolom)**: Ekspor dan impor tugas berstandar enterprise dengan pemetaan SDLC Waterfall Milestone.
+- **Ekspor Data Tugas Terseleksi**: Kemampuan mengekspor tugas-tugas terpilih dari baris tabel (*checkbox selection*) ke berkas `.xlsx`.
 
 ### 5.11 Modul Anggota Tim (Member), Direktori Pure Grid Card, Banner Profil & Hapus Permanen Akun
 - **Direktori Pure Grid Card Layout**:
   - Tampilan direktori tim berbasis *Pure Grid Card* responsif (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`) dengan visual kartu tim modern, avatar inisial berwarna, badge jabatan, dan ringkasan metrik jam kerja.
+  - Terikat dengan isolasi perusahaan (`CompanyId`): pengguna non-admin hanya melihat daftar rekan satu perusahaannya.
   - Proteksi *Anti-Overflow & Truncation* pada kartu anggota untuk menjamin estetika tata letak tetap rapi pada teks nama, email, dan jabatan yang panjang tanpa merusak layout.
 - **Kustomisasi Banner Cover Profil (`CoverPictureUrl`)**:
   - Pengguna dapat mengunggah gambar sampul (cover banner) kustom untuk mempercantik halaman profil pribadi (`/Account/Profile`).
@@ -483,8 +513,15 @@ erDiagram
 - Pencatatan otomatis seluruh aktivitas controller via `AuditLogActionFilter`.
 - Visualisasi grafik multi-series tren aktivitas dan ekspor audit log ke CSV.
 
-### 5.13 Modul Master Data (Prioritas, Status & Milestone SDLC)
-- Pengelolaan referensi Master Prioritas, Master Status, Kategori, dan Master Milestone SDLC Waterfall (*Requirement Analysis*, *System Design*, *Implementation*, *Testing & QA*, *Deployment*, *Maintenance*).
+### 5.13 Modul Master Data, Identitas Aplikasi & Footer Panduan
+- **Pengelolaan Referensi SDLC**: Master Prioritas, Master Status, Kategori, dan Master Milestone SDLC Waterfall (*Requirement Analysis*, *System Design*, *Implementation*, *Testing & QA*, *Deployment*, *Maintenance*).
+- **Sub-Modul Identitas Aplikasi & Footer Panduan**:
+  - Disediakan tab khusus di `/master-data` dan `/Configuration` bagi Administrator untuk mengatur identitas aplikasi secara dinamis:
+    - **Nama Aplikasi**: Default `Work Tracker Pro v3.6 • Enterprise Edition`.
+    - **Nama Perusahaan Pembuat / Vendor**: Default `PT Elistec Teknologi`.
+    - **Deskripsi Aplikasi**: Ringkasan platform yang tampil pada metadata sistem.
+    - **Timezone Sistem**: Konfigurasi zona waktu operasional (default: `GMT+7`).
+  - Seluruh parameter tersimpan pada tabel `SystemSettings` dan langsung me-refresh tampilan bilah footer serta header pada **Buku Panduan Pengguna** (`/guide` dan `USER_GUIDE.md`) secara otomatis tanpa perlu deployment ulang.
 
 ### 5.14 Modul Kalender Tugas Interaktif & Role-Based Scope Filter
 - Antarmuka kalender visual bertenaga **FullCalendar v6** dengan tampilan Bulan (*Month*), Minggu (*Week*), dan Hari (*Day*).

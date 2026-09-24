@@ -1,7 +1,8 @@
 # Buku Panduan Pengguna (User Guide)
 # Work Tracker Pro (TrackerKerja)
 
-> **Versi Aplikasi**: 3.6 (Enterprise Security, Dual Auth & Multi-Instance Edition)  
+> **Versi Aplikasi**: Work Tracker Pro v3.6 • Enterprise Edition  
+> **Vendor / Pengembang**: PT Elistec Teknologi  
 > **Target Pengguna**: Seluruh Karyawan, System Analyst, Developer, QA, Technical Writer, Project Lead, dan Administrator  
 > **Terakhir Diperbarui**: 24 September 2026  
 
@@ -17,7 +18,7 @@
 2. [Dashboard & Ringkasan Kinerja](#2-dashboard--ringkasan-kinerja)
    - 2.1 [Kartu Metrik & Statistik Pribadi](#21-kartu-metrik--statistik-pribadi)
    - 2.2 [Pemberitahuan & Notifikasi Lonceng](#22-pemberitahuan--notifikasi-lonceng)
-   - 2.3 [Distribusi Tugas & Beban Kerja Proyek](#23-distribusi-tugas--beban-kerja-proyek)
+   - 2.3 [Distribusi Tugas & Grafik Beban Kerja Tim (Vertical Bar)](#23-distribusi-tugas--grafik-beban-kerja-tim-vertical-bar)
 3. [Modul Task (Manajemen Tugas Kerja)](#3-modul-task-manajemen-tugas-kerja)
    - 3.1 [Membuat Tugas Baru](#31-membuat-tugas-baru)
    - 3.2 [Daftar Tugas & Filter Pencarian Cepat](#32-daftar-tugas--filter-pencarian-cepat)
@@ -27,9 +28,12 @@
    - 3.6 [Papan Kanban Interaktif (Geser & Letakkan)](#36-papan-kanban-interaktif-geser--letakkan)
    - 3.7 [Import Data Tugas dari Excel (Format Standar & Format ARMS)](#37-import-data-tugas-dari-excel-format-standar--format-arms)
    - 3.8 [Penyatuan Formulir Edit Tugas & Pengisian Jam Kerja Manual (Satu Tombol Simpan)](#38-penyatuan-formulir-edit-tugas--pengisian-jam-kerja-manual-satu-tombol-simpan)
+   - 3.9 [Operasi Massal Tugas (Checklist, Select All, Bulk Update & Delete)](#39-operasi-massal-tugas-checklist-select-all-bulk-update--delete)
+   - 3.10 [Tampilan Teks Nama Tugas Melipat (Text Wrapping) & Ekspor Terpilih](#310-tampilan-teks-nama-tugas-melipat-text-wrapping--ekspor-terpilih)
 4. [Modul Project (Manajemen Proyek)](#4-modul-project-manajemen-proyek)
    - 4.1 [Membuat & Mengelola Proyek](#41-membuat--mengelola-proyek)
    - 4.2 [Memantau Linimasa, Tenggat Waktu & Progres Proyek](#42-memantau-linimasa-tenggat-waktu--progres-proyek)
+   - 4.3 [Tampilan Proyek Berdasarkan Perusahaan (Admin Grouping View vs Pengguna Biasa)](#43-tampilan-proyek-berdasarkan-perusahaan-admin-grouping-view-vs-pengguna-biasa)
 5. [Modul Timesheet & Pelacakan Jam Kerja](#5-modul-timesheet--pelacakan-jam-kerja)
    - 5.1 [Pencatatan Jam Otomatis (Live Timer / Clock In & Clock Out)](#51-pencatatan-jam-otomatis-live-timer--clock-in--clock-out)
    - 5.2 [Penggunaan Multi-Timer Bersamaan](#52-penggunaan-multi-timer-bersamaan)
@@ -39,7 +43,8 @@
 6. [Modul Absensi & Presensi Kerja (Attendance)](#6-modul-absensi--presensi-kerja-attendance)
    - 6.1 [Pencatatan Check-In & Check-Out Harian](#61-pencatatan-check-in--check-out-harian)
    - 6.2 [Status Kehadiran Fleksibel (Hadir, WFH, Sakit, Izin, Cuti, Libur)](#62-status-kehadiran-fleksibel-hadir-wfh-sakit-izin-cuti-libur)
-   - 6.3 [Monitoring Rekapitulasi Presensi Tim](#63-monitoring-rekapitulasi-presensi-tim)
+   - 6.3 [Input Presensi Manual & Pengaturan Zona Waktu GMT+7](#63-input-presensi-manual--pengaturan-zona-waktu-gmt7)
+   - 6.4 [Monitoring Rekapitulasi Presensi Tim](#64-monitoring-rekapitulasi-presensi-tim)
 7. [Modul Kalender Kerja & Jadwal (Calendar)](#7-modul-kalender-kerja--jadwal-calendar)
    - 7.1 [Tampilan Kalender Berbasis Peran (RBAC Filter)](#71-tampilan-kalender-berbasis-peran-rbac-filter)
    - 7.2 [Fitur Khusus Administrator (Dropdown Semua Tugas vs Tugas Saya)](#72-fitur-khusus-administrator-dropdown-semua-tugas-vs-tugas-saya)
@@ -66,6 +71,8 @@
     - 13.4 [Sinkronisasi Multi-Instance ke Host Induk (Online Streaming Base64 & Paket ZIP)](#134-sinkronisasi-multi-instance-ke-host-induk-online-streaming-base64--paket-zip)
     - 13.5 [Backup & Export Database (.db & .sql)](#135-backup--export-database-db--sql)
     - 13.6 [Integrasi Server Email (SMTP), Diagnostik Koneksi & 7 Template Event](#136-integrasi-server-email-smtp-diagnostik-koneksi--7-template-event)
+    - 13.7 [Manajemen Template Email Event & Live Preview](#137-manajemen-template-email-event--live-preview)
+    - 13.8 [Konfigurasi Identitas Aplikasi & Footer Panduan Dinamis](#138-konfigurasi-identitas-aplikasi--footer-panduan-dinamis)
 14. [Tips & Pertanyaan Umum (FAQ)](#14-tips--pertanyaan-umum-faq)
 
 ---
@@ -154,8 +161,13 @@ Klik ikon **Lonceng Notifikasi** pada bilah atas untuk melihat panel pemberitahu
 - **Tab Mendekati Deadline**: Tugas yang memiliki batas waktu dalam 2–3 hari ke depan.
 - **Tab Timesheet (Pengingat Cut-Off)**: Menampilkan daftar tugas aktif yang belum memiliki catatan jam kerja (*timesheet*), terutama saat mendekati periode cut-off bulanan tanggal 25.
 
-### 2.3 Distribusi Tugas & Beban Kerja Proyek
-Menampilkan diagram lingkaran (*doughnut chart*) dan grafik batang interaktif untuk melihat sebaran tugas per proyek, persentase penyelesaian, serta ringkasan aktivitas terbaru tim.
+### 2.3 Distribusi Tugas & Grafik Beban Kerja Tim (Vertical Bar)
+- Menampilkan diagram lingkaran (*doughnut chart*) untuk sebaran status tugas serta **Grafik Batang Vertikal (*Vertical Bar Chart*)** untuk beban kerja tim aktif.
+- **Visualisasi Tinggi Beban Kerja yang Presisi**:
+  - Grafik batang vertikal menampilkan jumlah tugas aktif yang sedang ditangani oleh masing-masing anggota tim.
+  - Sumbu Y dikonfigurasi dengan interval angka bulat yang jelas (0, 1, 2, 3, ...), sehingga perbedaan tinggi-rendahnya batang grafik langsung memberikan informasi komparatif yang akurat mengenai siapa anggota tim yang memiliki beban kerja tinggi maupun yang masih memiliki kapasitas luang.
+- **Pengecualian Akun Administrator**:
+  - Akun dengan peran **Administrator** secara otomatis dikecualikan dari grafik beban kerja tim operasional ini, sehingga grafik murni mencerminkan alokasi tugas para staf dan pengembang pelaksana.
 
 ---
 
@@ -222,7 +234,7 @@ Aplikasi mendukung impor banyak tugas sekaligus melalui berkas spreadsheet Excel
 
 ### 3.8 Penyatuan Formulir Edit Tugas & Pengisian Jam Kerja Manual (Satu Tombol Simpan)
 Untuk mempercepat alur kerja harian pengembang dan analis sistem:
-- Pada halaman **Ubah Tugas** (`/Task/Edit/{id}`), selain memperbarui rincian tugas (judul, status, progress, kendala, solusi), formulir kini menyediakan seksi terintegrasi **Catat Jam Kerja Sesi Ini (Manual Timesheet)**.
+- Pada halaman **Ubah Tugas** (`/Task/Edit/{id}`), selain memperbarui rincian tugas (judul, status, progress, kendala, solusi), formulir menyediakan seksi terintegrasi **Catat Jam Kerja Sesi Ini (Manual Timesheet)**.
 - Anda dapat langsung mengisi:
   - **Durasi Jam & Menit**: Misal *2 Jam 30 Menit*.
   - **Tanggal Sesi Kerja**: Tanggal saat pekerjaan dilakukan (default: hari ini).
@@ -230,6 +242,29 @@ Untuk mempercepat alur kerja harian pengembang dan analis sistem:
 - **Tombol Aksi Tunggal ("Simpan Perubahan & Sesi Kerja Manual")**:
   - Cukup satu kali klik, sistem secara atomik akan memperbarui informasi tugas di tabel `WorkTasks` dan sekaligus membuat entri log sesi kerja baru di tabel `WorkSessions`.
   - Anda tidak perlu lagi berpindah bolak-balik antara menu Tugas dan menu Timesheet terpisah.
+
+### 3.9 Operasi Massal Tugas (Checklist, Select All, Bulk Update & Delete)
+Untuk mengelola puluhan atau ratusan tugas secara cepat dan efisien:
+1. **Memilih Tugas (Checklist Baris & Select All)**:
+   - Centang kotak kecil (*row checkbox*) pada baris tugas yang ingin Anda kelola.
+   - Untuk memilih seluruh tugas pada halaman saat ini, cukup klik **Kotak Centang Header (Select All)** di baris paling atas tabel.
+2. **Bilah Aksi Mengambang (Floating Bulk Action Bar)**:
+   - Segera setelah minimal satu tugas dicentang, bilah aksi mengambang berwarna gelap/aksen akan muncul di bagian bawah layar menampilkan jumlah tugas yang dipilih beserta tombol aksi:
+   - **Perbarui Masal (Bulk Update)**:
+     - Klik tombol **Update Status / Prioritas**.
+     - Dialog modal akan muncul memungkinkan Anda mengubah **Status**, **Prioritas**, **PIC Penugasan**, atau **Progress (0–100%)** secara serentak.
+     - Pilih atribut yang ingin diubah, lalu klik **Terapkan Pembaruan Massal**.
+   - **Hapus Masal (Bulk Delete)**:
+     - Klik tombol merah **Hapus Terpilih**.
+     - Sistem akan menampilkan dialog konfirmasi keamanan jumlah tugas yang akan dihapus. Klik **Ya, Hapus Semua** untuk mengeksekusi penghapusan serentak.
+   - **Batal Pilihan**: Klik tombol **Batal / Deselect** untuk membersihkan seluruh centang seleksi.
+
+### 3.10 Tampilan Teks Nama Tugas Melipat (Text Wrapping) & Ekspor Terpilih
+1. **Teks Melipat Otomatis (Dynamic Text Wrapping)**:
+   - Kolom nama tugas pada tabel dirancang fleksibel dengan tinggi baris yang menyesuaikan secara dinamis.
+   - Baris grid data tidak diwajibkan seragam tingginya. Nama tugas yang panjang tidak lagi terpotong elipsis (`...`), melainkan melipat rapi ke baris berikutnya sehingga seluruh deskripsi judul tugas dapat dibaca secara utuh langsung dari tabel.
+2. **Ekspor Tugas Terpilih ke Excel**:
+   - Anda dapat memilih beberapa tugas spesifik menggunakan kotak centang, lalu mengklik tombol **Export Excel** pada bilah aksi massal untuk mengunduh spreadsheet `.xlsx` resmi yang hanya memuat tugas-tugas terpilih tersebut.
 
 ---
 
@@ -239,11 +274,25 @@ Untuk mempercepat alur kerja harian pengembang dan analis sistem:
 1. Buka menu **Proyek** (`/Project`).
 2. Klik tombol **+ Proyek Baru**.
 3. Masukkan **Nama Proyek**, **Deskripsi**, **Warna Identitas Proyek** (digunakan sebagai label pada kartu tugas), dan **Batas Akhir Proyek (Deadline)**.
-4. Klik **Simpan Proyek**.
+4. *(Khusus Administrator)*: Tentukan **Perusahaan / Organisasi** pemilik proyek melalui pilihan dropdown yang tersedia.
+5. Klik **Simpan Proyek**.
 
 ### 4.2 Memantau Linimasa, Tenggat Waktu & Progres Proyek
 - Setiap kartu proyek menampilkan persentase penyelesaian keseluruhan tugas, rasio tugas selesai vs total tugas, dan status ketercapaian target waktu (*On Track* atau *At Risk*).
 - Mengklik salah satu proyek akan membuka halaman khusus proyek yang menyajikan seluruh tugas, timesheet, catatan, dan linimasa yang berkaitan langsung dengan proyek tersebut.
+
+### 4.3 Tampilan Proyek Berdasarkan Perusahaan (Admin Grouping View vs Pengguna Biasa)
+Aplikasi menerapkan pemisahan hak akses dan mode tampilan yang berbeda untuk menjamin privasi dan kemudahan tata kelola proyek:
+1. **Tampilan Pengguna Biasa (Member / Staf)**:
+   - Pengguna reguler hanya dapat melihat proyek-proyek yang terdaftar di bawah perusahaan tempat ia bernaung.
+   - Proyek dari perusahaan lain disembunyikan sepenuhnya dari pandangan (*strict multi-tenant isolation*).
+2. **Tampilan Administrator (Company Grouping View / Mode Dikelompokkan per Perusahaan)**:
+   - Administrator disajikan dengan tampilan proyek yang dikelompokkan secara terstruktur berdasarkan **Nama Perusahaan**.
+   - Setiap perusahaan disajikan dalam bentuk **Kartu Akordeon Lipat (*Collapsible Accordion*)** yang memuat:
+     - Nama perusahaan dan badge kode perusahaan.
+     - Ringkasan metrik: Total Proyek, Total Tugas, Tugas Selesai, dan Rata-rata Progres Proyek.
+     - Kartu-kartu proyek yang berada di bawah naungan perusahaan tersebut.
+   - **Filter Pills Perusahaan**: Di bagian atas halaman, tersedia tombol-tombol pil (*pill buttons*) untuk menyaring tampilan secara instan ke satu perusahaan tertentu atau menampilkan seluruh kelompok perusahaan secara bersamaan.
 
 ---
 
@@ -301,9 +350,25 @@ Pengguna dapat memilih status kehadiran sesuai kondisi kerja:
 - **Izin / Cuti**: Mengambil jatah cuti atau izin keperluan pribadi.
 - **Libur**: Hari libur resmi.
 
-### 6.3 Monitoring Rekapitulasi Presensi Tim
+### 6.3 Input Presensi Manual & Pengaturan Zona Waktu GMT+7
+1. **Pencatatan Presensi Manual**:
+   - Jika Anda lupa melakukan Check-In / Check-Out pada hari kerja sebelumnya, atau bagi Administrator yang perlu merekap kehadiran anggota tim:
+   - Klik tombol **+ Input Presensi Manual** pada halaman `/Attendance`.
+   - Isi formulir modal kehadiran:
+     - **Tanggal Kehadiran**: Tanggal hari kerja yang ingin direkam.
+     - **Karyawan / Anggota**: (Khusus Administrator dapat memilih anggota tim target; untuk staf biasa otomatis terkunci pada akun sendiri).
+     - **Status Kehadiran**: Pilih status (Hadir, WFH, Sakit, Izin, Cuti, dll).
+     - **Jam Masuk (Clock In)** & **Jam Keluar (Clock Out)**: Tentukan waktu kedatangan dan kepulangan. Sistem secara otomatis menghitung **Total Jam Kerja** dalam format jam desimal.
+     - **Catatan & Lokasi**: Tuliskan alasan keterlambatan atau catatan kegiatan kerja.
+   - Klik tombol **Simpan Presensi**.
+2. **Standardisasi Zona Waktu Operasional (GMT+7 / WIB)**:
+   - Seluruh timer kehadiran, tombol Check-In / Check-Out, serta pencatatan jam kerja beroperasi terstandarisasi pada waktu Indonesia Barat (**GMT+7**).
+   - Zona waktu ini dapat disesuaikan oleh Administrator melalui menu konfigurasi aplikasi sesuai zona waktu operasional perusahaan.
+
+### 6.4 Monitoring Rekapitulasi Presensi Tim
 - Administrator dapat melihat rekapitulasi kehadiran seluruh anggota tim dalam format tabel bulanan yang rapi.
 - Membantu bagian operasional dan manajemen dalam memverifikasi kedisiplinan dan ketersediaan tim.
+- Pengguna non-admin hanya dapat melihat riwayat kehadiran mereka sendiri sesuai isolasi perusahaan (*multi-tenant company isolation*).
 
 ---
 
@@ -492,8 +557,17 @@ Sistem menyediakan sub-modul khusus untuk mengatur format dan isi pesan email un
 3. **Pratinjau Langsung (Live Preview Modal)**:
    - Klik tombol **Pratinjau (Preview)** pada kartu template.
    - Sistem akan me-render template lengkap dengan data contoh secara real-time sehingga Anda dapat memastikan tampilan email tampak rapi, profesional, dan responsif.
-4. **Memulihkan Template Bawaan (Reset ke Default)**:
-   - Jika Anda ingin mengembalikan format template ke rancangan default pabrik, klik tombol **Reset ke Default** di pojok kanan atas sub-modul template.
+### 13.8 Konfigurasi Identitas Aplikasi & Footer Panduan Dinamis
+Bagi Administrator sistem, nama aplikasi dan identitas vendor pembuat dapat disesuaikan secara dinamis:
+1. Buka menu **Master Data (`/master-data`)** atau **Konfigurasi Sistem (`/Configuration`)**, lalu pilih tab **Identitas Aplikasi**.
+2. Anda dapat memperbarui parameter berikut:
+   - **Nama Aplikasi**: Standar bawaan sistem adalah `Work Tracker Pro v3.6 • Enterprise Edition`. Anda dapat menyesuaikannya dengan nama produk internal perusahaan.
+   - **Nama Perusahaan Pembuat (Vendor)**: Standar bawaan sistem adalah `PT Elistec Teknologi`.
+   - **Deskripsi Aplikasi**: Deskripsi singkat mengenai fungsi dan platform aplikasi.
+   - **Zona Waktu Operasional (Timezone)**: Pengaturan default timezone aplikasi (misal `GMT+7`).
+3. Klik tombol **Simpan Konfigurasi Identitas**.
+4. **Pembaruan Footer Panduan Real-Time**:
+   - Setelah disimpan, sistem secara otomatis memperbarui teks bilah footer di halaman panduan pengguna (`/guide`) dan antarmuka sistem tanpa memerlukan proses build ulang atau restart server.
 
 ---
 
@@ -516,4 +590,5 @@ Sistem menyediakan sub-modul khusus untuk mengatur format dan isi pesan email un
 
 ---
 
-*(Buku Panduan Pengguna Work Tracker Pro — Diterbitkan untuk Efisiensi & Transparansi Kerja Tim)*
+**Work Tracker Pro v3.6 • Enterprise Edition** • *Dikembangkan oleh PT Elistec Teknologi*  
+*(Hak Cipta © 2026 PT Elistec Teknologi. Seluruh Hak Cipta Dilindungi Undang-Undang)*
