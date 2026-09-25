@@ -74,8 +74,11 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 // 5. CORS Configuration
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
-    ?? new[] { "http://localhost:5173", "http://localhost:3000" };
+var envFrontendUrl = builder.Configuration["FRONTEND_BASE_URL"] ?? builder.Configuration["CORS_ALLOWED_ORIGINS"];
+var allowedOrigins = !string.IsNullOrWhiteSpace(envFrontendUrl)
+    ? envFrontendUrl.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    : builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+      ?? new[] { "http://localhost:5173", "http://localhost:3000" };
 
 builder.Services.AddCors(options =>
 {

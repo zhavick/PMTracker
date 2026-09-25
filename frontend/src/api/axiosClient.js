@@ -1,6 +1,11 @@
 import axios from 'axios';
 
+// Konfigurasi Base URL dari environment variable (.env VITE_API_BASE_URL)
+const envBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+const normalizedBaseUrl = envBaseUrl.endsWith('/') ? envBaseUrl.slice(0, -1) : envBaseUrl;
+
 const axiosClient = axios.create({
+  baseURL: normalizedBaseUrl || undefined,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -9,7 +14,7 @@ const axiosClient = axios.create({
 axiosClient.interceptors.request.use(
   (config) => {
     if (config.url) {
-      if (!config.url.startsWith('/api/') && config.url !== '/api') {
+      if (!config.url.startsWith('/api/') && config.url !== '/api' && !config.url.startsWith('http://') && !config.url.startsWith('https://')) {
         config.url = '/api' + (config.url.startsWith('/') ? config.url : '/' + config.url);
       }
     }
