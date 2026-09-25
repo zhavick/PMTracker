@@ -69,6 +69,14 @@ export const ThemeProvider = ({ children }) => {
     setThemeState(newTheme);
     localStorage.setItem('wt_theme', newTheme);
     document.documentElement.setAttribute('data-theme', newTheme);
+    const themeObj = THEMES_LIST.find(t => t.id === newTheme);
+    if (themeObj?.mode === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.setAttribute('data-mode', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.setAttribute('data-mode', 'light');
+    }
   };
 
   const setFont = (newFont) => {
@@ -80,6 +88,14 @@ export const ThemeProvider = ({ children }) => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.setAttribute('data-font', font);
+    const themeObj = THEMES_LIST.find(t => t.id === theme);
+    if (themeObj?.mode === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.setAttribute('data-mode', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.setAttribute('data-mode', 'light');
+    }
   }, [theme, font]);
 
   return (

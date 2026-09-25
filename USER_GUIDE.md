@@ -1,10 +1,10 @@
 # Buku Panduan Pengguna (User Guide)
 # Work Tracker Pro (TrackerKerja)
 
-> **Versi Aplikasi**: Work Tracker Pro v3.6 • Enterprise Edition  
+> **Versi Aplikasi**: Work Tracker Pro v3.7 • Enterprise Edition  
 > **Vendor / Pengembang**: PT Elistec Teknologi  
 > **Target Pengguna**: Seluruh Karyawan, System Analyst, Developer, QA, Technical Writer, Project Lead, dan Administrator  
-> **Terakhir Diperbarui**: 24 September 2026  
+> **Terakhir Diperbarui**: 25 September 2026  
 
 ---
 
@@ -73,7 +73,15 @@
     - 13.6 [Integrasi Server Email (SMTP), Diagnostik Koneksi & 7 Template Event](#136-integrasi-server-email-smtp-diagnostik-koneksi--7-template-event)
     - 13.7 [Manajemen Template Email Event & Live Preview](#137-manajemen-template-email-event--live-preview)
     - 13.8 [Konfigurasi Identitas Aplikasi & Footer Panduan Dinamis](#138-konfigurasi-identitas-aplikasi--footer-panduan-dinamis)
-14. [Tips & Pertanyaan Umum (FAQ)](#14-tips--pertanyaan-umum-faq)
+14. [Modul Ticketing & Helpdesk Internal](#14-modul-ticketing--helpdesk-internal)
+    - 14.1 [Membuat Tiket Dukungan Baru](#141-membuat-tiket-dukungan-baru)
+    - 14.2 [Memantau & Berkomunikasi pada Tiket](#142-memantau--berkomunikasi-pada-tiket)
+    - 14.3 [Pengelolaan Tiket oleh Administrator](#143-pengelolaan-tiket-oleh-administrator)
+15. [Modul Gamifikasi, Badge Prestasi & Reward Poin](#15-modul-gamifikasi-badge-prestasi--reward-poin)
+    - 15.1 [Melihat Badge & Pencapaian Pribadi](#151-melihat-badge--pencapaian-pribadi)
+    - 15.2 [Mengajukan Klaim Reward Poin](#152-mengajukan-klaim-reward-poin)
+    - 15.3 [Leaderboard Tim](#153-leaderboard-tim)
+16. [Tips & Pertanyaan Umum (FAQ)](#16-tips--pertanyaan-umum-faq)
 
 ---
 
@@ -571,7 +579,78 @@ Bagi Administrator sistem, nama aplikasi dan identitas vendor pembuat dapat dise
 
 ---
 
-## 14. Tips & Pertanyaan Umum (FAQ)
+## 14. Modul Ticketing & Helpdesk Internal
+
+Modul Ticketing (`/Ticketing`) memungkinkan Anda melaporkan kendala sistem, permintaan fitur, atau kebutuhan bantuan teknis langsung dari dalam aplikasi.
+
+### 14.1 Membuat Tiket Dukungan Baru
+1. Buka menu **Ticketing** pada bilah navigasi sidebar.
+2. Klik tombol **+ Buat Tiket Baru**.
+3. Isi formulir tiket:
+   - **Judul Tiket**: Ringkasan singkat permasalahan atau permintaan.
+   - **Kategori**: Pilih kategori yang sesuai:
+     - 🐛 **Bug** — Error atau malfungsi sistem
+     - ✨ **Feature Request** — Permintaan fitur baru
+     - 🛠️ **Support** — Bantuan teknis/operasional
+     - 🌐 **Infrastructure** — Jaringan/Server/Database
+     - 🔑 **Account Access** — Masalah hak akses akun
+     - 📋 **Other** — Lainnya
+   - **Tingkat Prioritas**: Low, Medium, High, atau Critical.
+   - **Deskripsi**: Uraian detail permasalahan, langkah reproduksi, atau instruksi teknis yang diperlukan.
+4. Klik **Kirim Tiket**. Sistem secara otomatis menghasilkan nomor tiket berformat `TCK-YYYYMM-NNNN`.
+
+### 14.2 Memantau & Berkomunikasi pada Tiket
+- Tiket Anda akan muncul di halaman **Daftar Tiket Saya** dengan status yang diperbarui secara *real-time*.
+- **Alur Status Tiket**: `Open` → `In Progress` → `Pending User` → `Resolved` → `Closed`.
+- Klik tiket manapun untuk membuka detail, melihat perkembangan, dan berkomunikasi melalui fitur **Komentar**:
+  - Tambahkan balasan atau informasi tambahan ke dalam kolom komentar lalu klik **Kirim**.
+  - Komentar bertanda 🔒 bersifat **Internal** dan hanya terlihat oleh Administrator.
+- Jika status tiket berubah menjadi **Pending User**, artinya tim teknis memerlukan klarifikasi tambahan dari Anda.
+- Setelah permasalahan teratasi, status berubah ke **Resolved** atau **Closed**.
+
+### 14.3 Pengelolaan Tiket oleh Administrator
+- Administrator dapat melihat **seluruh tiket** dari semua pengguna pada tampilan **Admin View**.
+- **Filter Tiket**: Berdasarkan status, kategori, prioritas, atau pelapor.
+- **Menugaskan PIC**: Tentukan anggota tim teknis yang bertanggung jawab menangani tiket.
+- **Ubah Status**: Perbarui status tiket sesuai perkembangan penanganan.
+- **Tambah Komentar Internal**: Tandai komentar sebagai Internal agar tidak terlihat oleh pelapor (berguna untuk catatan teknis internal).
+- **Tutup Tiket**: Ubah status ke *Closed* untuk menandai tiket selesai.
+
+---
+
+## 15. Modul Gamifikasi, Badge Prestasi & Reward Poin
+
+Modul Gamifikasi (`/Gamification`) menghadirkan sistem pencapaian dan penghargaan yang memotivasi anggota tim untuk terus produktif.
+
+### 15.1 Melihat Badge & Pencapaian Pribadi
+- Buka menu **Gamifikasi** atau halaman **Profil Akun** untuk melihat badge yang Anda miliki.
+- **Badge Otomatis**: Badge diberikan secara otomatis saat Anda mencapai milestone produktivitas:
+  - Contoh: *"Task Crusher"* — Menyelesaikan 10 tugas, *"Time Master"* — Mencatat 100 jam kerja
+  - Contoh: *"Note Keeper"* — Membuat 20 catatan kerja
+- **Tingkat Kelangkaan Badge**: Common 🟢, Rare 🔵, Epic 🟣, Legendary 🟡
+- **Badge Pilihan (Featured)**: Pilih badge favorit untuk ditampilkan menonjol di profil Anda dengan klik ikon ⭐ pada badge.
+- **Poin**: Setiap badge memberikan poin yang diakumulasi di profil Anda.
+- **Leaderboard**: Lihat peringkat poin produktivitas Anda dibandingkan rekan tim.
+
+### 15.2 Mengajukan Klaim Reward Poin
+Poin yang Anda kumpulkan dapat ditukarkan dengan reward nyata:
+1. Buka menu **Gamifikasi** dan pilih tab **Klaim Reward**.
+2. Masukkan **Jumlah Poin** yang ingin diklaim.
+   - Nilai konversi: **1 Poin = Rp 100**
+3. Pilih **Jenis Reward**:
+   - 💰 **Cash Transfer**: Transfer langsung ke rekening bank atau e-wallet.
+   - 🍜 **Traktiran**: Ditraktir makan/minum oleh perusahaan.
+4. Isi **Informasi Rekening/Kontak** dan **Catatan Request**.
+5. Klik **Ajukan Klaim Reward**. Klaim akan masuk dengan status **Pending** menunggu verifikasi Administrator.
+6. Setelah Administrator menyetujui dan memproses, status berubah ke **Approved** dan reward akan direalisasikan.
+
+### 15.3 Leaderboard Tim
+- Halaman **Leaderboard** menampilkan peringkat seluruh anggota tim berdasarkan total poin yang dikumpulkan.
+- Motivasi untuk terus aktif menyelesaikan tugas, mencatat jam kerja, dan berkontribusi pada proyek tim.
+
+---
+
+## 16. Tips & Pertanyaan Umum (FAQ)
 
 ### Q1: Bagaimana cara mencetak atau menyimpan panduan ini ke format PDF?
 > **Jawaban**: Klik menu **📖 Panduan Pengguna** pada bilah samping (Sidebar) navigasi aplikasi di bagian bawah (*Akun & Bantuan*). Pada jendela modal panduan yang terbuka, klik tombol **🖨️ Cetak / Simpan PDF**. Pada jendela print peramban, pilih tujuan printer sebagai **Save as PDF (Simpan sebagai PDF)** dan klik **Save**.
@@ -588,7 +667,13 @@ Bagi Administrator sistem, nama aplikasi dan identitas vendor pembuat dapat dise
 ### Q5: Bagaimana cara mencatat absensi jika saya bekerja dari rumah (WFH)?
 > **Jawaban**: Buka menu **Absensi** (`/Attendance`), pilih status **WFH (Work From Home)**, lalu klik tombol **Check In**.
 
+### Q6: Bagaimana cara menukar poin gamifikasi saya dengan reward?
+> **Jawaban**: Buka menu **Gamifikasi**, lalu pilih tab **Klaim Reward**. Isi jumlah poin yang ingin ditukarkan, pilih jenis reward (Cash Transfer atau Traktiran), isi informasi rekening/kontak, dan klik **Ajukan Klaim Reward**. Administrator akan memverifikasi dan memproses klaim Anda.
+
+### Q7: Bagaimana cara melaporkan bug atau meminta fitur baru?
+> **Jawaban**: Gunakan modul **Ticketing** (`/Ticketing`) yang tersedia di sidebar. Klik **+ Buat Tiket Baru**, pilih kategori **Bug** atau **Feature Request**, isi detail permasalahan, dan kirim. Tim teknis akan memproses tiket Anda dan berkomunikasi melalui fitur komentar tiket.
+
 ---
 
-**Work Tracker Pro v3.6 • Enterprise Edition** • *Dikembangkan oleh PT Elistec Teknologi*  
+**Work Tracker Pro v3.7 • Enterprise Edition** • *Dikembangkan oleh PT Elistec Teknologi*  
 *(Hak Cipta © 2026 PT Elistec Teknologi. Seluruh Hak Cipta Dilindungi Undang-Undang)*

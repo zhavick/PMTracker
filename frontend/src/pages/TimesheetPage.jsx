@@ -501,10 +501,10 @@ export default function TimesheetPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div 
             className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden animate-scale-up"
-            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+            style={{ backgroundColor: 'var(--card-bg, var(--bg-card, #FFFFFF))', borderColor: 'var(--border-color)' }}
           >
             <div 
-              className="flex items-center justify-between px-6 py-4 border-b"
+              className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
               style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}
             >
               <div className="flex items-center space-x-2">
@@ -522,7 +522,7 @@ export default function TimesheetPage() {
               </button>
             </div>
 
-            <form onSubmit={handleManualSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleManualSubmit} className="p-6 space-y-4" style={{ backgroundColor: 'var(--card-bg, var(--bg-card, #FFFFFF))' }}>
               {manualError && (
                 <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-medium">
                   {manualError}

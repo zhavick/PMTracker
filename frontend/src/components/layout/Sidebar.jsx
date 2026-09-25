@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, CheckSquare, Briefcase, Clock, Calendar, 
   FileText, Database, Code, Users, Settings, ShieldAlert, 
-  Mail, RefreshCw, ChevronLeft, ChevronRight, ExternalLink, HelpCircle, Trophy, LifeBuoy
+  SlidersHorizontal, ChevronLeft, ChevronRight, ExternalLink, HelpCircle, Trophy, LifeBuoy
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -40,8 +40,7 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }) {
         { path: '/members', label: 'Anggota Tim & Approval', icon: Users },
         { path: '/master-data', label: 'Master Data & SDLC', icon: Settings },
         { path: '/audit-trail', label: 'Audit Trail & Log', icon: ShieldAlert },
-        { path: '/email-settings', label: 'Email SMTP & Template', icon: Mail },
-        { path: '/sync', label: 'Host Induk Sync', icon: RefreshCw },
+        { path: '/configuration', label: 'Konfigurasi', icon: SlidersHorizontal },
       ]
     }] : [])
   ];
@@ -99,7 +98,8 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }) {
             <div className="space-y-1">
               {section.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = location.pathname.startsWith(item.path);
+                const isActive = location.pathname.startsWith(item.path) || 
+                  (item.path === '/configuration' && (location.pathname.startsWith('/email-settings') || location.pathname.startsWith('/sync')));
                 return (
                   <NavLink
                     key={item.path}

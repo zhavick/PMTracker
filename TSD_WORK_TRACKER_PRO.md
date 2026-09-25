@@ -2,11 +2,11 @@
 # WORK TRACKER PRO (TRACKERKERJA)
 
 > **Dokumen Spesifikasi Teknis: Arsitektur Pengambilan Data, Controller, API Endpoint, Layanan Backend, dan Desain Basis Data Relasional**  
-> **Versi Sistem:** v3.6 Enterprise Security & Multi-Instance Edition  
-> **Target Framework:** .NET 8.0 (C# 12), ASP.NET Core MVC & RESTful Web API, Entity Framework Core 8  
-> **Mesin Basis Data:** SQLite 3 (Write-Ahead Logging / WAL Mode)  
+> **Versi Sistem:** v3.7 Enterprise Edition — Ticketing, Gamification & React SPA Architecture  
+> **Target Framework:** .NET 8.0 (C# 12), ASP.NET Core 8.0 RESTful Web API, Entity Framework Core 8  
+> **Mesin Basis Data:** MySQL 8.x (via Pomelo.EntityFrameworkCore.MySql)  
 > **Status Dokumen:** Approved & Published  
-> **Tanggal Rilis:** 24 September 2026  
+> **Tanggal Rilis:** 25 September 2026  
 
 ---
 
@@ -54,65 +54,63 @@
 | Properti Dokumen | Rincian Teknis |
 | :--- | :--- |
 | **Nama Dokumen** | Technical Specification Document (TSD) Work Tracker Pro |
-| **Kode Dokumen** | TSD-WTP-3.6-202609 |
-| **Versi Aplikasi** | v3.6 Enterprise Security & Multi-Instance Edition |
+| **Kode Dokumen** | TSD-WTP-3.7-202609 |
+| **Versi Aplikasi** | v3.7 Enterprise Edition — Ticketing, Gamification & React SPA Architecture |
 | **Arsitek Sistem** | Senior Systems & Software Engineering Team |
 | **Klasifikasi Akses** | Internal Development Team, Technical Leads, DevOps, & DB Administrator |
-| **Tanggal Pembaruan** | 24 September 2026 |
+| **Tanggal Pembaruan** | 25 September 2026 |
 
 ---
 
 ### 1.2 Ringkasan Arsitektur Aplikasi
 
-TrackerKerja dibangun menggunakan arsitektur hybrid **ASP.NET Core 8.0**:
-1. **Server-Side Rendered (SSR) Presentation Layer**: Menggunakan ASP.NET Core MVC (Razor Views `.cshtml`) untuk peramban desktop dan antarmuka operasional pengguna internal.
-2. **RESTful Web API Layer**: Menggunakan ASP.NET Core API Controllers (`[ApiController]`) di bawah prefix route `/api/*` untuk melayani panggilan AJAX asinkron (*zero page reload*), integrasi klien eksternal, dan pertukaran data sinkronisasi multi-instance.
-3. **Business Logic & Service Layer**: Berisi layanan inti seperti `DatabaseSyncService`, `ExcelSyncService`, `EmailService`, `GamificationService`, dan `JwtService`.
-4. **Data Access Layer**: Didukung oleh **Entity Framework Core 8.0** (`AppDbContext`) yang berinteraksi langsung dengan berkas basis data SQLite 3 melalui driver `Microsoft.EntityFrameworkCore.Sqlite`.
+TrackerKerja dibangun menggunakan arsitektur **Decoupled SPA + REST API**:
+1. **React 18 SPA (Single Page Application) — Frontend Layer**: Aplikasi React 18 dibangun menggunakan Vite. Berkomunikasi dengan Backend REST API melalui HTTP/JSON menggunakan `AuthContext` dan JWT Bearer token. Routing dikelola oleh React Router v6.
+2. **ASP.NET Core 8.0 REST API — Backend Layer**: Seluruh logika bisnis dikemas dalam API Controllers (`[ApiController]`) di bawah prefix route `/api/*` untuk melayani permintaan dari React SPA dan klien eksternal.
+3. **Business Logic & Service Layer**: Berisi layanan inti seperti `DatabaseSyncService`, `ExcelService`, `EmailService`, `GamificationService`, dan `JwtService`.
+4. **Data Access Layer**: Didukung oleh **Entity Framework Core 8.0** (`AppDbContext`) yang berinteraksi dengan basis data **MySQL 8.x** melalui driver `Pomelo.EntityFrameworkCore.MySql`.
 
 ```mermaid
 graph TD
     subgraph Client Layer
-        WebBrowser["Web Browser (Razor Views + Vanilla JS + AJAX)"]
+        ReactSPA["React 18 SPA (Vite / React Router + AuthContext)"]
         ExternalClient["External Client / Swagger UI / Child Instances"]
     end
 
     subgraph Security & Middleware Pipeline
-        AuthMiddleware["Authentication Middleware (Cookie + JWT Bearer)"]
+        AuthMiddleware["Authentication Middleware (JWT Bearer)"]
         AuditFilter["AuditLogActionFilter (Automated Audit Logging)"]
-        SessionGuard["Session Inactivity Guard (60 Min Max / 5 Min Alert)"]
     end
 
     subgraph Application Controller Layer
-        MVCControllers["MVC Controllers (Task, Timesheet, Member, Attendance, etc.)"]
-        ApiControllers["API Controllers (/api/tasks, /api/attendance, /api/sync, etc.)"]
+        ApiControllers["API Controllers (/api/tasks, /api/attendance, /api/sync, /api/tickets, /api/gamification, etc.)"]
     end
 
     subgraph Service Layer
         SyncService["DatabaseSyncService (Push / Pull / ZIP)"]
-        ExcelService["ExcelSyncService (ClosedXML Standard & ARMS)"]
+        ExcelService["ExcelService (ClosedXML Standard & ARMS)"]
         EmailService["EmailService (MailKit SMTP + Dynamic Templates)"]
-        GamifyService["GamificationService (Badges, EXP, Triggers)"]
+        GamifyService["GamificationService (Badges, Points, Triggers)"]
         JwtService["JwtService (HMAC-SHA256 Token Engine)"]
     end
 
     subgraph Data Access Layer
         AppDbContext["Entity Framework Core 8 (AppDbContext)"]
-        SQLiteDB[("SQLite 3 Database (trackerkerja.db - WAL Mode)")]
+        MySQLDB[("MySQL 8.x Database (worktracker_db)")]
         FileStorage[("Physical File Storage (/wwwroot/uploads/)")]
     end
 
-    WebBrowser --> AuthMiddleware
+    ReactSPA --> AuthMiddleware
     ExternalClient --> AuthMiddleware
     AuthMiddleware --> AuditFilter
-    AuditFilter --> SessionGuard
-    SessionGuard --> MVCControllers
-    SessionGuard --> ApiControllers
+    AuditFilter --> ApiControllers
 
-    MVCControllers --> AppDbContext
-    MVCControllers --> ServiceLayer
     ApiControllers --> AppDbContext
-    ApiControllers --> ServiceLayer
+    ApiControllers --> SyncService
+    ApiControllers --> ExcelService
+    ApiControllers --> EmailService
+    ApiControllers --> GamifyService
+    ApiControllers --> JwtService
 
     SyncService --> AppDbContext
     SyncService --> FileStorage
@@ -121,7 +119,7 @@ graph TD
     EmailService --> AppDbContext
     JwtService --> AppDbContext
 
-    AppDbContext --> SQLiteDB
+    AppDbContext --> MySQLDB
 ```
 
 ---
@@ -137,11 +135,11 @@ Pengambilan data di seluruh sistem mengikuti standar efisiensi tingkat enterpris
 
 ---
 
-### 1.4 Pipeline Autentikasi Ganda (Dual Authentication Pipeline)
+### 1.4 Pipeline Autentikasi JWT Bearer
 
-Sistem menerapkan proteksi berlapis ganda dalam file `Program.cs`:
-- **Skema Default Web (`IdentityConstants.ApplicationScheme`)**: Menggunakan enkripsi Cookie terproteksi HTTP-Only dengan waktu inaktivitas sesi (*sliding expiration*) 60 menit.
+Sistem menerapkan autentikasi JWT Bearer dalam `Program.cs`:
 - **Skema API Token (`JwtBearerDefaults.AuthenticationScheme`)**: Menggunakan validasi token stateless JSON Web Token (JWT) dengan penandatanganan `HmacSha256` menggunakan konfigurasi `Jwt:Key` (minimal 32 karakter), `Jwt:Issuer`, dan `Jwt:Audience`.
+- **AuthContext (React)**: Frontend menyimpan token JWT di `localStorage` dan mengirimkannya di setiap panggilan API melalui header `Authorization: Bearer <token>`.
 - **Swagger UI Integration**: `/swagger` dilengkapi tombol **Authorize** dengan skema format `Bearer {token}` untuk pengujian langsung oleh pengembang.
 
 ---
@@ -710,10 +708,10 @@ Saat endpoint `PUT /api/app-settings` dieksekusi oleh Administrator, sistem memp
 
 | Tipe | Route / URL | Controller | Nama Fungsi / Prosedur | Keterangan |
 | :--- | :--- | :--- | :--- | :--- |
-| **MVC** | `POST /Account/Login` | `AccountController` | `Task<IActionResult> Login(...)` | Autentikasi Cookie peramban web |
-| **MVC** | `POST /Account/Logout` | `AccountController` | `Task<IActionResult> Logout()` | Mengakhiri sesi cookie dan membersihkan auth state |
 | **API** | `POST /api/auth/login` | `AuthApiController` | `Task<IActionResult> Login(...)` | Menghasilkan token JWT Bearer (HMAC-SHA256) |
 | **API** | `GET /api/auth/me` | `AuthApiController` | `Task<IActionResult> GetProfile()` | Mengambil data akun dari claims token yang aktif |
+| **API** | `POST /api/auth/register` | `AuthApiController` | `Task<IActionResult> Register(...)` | Mendaftarkan akun baru dengan status pending approval |
+| **API** | `POST /api/auth/logout` | `AuthApiController` | `Task<IActionResult> Logout()` | Membersihkan state sesi (client-side token clear) |
 
 ---
 
@@ -726,16 +724,17 @@ Bagian ini merupakan rujukan komprehensif arsitektur basis data relasional Work 
 ### 3.1 Filosofi Desain Basis Data & Storage Engine
 
 Basis data TrackerKerja dirancang dengan standar keandalan tinggi:
-1. **Engine**: SQLite 3 terkonfigurasi dengan mode **Write-Ahead Logging (WAL)**. Mode WAL memungkinkan operasi pembacaan konkuren (*concurrent read*) berjalan secara simultan tanpa terblokir oleh operasi penulisan (*write locks*).
-2. **Multi-Tenancy Isolation**: Isolasi organisasi dicapai melalui penyematan kolom kunci asing `CompanyId` pada entitas `AspNetUsers`, `Projects`, `Tasks`, dan `Notes`.
-3. **Auditing & Traceability**: Setiap entitas utama mencatat `CreatedAt` dan `UpdatedAt` secara otomatis. Log mutasi operasional dicatat pada tabel terpisah `AuditLogs`.
-4. **Data Integrity & Cascading Rules**: Menghindari anomali *orphan records* dengan menerapkan aturan `ON DELETE CASCADE` untuk dependensi ketat (misal: Sesi Kerja yang melekat pada Tugas) dan `ON DELETE SET NULL` untuk asosiasi relasional longgar (misal: Tugas pada Proyek atau Pengguna Pembuat Catatan).
+1. **Engine**: MySQL 8.x menggunakan storage engine **InnoDB** dengan dukungan transaksi ACID penuh, foreign key constraints, dan penguncian tingkat baris (*row-level locking*).
+2. **Provider**: `Pomelo.EntityFrameworkCore.MySql` sebagai EF Core provider dengan dukungan `EnableRetryOnFailure(maxRetryCount: 5)` untuk ketahanan koneksi.
+3. **Multi-Tenancy Isolation**: Isolasi organisasi dicapai melalui penyematan kolom kunci asing `CompanyId` pada entitas `AspNetUsers`, `Projects`, `Tasks`, dan `Notes`.
+4. **Auditing & Traceability**: Setiap entitas utama mencatat `CreatedAt` dan `UpdatedAt` secara otomatis. Log mutasi operasional dicatat pada tabel terpisah `AuditLogs`.
+5. **Data Integrity & Cascading Rules**: Menghindari anomali *orphan records* dengan menerapkan aturan `ON DELETE CASCADE` untuk dependensi ketat (misal: Sesi Kerja yang melekat pada Tugas) dan `ON DELETE SET NULL` untuk asosiasi relasional longgar (misal: Tugas pada Proyek atau Pengguna Pembuat Catatan).
 
 ---
 
 ### 3.2 Entity Relationship Diagram (ERD Lengkap)
 
-Diagram di bawah ini menggambarkan arsitektur relasi seluruh tabel pada basis data `trackerkerja.db`:
+Diagram di bawah ini menggambarkan arsitektur relasi seluruh tabel pada basis data `worktracker_db` (MySQL 8.x):
 
 ```mermaid
 erDiagram
@@ -754,6 +753,9 @@ erDiagram
     AspNetUsers ||--o{ Notes : "authors"
     AspNetUsers ||--o{ NoteAttachments : "uploads"
     AspNetUsers ||--o{ UserBadges : "earns"
+    AspNetUsers ||--o{ Tickets : "reports"
+    AspNetUsers ||--o{ TicketComments : "comments"
+    AspNetUsers ||--o{ RewardClaims : "claims"
 
     Projects ||--o{ Tasks : "contains"
     Categories ||--o{ Tasks : "categorizes"
@@ -765,6 +767,7 @@ erDiagram
 
     Notes ||--o{ NoteAttachments : "contains files"
     MasterBadges ||--o{ UserBadges : "defines"
+    Tickets ||--o{ TicketComments : "has comments"
 
     Companies {
         INTEGER Id PK
@@ -998,6 +1001,55 @@ erDiagram
         INTEGER TaskId FK
         TEXT CreatedAt
     }
+
+    Tickets {
+        INTEGER Id PK
+        TEXT TicketNumber
+        TEXT Title
+        TEXT Description
+        TEXT Category
+        INTEGER Priority
+        INTEGER Status
+        TEXT ReportedByUserId FK
+        TEXT AssignedToUserId FK
+        TEXT CreatedAt
+        TEXT UpdatedAt
+        TEXT ResolvedAt
+        TEXT ClosedAt
+    }
+
+    TicketComments {
+        INTEGER Id PK
+        INTEGER TicketId FK
+        TEXT UserId FK
+        TEXT Comment
+        INTEGER IsInternal
+        TEXT CreatedAt
+    }
+
+    MasterHolidays {
+        INTEGER Id PK
+        TEXT Date
+        TEXT Name
+        TEXT Description
+        INTEGER IsRecurring
+        TEXT CreatedAt
+    }
+
+    RewardClaims {
+        INTEGER Id PK
+        TEXT UserId FK
+        INTEGER PointsClaimed
+        DECIMAL RupiahAmount
+        TEXT ClaimType
+        TEXT AccountInfo
+        TEXT Notes
+        INTEGER Status
+        TEXT ProcessedByUserId FK
+        TEXT ProcessedAt
+        TEXT AdminNotes
+        TEXT CreatedAt
+    }
 ```
 
 ---
@@ -1030,6 +1082,12 @@ Tabel di bawah ini mendokumentasikan pemetaan kunci asing (*Foreign Keys*) beser
 | `AspNetUserRoles`| `RoleId` | `AspNetRoles`| `Id`| `CASCADE` | Hubungan peran akun terhapus saat role dihapus |
 | `JsonHistories` | `TaskId` | `Tasks` | `Id` | `NO ACTION`| Riwayat JSON terkait tugas |
 | `SqlHistories` | `TaskId` | `Tasks` | `Id` | `SET NULL` | Riwayat query SQL dilepas dari tugas |
+| `Tickets` | `ReportedByUserId` | `AspNetUsers`| `Id`| `SET NULL` | Tiket dipertahankan meski pelapor dihapus |
+| `Tickets` | `AssignedToUserId` | `AspNetUsers`| `Id`| `SET NULL` | Tiket dilepas dari PIC jika user dihapus |
+| `TicketComments` | `TicketId` | `Tickets` | `Id` | `CASCADE` | Komentar terhapus bersamaan saat tiket dihapus |
+| `TicketComments` | `UserId` | `AspNetUsers`| `Id`| `SET NULL` | Penulis komentar diset null jika user dihapus |
+| `RewardClaims` | `UserId` | `AspNetUsers`| `Id`| `SET NULL` | Klaim dipertahankan meski user dihapus |
+| `RewardClaims` | `ProcessedByUserId` | `AspNetUsers`| `Id`| `SET NULL` | Jejak admin pemroses diset null jika user dihapus |
 
 ---
 
@@ -1425,17 +1483,10 @@ Untuk menjamin latensi kueri yang rendah di bawah beban operasi data yang masif:
    });
    ```
    Indeks komposit ini menjamin pencarian presensi hari ini (`UserId == uid && Date == today`) dieksekusi secara instan $O(\log n)$ tanpa *full table scan*.
-2. **Indeks Kunci Asing Otomatis**:
-   Seluruh relasi FK (`ProjectId`, `CategoryId`, `CompanyId`, `AssignedToUserId`, `ParentTaskId`, `TaskId`, `NoteId`, `BadgeId`) diindeks oleh SQLite guna mempercepat operasi `JOIN`, `.Include()`, dan validasi integritas *cascade*.
-3. **Konkurensi WAL Mode**:
-   Koneksi SQLite diaktifkan dengan pragmas:
-   ```sql
-   PRAGMA journal_mode = WAL;
-   PRAGMA synchronous = NORMAL;
-   PRAGMA foreign_keys = ON;
-   PRAGMA busy_timeout = 5000;
-   ```
-   Konfigurasi ini memastikan waktu tunggu transaksi hingga 5.000 ms sebelum melemparkan *database is locked*, mengeliminasi *deadlock* pada penulisan konkuren.
+2. **Indeks Kunci Asing Otomatis (MySQL InnoDB)**:
+   Seluruh relasi FK (`ProjectId`, `CategoryId`, `CompanyId`, `AssignedToUserId`, `ParentTaskId`, `TaskId`, `NoteId`, `BadgeId`) diindeks secara otomatis oleh InnoDB guna mempercepat operasi `JOIN`, `.Include()`, dan validasi integritas *cascade*.
+3. **Ketahanan Koneksi MySQL**:
+   Konfigurasi EF Core menggunakan `EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30))` untuk menangani gangguan koneksi sementara secara otomatis.
 
 ---
 
@@ -1460,7 +1511,7 @@ catch (Exception)
 ```
 
 ### 4.2 Proteksi SQL Injection & Parameterized LINQ
-1. Seluruh kueri dinamis yang dibentuk melalui Entity Framework Core secara otomatis dikonversi menjadi *parameterized query* di level mesin SQLite (`@p0`, `@p1`).
+1. Seluruh kueri dinamis yang dibentuk melalui Entity Framework Core secara otomatis dikonversi menjadi *parameterized query* di level mesin MySQL (`@p0`, `@p1`).
 2. Pada fitur eksekusi skrip sinkronisasi atau pemulihan database, parser melakukan sanitasi perintah berbahaya dan memvalidasi tipe sintaks sebelum diteruskan ke `ExecuteSqlRawAsync`.
 
 ### 4.3 Isolasi Multi-Tenancy Berbasis `CompanyId`
@@ -1521,4 +1572,4 @@ Pada modul `NoteController` dan `NotesApiController`:
 
 ## 5. KESIMPULAN
 
-Dokumen TSD ini menjadi acuan teknis definitif bagi arsitektur sistem, pengembangan antarmuka, pembuatan integrasi API eksternal, serta pemeliharaan skema basis data **Work Tracker Pro (TrackerKerja) v3.6**. Seluruh tim teknis wajib mematuhi standar penamaan prosedur, struktur relasional tabel, dan konvensi otorisasi yang telah dijabarkan di atas.
+Dokumen TSD ini menjadi acuan teknis definitif bagi arsitektur sistem, pengembangan antarmuka, pembuatan integrasi API eksternal, serta pemeliharaan skema basis data **Work Tracker Pro (TrackerKerja) v3.7**. Seluruh tim teknis wajib mematuhi standar penamaan prosedur, struktur relasional tabel, dan konvensi otorisasi yang telah dijabarkan di atas.

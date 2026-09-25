@@ -276,7 +276,7 @@ export default function CalendarPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div 
             className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden animate-scale-up"
-            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+            style={{ backgroundColor: 'var(--card-bg, var(--bg-card, #FFFFFF))', borderColor: 'var(--border-color)' }}
           >
             <div 
               className="p-5 border-b flex items-start justify-between"

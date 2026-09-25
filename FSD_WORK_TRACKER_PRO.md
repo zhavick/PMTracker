@@ -5,14 +5,14 @@
 
 ### INFORMASI DOKUMEN
 - **Nama Aplikasi**: Work Tracker Pro (TrackerKerja)
-- **Versi Dokumen**: 3.6 (Enterprise Security, Dual Auth, Multi-Instance & UI Ergonomics Edition)
+- **Versi Dokumen**: 3.7 (Enterprise Security, Dual Auth, Multi-Instance, Ticketing, Gamification & UI Ergonomics Edition)
 - **Status**: Disetujui & Terimplementasi Penuh (Production-Ready)
-- **Target Platform**: Web Application (ASP.NET Core 8.0 MVC / REST API / Docker Linux Container)
-- **Basis Data**: Entity Framework Core 8.0 dengan SQLite Database Engine (`/app/data/trackerkerja.db` via `./db_data` volume)
+- **Target Platform**: Web Application (React 18 SPA Frontend + ASP.NET Core 8.0 REST API Backend / Docker Container)
+- **Basis Data**: Entity Framework Core 8.0 dengan **MySQL 8.x** (via Pomelo MySQL Provider)
 - **Engine Spreadsheet**: ClosedXML 0.104.2 (Format ARMS 21-kolom, Template Standar 9-kolom, & Timesheet Personal)
 - **Dokumentasi REST API**: OpenAPI 3.0 via Swashbuckle Swagger UI (`/swagger`) dengan Strict JWT Bearer Authorization & Postman Collection
-- **Repositori Source Code**: [https://github.com/zhavick/TrackerKerja.git](https://github.com/zhavick/TrackerKerja.git)
-- **Tanggal Rilis & Pembaruan**: 24 September 2026
+- **Repositori Source Code**: [https://github.com/zhavick/PMTracker.git](https://github.com/zhavick/PMTracker.git)
+- **Tanggal Rilis & Pembaruan**: 25 September 2026
 
 ---
 
@@ -23,7 +23,7 @@
 4. [Role-Based Access Control (RBAC) & Matriks Hak Akses](#4-role-based-access-control-rbac--matriks-hak-akses)
 5. [Flow Proses & Spesifikasi Modul](#5-flow-proses--spesifikasi-modul)
    - [5.1 Modul Autentikasi Ganda (Dual Auth), Keamanan Sesi, Admin Approval & Multi-Tenancy](#51-modul-autentikasi-ganda-dual-auth-keamanan-sesi-admin-approval--multi-tenancy)
-     - [5.1.1 Arsitektur Autentikasi Ganda: Cookie Web & JWT Bearer Token](#511-arsitektur-autentikasi-ganda-cookie-web--jwt-bearer-token)
+     - [5.1.1 Arsitektur Autentikasi JWT Bearer Token](#511-arsitektur-autentikasi-jwt-bearer-token)
      - [5.1.2 Keamanan Sesi & Auto-Logout Inaktivitas 1 Jam](#512-keamanan-sesi--auto-logout-inaktivitas-1-jam)
      - [5.1.3 Alur Persetujuan Registrasi Pengguna Baru (Admin Approval Workflow)](#513-alur-persetujuan-registrasi-pengguna-baru-admin-approval-workflow)
      - [5.1.4 Modul Multi-Tenancy Organisasi & Perusahaan (Company Isolation)](#514-modul-multi-tenancy-organisasi--perusahaan-company-isolation)
@@ -40,11 +40,13 @@
    - [5.12 Modul Audit Trail & Aktivitas Sistem](#512-modul-audit-trail--aktivitas-sistem)
    - [5.13 Modul Master Data, Identitas Aplikasi & Footer Panduan](#513-modul-master-data-identitas-aplikasi--footer-panduan)
    - [5.14 Modul Kalender Tugas Interaktif & Role-Based Scope Filter](#514-modul-kalender-tugas-interaktif--role-based-scope-filter)
-   - [5.15 Modul SQL Beautifier & Query Tools](#515-modul-sql-beautifier--query-tools)
+   - [5.15 Modul Developer Tools: SQL Beautifier, JSON Tools & Query History](#515-modul-developer-tools-sql-beautifier-json-tools--query-history)
    - [5.16 Modul Multi-Instance Synchronization & File Attachment Sync (Host Induk Sync)](#516-modul-multi-instance-synchronization--file-attachment-sync-host-induk-sync)
    - [5.17 Modul RESTful API (100+ Endpoints) & Strict Swagger JWT Bearer Authorization](#517-modul-restful-api-100-endpoints--strict-swagger-jwt-bearer-authorization)
    - [5.18 Modul Integrasi Server Email (SMTP) & Sub-Modul Template Email Event](#518-modul-integrasi-server-email-smtp--sub-modul-template-email-event)
-   - [5.19 Pembaruan Navigasi, Ergonomi Antarmuka, Halaman Login Lottie, Onboarding Tour & AJAX Grid Table Pagination](#519-pembaruan-navigasi-ergonomi-antarmuka-halaman-login-lottie-onboarding-tour--ajax-grid-table-pagination)
+   - [5.19 Pembaruan Navigasi, Ergonomi Antarmuka, Halaman Login, Onboarding Tour & AJAX Grid Table Pagination](#519-pembaruan-navigasi-ergonomi-antarmuka-halaman-login-onboarding-tour--ajax-grid-table-pagination)
+   - [5.20 Modul Ticketing & Helpdesk Internal (IT Support Ticket System)](#520-modul-ticketing--helpdesk-internal-it-support-ticket-system)
+   - [5.21 Modul Gamifikasi, Badge Prestasi & Sistem Reward Poin](#521-modul-gamifikasi-badge-prestasi--sistem-reward-poin)
 6. [Spesifikasi Non-Fungsional, Keamanan & Privasi Data](#6-spesifikasi-non-fungsional-keamanan--privasi-data)
 7. [Panduan Docker Containerization, Git Repository & Deployment](#7-panduan-docker-containerization-git-repository--deployment)
 
@@ -370,14 +372,13 @@ erDiagram
 - Manajemen password hashing (PBKDF2), lockout policies, dan token manajemen.
 - Upload foto avatar tersimpan di `wwwroot/uploads/avatars/` dan cover profil di `wwwroot/uploads/covers/`.
 
-#### 5.1.1 Arsitektur Autentikasi Ganda: Cookie Web & JWT Bearer Token
-- **Cookie Session untuk Web Browser**:
-  - Menggunakan skema `IdentityConstants.ApplicationScheme` dengan cookie terenkripsi (`AspNetCore.Identity.Application`).
-  - Dilengkapi *Sliding Expiration* dan proteksi `SameSite = Lax` serta `HttpOnly`.
-- **JWT (JSON Web Token) untuk RESTful API & Integrasi**:
-  - Menggunakan skema `JwtBearerDefaults.AuthenticationScheme` dengan algoritma enkripsi simetris `HmacSha256` (`Jwt__Key`).
+#### 5.1.1 Arsitektur Autentikasi JWT Bearer Token
+- **Arsitektur Aplikasi**: React 18 SPA (Single Page Application) sebagai frontend yang berkomunikasi dengan ASP.NET Core 8.0 REST API Backend melalui HTTP/JSON.
+- **JWT (JSON Web Token) untuk Autentikasi SPA & RESTful API**:
+  - Menggunakan skema `JwtBearerDefaults.AuthenticationScheme` dengan algoritma enkripsi simetris `HmacSha256` (`Jwt:Key`).
   - Endpoint `POST /api/auth/login` menghasilkan token JWT lengkap dengan klaim standar (`sub`, `email`, `jti`, `name`, `role`, `companyId`) dan waktu kedaluwarsa dinamis.
-  - Seluruh REST API (`/api/*`) mewajibkan header `Authorization: Bearer <token>` atau API Key terproteksi.
+  - Frontend React menyimpan JWT di `localStorage` dan menggunakannya via `AuthContext` untuk seluruh panggilan API.
+  - Seluruh REST API (`/api/*`) mewajibkan header `Authorization: Bearer <token>`.
   - Integrasi OpenAPI/Swagger UI menyertakan tombol dialog modal *Authorize* standar industri untuk pengujian endpoint API berotentikasi Bearer JWT.
 
 #### 5.1.2 Keamanan Sesi & Auto-Logout Inaktivitas 1 Jam
@@ -534,7 +535,9 @@ erDiagram
   - Klik pada event kalender membuka modal rincian tugas: Judul, Proyek, Kategori, PIC (Nama & Avatar), Prioritas, Status, Milestone, Rentang Tanggal, serta Tombol Aksi Cepat (*Lihat Detail* / *Edit Tugas*).
   - Integrasi API Endpoint: `GET /api/calendar/events?start={date}&end={date}&filter={mine|all}`.
 
-### 5.15 Modul SQL Beautifier & Query Tools
+### 5.15 Modul Developer Tools: SQL Beautifier, JSON Tools & Query History
+
+#### 5.15.1 SQL Beautifier & Query Tools
 - Modul pemformat dan validasi kueri SQL mandiri terintegrasi di dalam aplikasi tanpa ketergantungan tool pihak ketiga.
 - **15+ Dialek Database yang Didukung**:
   - *Standard SQL*, *PostgreSQL*, *MySQL*, *SQL Server (T-SQL)*, *Oracle PL/SQL*, *SQLite*, *BigQuery*, *Snowflake*, *Redshift*, *IBM DB2*, *MariaDB*, *CockroachDB*, *Couchbase N1QL*, *Spark SQL*, *Trino / Presto*.
@@ -543,10 +546,24 @@ erDiagram
   - **Minify SQL**: Mengompres kueri menjadi satu baris efisien untuk integrasi script atau konfigurasi.
   - **Syntax Validator**: Memeriksa pasangan tanda kurung, struktur klausa (`SELECT`, `FROM`, `WHERE`, `GROUP BY`, `ORDER BY`), dan tanda kutip literal.
   - **Aksi Cepat**: Copy ke Clipboard, Download file `.sql`, Clear buffer, dan Sample Query Loader.
+  - **Riwayat Query (SQL History)**: Menyimpan snippet kueri SQL ke database dan menghubungkannya ke tugas kerja tertentu (`SqlHistory` entity linked ke `TaskId`).
 - **REST API Endpoints**:
   - `POST /api/sqltools/format`
   - `POST /api/sqltools/minify`
   - `POST /api/sqltools/validate`
+  - `GET /api/sqltools/history`
+
+#### 5.15.2 JSON Payload Tools
+- Modul pengolah dan validasi payload data JSON untuk kebutuhan pengujian integrasi API, pemeriksaan response, dan dokumentasi API.
+- **Fitur Utama**:
+  - **Beautify / Format JSON**: Merapikan indentasi JSON terstruktur dengan 2/4 spasi.
+  - **Minify JSON**: Mengompres JSON ke satu baris efisien.
+  - **Syntax Validator**: Mendeteksi kesalahan penulisan kurung, koma, kutip, atau struktur data JSON tidak valid.
+  - **Riwayat Payload (JSON History)**: Menyimpan template payload JSON yang sering digunakan ke database dan menghubungkannya ke tugas kerja (`JsonHistory` entity linked ke `TaskId`).
+- **REST API Endpoints**:
+  - `POST /api/jsontools/format`
+  - `POST /api/jsontools/validate`
+  - `GET /api/jsontools/history`
 
 ### 5.16 Modul Multi-Instance Synchronization & File Attachment Sync (Host Induk Sync)
 - Menghubungkan beberapa instance TrackerKerja terdistribusi (misalnya laptop tim lokal atau node cabang) ke satu **Server Host Induk** terpusat dengan sinkronisasi basis data dan berkas lampiran (*file attachments & uploads*).
@@ -595,7 +612,7 @@ erDiagram
 ### 5.18 Modul Integrasi Server Email (SMTP) & Sub-Modul Template Email Event
 - **Latar Belakang & Arsitektur**:
   - Modul integrasi email menyediakan saluran komunikasi otomatis (*notification channel*) antara sistem TrackerKerja dengan seluruh pemangku kepentingan (karyawan, manajer, dan administrator).
-  - Seluruh konfigurasi server SMTP disimpan secara dinamis pada tabel `SystemSettings` di database SQLite tanpa membutuhkan restart aplikasi maupun build ulang kontainer.
+  - Seluruh konfigurasi server SMTP disimpan secara dinamis pada tabel `SystemSettings` di database MySQL tanpa membutuhkan restart aplikasi maupun build ulang kontainer.
 - **Konfigurasi Parameter SMTP**:
   - `Email_SmtpHost`: Server host SMTP (misal `smtp.gmail.com`, `smtp.office365.com`, `smtp.mailtrap.io`).
   - `Email_SmtpPort`: Port koneksi SMTP (misal `587` untuk STARTTLS, `465` untuk SSL, `2525`).
@@ -641,20 +658,80 @@ erDiagram
   - `DELETE /api/email-config/templates/{id}` — Menghapus template email kustom.
   - `POST /api/email-config/templates/{id}/preview` — Melakukan render pratinjau live template.
 
-### 5.19 Pembaruan Navigasi, Ergonomi Antarmuka, Halaman Login Lottie, Onboarding Tour & AJAX Grid Table Pagination
-- **Redesain Halaman Login Modern**:
-  - Mengintegrasikan animasi Lottie interaktif berkualitas tinggi, mode gelap/terang instan tanpa reload, dan dropdown perusahaan bertenaga Select2.
+### 5.19 Pembaruan Navigasi, Ergonomi Antarmuka, Halaman Login, Onboarding Tour & AJAX Grid Table Pagination
+- **Redesain Halaman Login Modern (React SPA)**:
+  - Halaman Login React (`LoginPage.jsx`) dengan desain modern, animasi visual, toggle mode gelap/terang via tema CSS, dan dropdown pemilih perusahaan.
   - Dilengkapi banner notifikasi status sesi (`?reason=timeout`, pending approval, atau gagal masuk).
-- **Tur Interaktif Layar (*Interactive Onboarding Tour* - `onboarding-tour.js`)**:
-  - 6 spotlight navigasi interaktif memandu pengguna baru memahami alur operasional: Ringkasan Metrik Dashboard, Manajemen Tugas & Multi-Timer, Kalender Kerja, Presensi Mandiri, SQL Beautifier, dan Theme & Font Switcher.
-  - Dapat diakses kembali sewaktu-waktu melalui menu profil navbar atau pintasan bantuan.
-- **Paginasi Grid Tabel AJAX (*Zero Reload* - `ajax-grid-manager.js`)**:
-  - Mengimplementasikan navigasi tabel instan tanpa memuat ulang halaman (*zero reload*) untuk tabel Tugas, Anggota Tim, Presensi, Audit Trail, dan Timesheet.
-  - Terintegrasi penuh dengan browser history API (`history.pushState`) sehingga URL tetap dapat di-bookmark dan dibagikan secara akurat.
+- **Tur Interaktif Layar (*Interactive Onboarding Tour*)**:
+  - Fitur panduan interaktif terintegrasi dalam React yang memandu pengguna baru memahami alur operasional.
+  - Dapat diakses kembali sewaktu-waktu melalui menu profil atau pintasan bantuan.
+- **Paginasi Grid Tabel (Client-Side React)**:
+  - Navigasi tabel instan pada React SPA untuk tabel Tugas, Anggota Tim, Presensi, Audit Trail, dan Timesheet.
+  - Terintegrasi dengan React Router sehingga navigasi tetap responsif dan SPA-native.
 - **Topbar Minimalis & Sentralisasi Navigasi Bantuan**:
-  - Bilah atas fokus menampilkan judul halaman aktif, badge nama perusahaan, kotak pencarian global, tombol *Import Excel*, lonceng notifikasi, pemilih 40 tema dinamis & 5 font, dan tombol profil dropdown.
-  - Tautan dokumentasi **Swagger REST API** dan **Buku Panduan Pengguna (PDF)** dipusatkan pada Bilah Samping (Sidebar) bagian bawah (*Akun & Bantuan*).
-  - Fitur **Tur Aplikasi (Interactive Onboarding Tour)** dapat diakses kapan saja melalui menu profil pengguna atau pintasan bantuan.
+  - Bilah atas fokus menampilkan judul halaman aktif, badge nama perusahaan, kotak pencarian global, lonceng notifikasi, pemilih 40 tema dinamis & 5 font, dan tombol profil dropdown.
+  - Tautan dokumentasi **Swagger REST API** dan **Panduan Pengguna** dipusatkan pada Sidebar bagian bawah.
+
+### 5.20 Modul Ticketing & Helpdesk Internal (IT Support Ticket System)
+- Modul sistem tiket dukungan teknis internal (*helpdesk*) yang memungkinkan seluruh pengguna melaporkan kendala sistem, permintaan fitur, atau kebutuhan bantuan teknis langsung dari dalam aplikasi.
+- **Kategori Tiket**:
+  - `Bug` — Kendala / Error Sistem
+  - `FeatureRequest` — Permintaan Fitur Baru
+  - `Support` — Bantuan Teknis & Operasional
+  - `Infrastructure` — Jaringan / Server / Database
+  - `AccountAccess` — Akses Akun / Hak Akses
+  - `Other` — Lainnya
+- **Tingkat Prioritas Tiket**: `Low`, `Medium`, `High`, `Critical`.
+- **Status Alur Tiket**: `Open` → `InProgress` → `PendingUser` → `Resolved` → `Closed` (atau `Rejected`).
+- **Nomor Tiket Otomatis**: Format standar `TCK-YYYYMM-NNNN` (contoh: `TCK-202609-0001`) digenerate otomatis oleh sistem.
+- **Komentar & Komunikasi Internal**:
+  - Entitas `TicketComment` memungkinkan komunikasi dua arah antara pelapor dan tim penanganan.
+  - Komentar dapat ditandai sebagai **Internal** (`IsInternal = true`) untuk catatan teknis yang hanya terlihat oleh Administrator/tim teknis.
+- **Hak Akses Tiket**:
+  - Seluruh pengguna dapat membuat dan memantau tiket mereka sendiri.
+  - Administrator dapat melihat, mengelola, menugaskan, dan menutup seluruh tiket dari semua pengguna.
+- **Entitas Database**: `Ticket`, `TicketComment`.
+- **REST API Endpoints**:
+  - `GET /api/tickets` — Mengambil daftar tiket (filter: status, kategori, prioritas)
+  - `POST /api/tickets` — Membuat tiket baru
+  - `GET /api/tickets/{id}` — Detail tiket beserta komentar
+  - `PUT /api/tickets/{id}` — Memperbarui status, prioritas, atau PIC tiket
+  - `POST /api/tickets/{id}/comments` — Menambah komentar pada tiket
+  - `DELETE /api/tickets/{id}` — Menghapus tiket (Admin only)
+
+### 5.21 Modul Gamifikasi, Badge Prestasi & Sistem Reward Poin
+- Sistem gamifikasi terintegrasi untuk meningkatkan motivasi dan keterlibatan (*engagement*) anggota tim melalui mekanisme pencapaian badge, akumulasi poin, dan program reward.
+
+#### 5.21.1 Sistem Badge & Pencapaian
+- **Master Badge**: Katalog lencana prestasi yang dapat dikonfigurasi Administrator dengan atribut:
+  - `Code`, `Name`, `Description`, `Category`, `Icon`, `Color`
+  - `Points`: Nilai poin yang diperoleh saat badge dibuka
+  - `Rarity`: Tingkat kelangkaan badge (`Common`, `Rare`, `Epic`, `Legendary`)
+  - `TriggerType`: Mekanisme pemicu (`Manual` oleh Admin, `Auto_DoneTasks`, `Auto_WorkHours`, `Auto_Notes`, dll)
+  - `TriggerThreshold`: Ambang batas numerik untuk pemicu otomatis
+- **Evaluasi Otomatis Badge**: Sistem secara otomatis mengevaluasi dan memberikan badge kepada pengguna saat milestone pencapaian tercapai (misal: menyelesaikan 10 tugas, mencatat 100 jam kerja).
+- **Badge Pilihan (Featured)**: Pengguna dapat memilih badge favorit untuk ditampilkan secara menonjol di profil mereka.
+- **Pemberian Badge Manual**: Administrator dapat memberikan badge khusus (misal: *Team Player*, *Rockstar Developer*) kepada pengguna secara langsung.
+
+#### 5.21.2 Sistem Poin & Reward Claim
+- **Akumulasi Poin**: Setiap badge yang dibuka memberikan poin kepada pengguna (`MasterBadge.Points`).
+- **Klaim Reward (RewardClaim)**: Pengguna dapat menukarkan poin yang terkumpul dengan reward nyata:
+  - Nilai konversi: **1 Poin = Rp 100** (`RupiahAmount = PointsClaimed × 100`)
+  - Jenis reward: `CashTransfer` (transfer bank/e-wallet) atau `Traktiran` (ditraktir makan/minum)
+  - Pengguna mengisi informasi rekening/kontak dan catatan request
+- **Proses Persetujuan Klaim (Admin)**:
+  - Status klaim: `Pending` → `Approved` (disetujui & diproses) → `Rejected`
+  - Administrator memverifikasi, memproses pembayaran, dan menginputkan bukti/catatan admin
+- **Leaderboard**: Peringkat poin dan produktivitas tim yang dapat dilihat oleh seluruh anggota.
+- **Entitas Database**: `MasterBadge`, `UserBadge`, `RewardClaim`.
+- **REST API Endpoints**:
+  - `GET /api/gamification/badges` — Katalog master badge
+  - `GET /api/gamification/user/{userId}` — Badge yang dimiliki pengguna
+  - `GET /api/gamification/leaderboard` — Peringkat poin tim
+  - `POST /api/gamification/award` — Admin memberikan badge manual
+  - `GET /api/gamification/rewards` — Daftar klaim reward
+  - `POST /api/gamification/rewards/claim` — Pengguna mengajukan klaim reward
+  - `PUT /api/gamification/rewards/{id}/process` — Admin memproses klaim
 
 ---
 
@@ -670,8 +747,8 @@ erDiagram
 
 ### 6.2 Performa & Keandalan
 1. **Index Optimization**: Indeks database pada `Tasks.ProjectId`, `Tasks.AssignedToUserId`, `Tasks.ParentTaskId`, `AttendanceRecords.UserId`, `AttendanceRecords.Date`, dan `AuditLogs.Timestamp`.
-2. **Efisiensi File Streaming**: Endpoint download berkas menggunakan `PhysicalFileResult` stream native ASP.NET Core.
-3. **SQLite Database Compaction**: Fitur *Shrink Database (VACUUM)* untuk menjaga ukuran file basis data tetap ringkas.
+2. **MySQL Connection Resilience**: Retry policy dengan `EnableRetryOnFailure(maxRetryCount: 5)` untuk ketahanan koneksi database.
+3. **Efisiensi File Streaming**: Endpoint download berkas menggunakan streaming native ASP.NET Core.
 
 ---
 
@@ -686,26 +763,46 @@ Aplikasi dikompilasi menggunakan multi-stage build resmi Microsoft:
 ### 7.2 Docker Compose & Persistent Volumes
 ```yaml
 services:
-  trackerkerja:
-    image: trackerkerja:latest
+  worktracker-api:
+    image: worktracker-api:latest
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: trackerkerja_app
+    container_name: worktracker_api
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "5000:5080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:5000
-      - ConnectionStrings__DefaultConnection=Data Source=data/trackerkerja.db
-      - GlobalBaseUrl=http://localhost:5000
-      - Jwt__Key=TrackerKerja_SuperSecretKey_Production_2026_Min256BitsLongKey!
-      - Jwt__Issuer=TrackerKerja
-      - Jwt__Audience=TrackerKerjaClient
+      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=worktracker_db;User=tracker_user;Password=${DB_PASSWORD};CharSet=utf8mb4;
+      - Jwt__Key=${JWT_KEY}
+      - Jwt__Issuer=WorkTrackerPro
+      - Jwt__Audience=WorkTrackerProClient
     volumes:
-      - ./db_data:/app/data
       - ./uploads:/app/wwwroot/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    container_name: worktracker_mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=worktracker_db
+      - MYSQL_USER=tracker_user
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql_data:
 ```
 
 ### 7.3 Perintah Menjalankan Aplikasi
@@ -730,18 +827,12 @@ dotnet run --urls=http://localhost:5000
 
 ### 7.4 Repositori GitHub & Sinkronisasi Kode
 
-- **URL Repositori**: 👉 **`https://github.com/zhavick/TrackerKerja.git`**
+- **URL Repositori**: 👉 **`https://github.com/zhavick/PMTracker.git`**
 - **Branch Utama**: `main`
-- **Script Push Otomatis**:
-```powershell
-.\git-push.ps1
-```
 
 ---
 
 ### 📦 Berkas Referensi Terkait
-- **Dokumentasi Pengguna**: [USER_GUIDE.md](file:///c:/TEMP/VSCODE/TrackerKerja/USER_GUIDE.md)
-- **Panduan Docker**: [DOCKER_GUIDE.md](file:///c:/TEMP/VSCODE/TrackerKerja/DOCKER_GUIDE.md)
-- **Ringkasan Proyek**: [README.md](file:///c:/TEMP/VSCODE/TrackerKerja/README.md)
-- **Postman Collection**: `TrackerKerja_Postman_Collection.json`
-- **Postman Environment**: `TrackerKerja_Postman_Environment.json`
+- **Dokumentasi Pengguna**: [USER_GUIDE.md](file:///c:/TEMP/VSCODE/ProjectManagementv2/USER_GUIDE.md)
+- **Ringkasan Proyek**: [README.md](file:///c:/TEMP/VSCODE/ProjectManagementv2/README.md)
+- **Spesifikasi Teknis**: [TSD_WORK_TRACKER_PRO.md](file:///c:/TEMP/VSCODE/ProjectManagementv2/TSD_WORK_TRACKER_PRO.md)

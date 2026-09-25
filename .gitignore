@@ -43,3 +43,10 @@ uploads/
 
 # Scratch / Local test scripts
 scratch/
+
+# Database dumps and sync backups
+backups/
+**/backups/
+*.sql
+*.zip
+*.tar.gz

@@ -18,6 +18,7 @@ import MasterDataPage from './pages/MasterDataPage';
 import AuditTrailPage from './pages/AuditTrailPage';
 import EmailSettingsPage from './pages/EmailSettingsPage';
 import SyncPage from './pages/SyncPage';
+import ConfigurationPage from './pages/ConfigurationPage';
 import ProfilePage from './pages/ProfilePage';
 import UserGuidePage from './pages/UserGuidePage';
 import GamificationPage from './pages/GamificationPage';
@@ -68,8 +69,9 @@ export default function App() {
 
           <Route path="master-data" element={<MasterDataPage />} />
           <Route path="audit-trail" element={<AuditTrailPage />} />
-          <Route path="email-settings" element={<EmailSettingsPage />} />
-          <Route path="sync" element={<SyncPage />} />
+          <Route path="configuration" element={<ConfigurationPage />} />
+          <Route path="email-settings" element={<Navigate to="/configuration?tab=email" replace />} />
+          <Route path="sync" element={<Navigate to="/configuration?tab=sync" replace />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="user-guide" element={<UserGuidePage />} />
           <Route path="gamification" element={<GamificationPage />} />

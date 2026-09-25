@@ -37,10 +37,12 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 .AddDefaultTokenProviders();
 
 // 3. Register Domain Services
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<ClosedXmlService>();
 builder.Services.AddScoped<TaskExcelImportService>();
 builder.Services.AddScoped<AuditLogActionFilter>();
+builder.Services.AddScoped<ISyncService, SyncService>();
 
 // 4. JWT Bearer Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "WorkTrackerPro_SuperSecretKey_Production_2026_Minimum256BitsKey!";
@@ -97,25 +99,38 @@ builder.Services.AddControllers(options =>
     options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
 });
 
-// 7. Swagger Documentation with JWT Authorize Modal
+// 7. Swagger Documentation with JWT & Sync API Key Authorize Modal
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "Work Tracker Pro API",
+        Title = "Work Tracker Pro API & Sync Engine",
         Version = "v3.6",
-        Description = "Enterprise Work Task Management, Multi-Timer Timesheet Tracking, Attendance & Technical Documentation REST API"
+        Description = "Enterprise Work Task Management, Multi-Timer Timesheet Tracking, Attendance & Master Server Synchronization REST API.\n\n" +
+                      "**Otorisasi Penggunaan API:**\n" +
+                      "- **Bearer JWT Token:** Login via `POST /api/auth/login` untuk mendapatkan token, lalu klik tombol **Authorize** di kanan atas dan masukkan: `Bearer <token_jwt>`\n" +
+                      "- **X-Sync-ApiKey:** Untuk modul sinkronisasi antar server, sertakan header `X-Sync-ApiKey` atau atur pada skema otorisasi di bawah.\n" +
+                      "- **Server Induk Default:** `https://tracker.saidilmuna.space/`"
     });
 
     // Add Bearer JWT definition to Swagger
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. Masukkan 'Bearer' [spasi] dan token JWT Anda di field bawah ini.\r\n\r\nContoh: \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI...\"",
+        Description = "JWT Authorization header using the Bearer scheme.\n\nMasukkan 'Bearer' [spasi] dan token JWT Anda.\n\nContoh: `Bearer eyJhbGciOi...`",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
+    });
+
+    // Add X-Sync-ApiKey definition to Swagger
+    c.AddSecurityDefinition("X-Sync-ApiKey", new OpenApiSecurityScheme
+    {
+        Description = "Custom API Key header untuk sinkronisasi antar server induk & node lokal.\n\nMasukkan Secret Key yang terdaftar (contoh: `TrackerKerja_Default_Sync_Secret_Key_2026!`).",
+        Name = "X-Sync-ApiKey",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey
     });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -130,6 +145,19 @@ builder.Services.AddSwaggerGen(c =>
                 },
                 Scheme = "oauth2",
                 Name = "Bearer",
+                In = ParameterLocation.Header
+            },
+            new List<string>()
+        },
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "X-Sync-ApiKey"
+                },
+                Name = "X-Sync-ApiKey",
                 In = ParameterLocation.Header
             },
             new List<string>()
@@ -168,8 +196,10 @@ if (app.Environment.IsDevelopment() || true) // Enable Swagger in all environmen
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Work Tracker Pro API v3.6");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Work Tracker Pro API & Sync v3.6");
         c.RoutePrefix = "swagger";
+        c.EnablePersistAuthorization();
+        c.DisplayRequestDuration();
     });
 }
 

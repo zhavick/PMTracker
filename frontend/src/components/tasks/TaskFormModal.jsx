@@ -193,11 +193,11 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div 
         className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden animate-scale-up"
-        style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+        style={{ backgroundColor: 'var(--card-bg, var(--bg-card, #FFFFFF))', borderColor: 'var(--border-color)' }}
       >
         {/* Header */}
         <div 
-          className="flex items-center justify-between px-6 py-4 border-b"
+          className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
           style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}
         >
           <div className="flex items-center space-x-3">
@@ -227,7 +227,7 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
 
         {/* Tab Navigation */}
         <div 
-          className="flex px-6 pt-2 border-b space-x-4 text-sm font-medium"
+          className="flex px-6 pt-2 border-b space-x-4 text-sm font-medium flex-shrink-0"
           style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}
         >
           <button
@@ -260,7 +260,11 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+        <form 
+          onSubmit={handleSubmit} 
+          className="flex-1 overflow-y-auto p-6 space-y-5"
+          style={{ backgroundColor: 'var(--card-bg, var(--bg-card, #FFFFFF))' }}
+        >
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-sm flex items-center space-x-2.5">
               <AlertTriangle className="w-5 h-5 flex-shrink-0" />
@@ -629,8 +633,8 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
 
           {/* Footer Controls */}
           <div 
-            className="flex items-center justify-end space-x-3 pt-4 border-t"
-            style={{ borderColor: 'var(--border-color)' }}
+            className="flex items-center justify-end space-x-3 pt-4 border-t flex-shrink-0"
+            style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-secondary)', margin: '-1.5rem -1.5rem -1.5rem -1.5rem', padding: '1rem 1.5rem' }}
           >
             <button
               type="button"

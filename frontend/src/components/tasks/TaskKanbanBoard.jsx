@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   AlertTriangle, 
   Clock, 
@@ -8,7 +8,9 @@ import {
   ChevronRight, 
   Plus, 
   CheckCircle2, 
-  Folder 
+  Folder,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
 
@@ -41,9 +43,20 @@ export default function TaskKanbanBoard({
   onTaskUpdated,
   onAddNewTask 
 }) {
+  const [showCompleted, setShowCompleted] = useState(false); // Secara default tidak muncul
   const [mobileActiveColumn, setMobileActiveColumn] = useState(0);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [movingTaskId, setMovingTaskId] = useState(null);
+
+  // Filter columns based on showCompleted toggle
+  const visibleColumns = showCompleted ? COLUMNS : COLUMNS.filter(c => c.id !== 2);
+
+  // Fallback mobile column if completed is hidden
+  useEffect(() => {
+    if (!showCompleted && mobileActiveColumn === 2) {
+      setMobileActiveColumn(0);
+    }
+  }, [showCompleted, mobileActiveColumn]);
 
   // Group tasks by column
   const groupedTasks = {
@@ -117,14 +130,67 @@ export default function TaskKanbanBoard({
     );
   }
 
+  const completedCount = (groupedTasks[2] || []).length;
+
   return (
     <div className="space-y-4">
+      {/* KANBAN TOOLBAR WITH COMPLETED TOGGLE */}
+      <div 
+        className="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:px-4 rounded-2xl border shadow-sm"
+        style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+      >
+        <div className="flex items-center space-x-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+          <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
+          <span className="font-bold" style={{ color: 'var(--text-primary)' }}>Papan Kanban</span>
+          <span>•</span>
+          <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold">
+            {visibleColumns.length} Kolom
+          </span>
+          {!showCompleted && completedCount > 0 && (
+            <span className="text-[11px] text-gray-500 dark:text-gray-400 hidden sm:inline">
+              ({completedCount} tugas dengan status Selesai disembunyikan)
+            </span>
+          )}
+        </div>
+
+        {/* Toggle Button Show/Hide Completed */}
+        <button
+          type="button"
+          onClick={() => setShowCompleted(prev => !prev)}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 border ${
+            showCompleted
+              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25'
+              : 'hover:bg-black/5 dark:hover:bg-white/5 text-gray-600 dark:text-gray-300'
+          }`}
+          style={!showCompleted ? { borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-secondary)' } : {}}
+          title={showCompleted ? "Sembunyikan kolom status Completed" : "Tampilkan kolom status Completed"}
+        >
+          {showCompleted ? (
+            <>
+              <Eye className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Selesai Ditampilkan</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-600 text-white font-bold">
+                {completedCount}
+              </span>
+            </>
+          ) : (
+            <>
+              <EyeOff className="w-3.5 h-3.5 text-gray-400" />
+              <span>Selesai Disembunyikan</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold">
+                {completedCount}
+              </span>
+            </>
+          )}
+        </button>
+      </div>
+
       {/* MOBILE SEGMENTED SWITCHER PILL BAR (< 768px, FSD 5.6) */}
       <div 
         className="flex md:hidden p-1.5 rounded-2xl border overflow-x-auto gap-1 shadow-sm"
         style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
       >
-        {COLUMNS.map(col => {
+        {visibleColumns.map(col => {
           const count = (groupedTasks[col.id] || []).length;
           const isActive = mobileActiveColumn === col.id;
           return (
@@ -149,8 +215,8 @@ export default function TaskKanbanBoard({
       </div>
 
       {/* KANBAN COLUMNS CONTAINER */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {COLUMNS.map(col => {
+      <div className={`grid grid-cols-1 ${showCompleted ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
+        {visibleColumns.map(col => {
           const colTasks = groupedTasks[col.id] || [];
           const isMobileVisible = mobileActiveColumn === col.id;
 

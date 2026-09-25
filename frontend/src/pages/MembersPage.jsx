@@ -695,10 +695,10 @@ export default function MembersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div 
             className="w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden"
-            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+            style={{ backgroundColor: 'var(--card-bg, var(--bg-card, #FFFFFF))', borderColor: 'var(--border-color)' }}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b flex-shrink-0" style={{ borderColor: 'var(--border-color)' }}>
+            <div className="flex items-center justify-between p-5 border-b flex-shrink-0" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}>
               <div className="flex items-center space-x-2">
                 <Edit3 className="w-5 h-5 text-indigo-600" />
                 <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
@@ -1071,7 +1071,7 @@ export default function MembersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div 
             className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden p-6 space-y-4"
-            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+            style={{ backgroundColor: 'var(--card-bg, var(--bg-card, #FFFFFF))', borderColor: 'var(--border-color)' }}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
@@ -1138,7 +1138,7 @@ export default function MembersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div 
             className="w-full max-w-lg rounded-2xl border border-rose-500/40 shadow-2xl overflow-hidden p-6 space-y-4"
-            style={{ backgroundColor: 'var(--card-bg)' }}
+            style={{ backgroundColor: 'var(--card-bg, var(--bg-card, #FFFFFF))' }}
           >
             <div className="flex items-center space-x-2.5 text-rose-600">
               <AlertTriangle className="w-6 h-6 animate-pulse" />

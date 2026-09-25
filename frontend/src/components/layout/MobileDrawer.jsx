@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   X, LayoutDashboard, CheckSquare, Briefcase, Clock, Calendar, 
   FileText, Database, Code, Users, Settings, ShieldAlert, 
-  Mail, RefreshCw, HelpCircle, ExternalLink, Building2
+  SlidersHorizontal, HelpCircle, ExternalLink, Building2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -27,8 +27,7 @@ export default function MobileDrawer({ isOpen, onClose }) {
       { path: '/members', label: 'Anggota Tim & Approval', icon: Users },
       { path: '/master-data', label: 'Master Data & SDLC', icon: Settings },
       { path: '/audit-trail', label: 'Audit Trail', icon: ShieldAlert },
-      { path: '/email-settings', label: 'Pengaturan Email SMTP', icon: Mail },
-      { path: '/sync', label: 'Multi-Instance Sync', icon: RefreshCw },
+      { path: '/configuration', label: 'Konfigurasi', icon: SlidersHorizontal },
     ] : [])
   ];
 

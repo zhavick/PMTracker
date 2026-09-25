@@ -120,7 +120,7 @@ export default function TaskTableGrid({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div 
             className="w-full max-w-md p-6 rounded-2xl border shadow-2xl space-y-4"
-            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+            style={{ backgroundColor: 'var(--card-bg, var(--bg-card, #FFFFFF))', borderColor: 'var(--border-color)' }}
           >
             <div className="flex items-center space-x-3">
               <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">

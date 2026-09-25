@@ -13,6 +13,25 @@
     min-height: 100vh;
     overflow-x: hidden;
   }
+
+  /* Form controls default solid backgrounds and text readability */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="button"]),
+  select,
+  textarea {
+    background-color: var(--input-bg, #FFFFFF);
+    color: var(--text-primary, #0F172A);
+    border-color: var(--border-color, #E2E8F0);
+  }
+
+  select option {
+    background-color: var(--bg-card, #FFFFFF);
+    color: var(--text-primary, #0F172A);
+  }
+
+  ::placeholder {
+    color: var(--text-secondary, #64748B);
+    opacity: 0.7;
+  }
 }
 
 /* Custom Scrollbar */
