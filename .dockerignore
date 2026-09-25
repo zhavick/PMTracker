@@ -1,0 +1,14 @@
+.git
+.vscode
+.vs
+mysql_data/
+backups/
+**/backups/
+uploads/
+scratch/
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+*.sql
+*.zip
