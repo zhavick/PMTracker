@@ -2,18 +2,18 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { 
-  Rocket, 
-  Mail, 
-  Lock, 
-  Key, 
-  AtSign, 
-  Eye, 
-  EyeOff, 
-  ArrowRight, 
-  Sun, 
-  Moon, 
-  Palette, 
+import {
+  Rocket,
+  Mail,
+  Lock,
+  Key,
+  AtSign,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  Sun,
+  Moon,
+  Palette,
   AlertCircle,
   CheckCircle2,
   ShieldCheck,
@@ -27,8 +27,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState('admin@trackerkerja.com');
-  const [password, setPassword] = useState('Admin@123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -71,15 +71,15 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen w-full flex flex-col lg:flex-row overflow-x-hidden select-none">
-      
+
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* LEFT PANEL: FULL-SCREEN SHOWCASE WITH LARGE LOTTIE ANIMATION & BRAND   */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <section 
+      <section
         className="lg:w-7/12 xl:w-3/5 relative flex flex-col justify-between p-6 sm:p-10 lg:p-12 overflow-hidden border-b lg:border-b-0 lg:border-r transition-all duration-300"
         style={{
-          background: isDark 
-            ? 'linear-gradient(135deg, #020617 0%, #0F172A 40%, #1E1B4B 100%)' 
+          background: isDark
+            ? 'linear-gradient(135deg, #020617 0%, #0F172A 40%, #1E1B4B 100%)'
             : 'linear-gradient(135deg, #4338CA 0%, #6366F1 50%, #4F46E5 100%)',
           borderColor: isDark ? '#1E293B' : '#E0E7FF',
           color: '#FFFFFF'
@@ -110,7 +110,7 @@ export default function LoginPage() {
 
         {/* Center Showcase: Large Lottie Animation & Headline */}
         <div className="relative z-10 my-auto py-8 lg:py-12 flex flex-col items-center text-center max-w-2xl mx-auto">
-          
+
           {/* Large Lottie Animation Container */}
           <div className="w-full max-w-[340px] sm:max-w-[420px] lg:max-w-[480px] h-[260px] sm:h-[320px] lg:h-[380px] flex items-center justify-center relative">
             <dotlottie-player
@@ -166,7 +166,7 @@ export default function LoginPage() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* RIGHT PANEL: CLEAN MODERN LOGIN FORM WITH DARK/LIGHT TOGGLE           */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <section 
+      <section
         className="lg:w-5/12 xl:w-2/5 min-h-full flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16 relative transition-all duration-300"
         style={{
           backgroundColor: isDark ? '#090D16' : '#FFFFFF',
@@ -183,8 +183,8 @@ export default function LoginPage() {
 
           <div className="flex items-center gap-2">
             {/* Quick Dark / Light Mode Switch Button */}
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={toggleThemeMode}
               aria-label="Ubah Tema Gelap atau Terang"
               title="Klik untuk beralih antara mode gelap dan terang"
@@ -226,7 +226,7 @@ export default function LoginPage() {
 
         {/* Center Form Card */}
         <div className="w-full max-w-md my-auto">
-          
+
           {/* Login Card Header */}
           <div className="mb-8">
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2" style={{ color: isDark ? '#FFFFFF' : '#0F172A' }}>
@@ -258,11 +258,11 @@ export default function LoginPage() {
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            
+
             {/* Email Input Field */}
             <div>
-              <label 
-                htmlFor="email-input" 
+              <label
+                htmlFor="email-input"
                 className="block text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5"
                 style={{ color: isDark ? '#CBD5E1' : '#334155' }}
               >
@@ -270,14 +270,14 @@ export default function LoginPage() {
                 <span>Alamat Email</span>
               </label>
               <div className="relative">
-                <input 
-                  type="email" 
-                  id="email-input" 
-                  required 
+                <input
+                  type="email"
+                  id="email-input"
+                  required
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nama@email.com" 
+                  placeholder="nama@email.com"
                   className="w-full px-4 py-3.5 pl-11 rounded-2xl border text-sm font-medium transition-all focus:outline-none"
                   style={{
                     backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
@@ -292,8 +292,8 @@ export default function LoginPage() {
             {/* Password Input Field */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label 
-                  htmlFor="password-input" 
+                <label
+                  htmlFor="password-input"
                   className="block text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
                   style={{ color: isDark ? '#CBD5E1' : '#334155' }}
                 >
@@ -302,14 +302,14 @@ export default function LoginPage() {
                 </label>
               </div>
               <div className="relative">
-                <input 
+                <input
                   type={showPassword ? 'text' : 'password'}
-                  id="password-input" 
-                  required 
+                  id="password-input"
+                  required
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Masukkan kata sandi..." 
+                  placeholder="Masukkan kata sandi..."
                   className="w-full px-4 py-3.5 pl-11 pr-11 rounded-2xl border text-sm font-medium transition-all focus:outline-none"
                   style={{
                     backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
@@ -318,8 +318,8 @@ export default function LoginPage() {
                   }}
                 />
                 <Key className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label="Tampilkan atau sembunyikan kata sandi"
                   className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl text-slate-400 hover:text-indigo-500 flex items-center justify-center transition-all cursor-pointer"
@@ -332,25 +332,25 @@ export default function LoginPage() {
             {/* Remember Me Checkbox */}
             <div className="flex items-center justify-between pt-1">
               <label className="flex items-center gap-2.5 cursor-pointer group select-none">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" 
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
                 <span className="text-xs font-medium transition-colors" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
                   Ingat sesi saya di perangkat ini
                 </span>
               </label>
 
-              <span className="text-[11px] opacity-75 font-mono" style={{ color: isDark ? '#64748B' : '#94A3B8' }}>
+              {/* <span className="text-[11px] opacity-75 font-mono" style={{ color: isDark ? '#64748B' : '#94A3B8' }}>
                 Default: admin@trackerkerja.com
-              </span>
+              </span> */}
             </div>
 
             {/* Submit Button */}
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={loading}
               className="btn-gradient w-full text-white font-black py-4 px-6 rounded-2xl text-sm shadow-xl flex items-center justify-center gap-2 cursor-pointer mt-3 disabled:opacity-50"
             >
@@ -360,12 +360,12 @@ export default function LoginPage() {
           </form>
 
           {/* Bottom Navigation Links */}
-          <div 
+          <div
             className="mt-8 pt-6 border-t text-center space-y-3"
             style={{ borderColor: isDark ? '#1E293B' : '#E2E8F0' }}
           >
             <p className="text-xs" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
-              Belum memiliki akun terdaftar? 
+              Belum memiliki akun terdaftar?
               <Link to="/register" className="text-indigo-500 font-bold hover:text-indigo-600 transition-colors ml-1">
                 Daftar Akun Baru &rarr;
               </Link>
@@ -380,9 +380,9 @@ export default function LoginPage() {
       </section>
 
       {/* Theme Selection Modal */}
-      <ThemeModal 
-        isOpen={isThemeModalOpen} 
-        onClose={() => setIsThemeModalOpen(false)} 
+      <ThemeModal
+        isOpen={isThemeModalOpen}
+        onClose={() => setIsThemeModalOpen(false)}
       />
     </div>
   );
