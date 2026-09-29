@@ -7,6 +7,7 @@ using WorkTracker.Core.DTOs;
 using WorkTracker.Core.Entities;
 using WorkTracker.Core.Enums;
 using WorkTracker.Infrastructure.Data;
+using WorkTracker.Infrastructure.Services;
 
 namespace WorkTracker.Api.Controllers;
 
@@ -17,12 +18,17 @@ public class GamificationApiController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly GamificationService _gamificationService;
     private const decimal POINT_TO_RUPIAH_RATE = 100m; // 1 Point = 100 Rupiah
 
-    public GamificationApiController(AppDbContext context, UserManager<ApplicationUser> userManager)
+    public GamificationApiController(
+        AppDbContext context, 
+        UserManager<ApplicationUser> userManager,
+        GamificationService gamificationService)
     {
         _context = context;
         _userManager = userManager;
+        _gamificationService = gamificationService;
     }
 
     // ── Badges Master ──────────────────────────────────────────────────────────
@@ -356,7 +362,129 @@ public class GamificationApiController : ControllerBase
         }));
     }
 
-    // ── Reward Claiming System (1 Point = 100 Rupiah) ──────────────────────────
+    // ── Daily Check-In & Gamification Profile ─────────────────────────────────
+
+    [HttpGet("profile")]
+    [HttpGet("status")]
+    public async Task<IActionResult> GetProfile()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+        var profile = await _gamificationService.GetGamificationProfileAsync(userId);
+        return Ok(ApiResponse<GamificationProfileDto>.Success(profile));
+    }
+
+    [HttpPost("check-in")]
+    public async Task<IActionResult> DailyCheckIn([FromBody] DailyCheckInRequest? req)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+        var result = await _gamificationService.ProcessDailyCheckInAsync(userId, req?.Notes);
+        if (!result.Success)
+        {
+            return BadRequest(ApiResponse<DailyCheckInResultDto>.Fail(result.Message));
+        }
+
+        return Ok(ApiResponse<DailyCheckInResultDto>.Success(result, result.Message));
+    }
+
+    // ── Reward Items Catalog (CRUD & Claiming) ────────────────────────────────
+
+    [HttpGet("rewards")]
+    public async Task<IActionResult> GetRewardItems()
+    {
+        var isAdmin = User.IsInRole("Admin");
+        var query = _context.RewardItems.AsQueryable();
+        if (!isAdmin)
+        {
+            query = query.Where(r => r.IsActive);
+        }
+
+        var items = await query
+            .OrderBy(r => r.OrderIndex)
+            .ThenBy(r => r.PointCost)
+            .ToListAsync();
+
+        return Ok(ApiResponse<List<RewardItem>>.Success(items));
+    }
+
+    [HttpPost("rewards")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CreateRewardItem([FromBody] CreateRewardItemDto dto)
+    {
+        var item = new RewardItem
+        {
+            Name = dto.Name.Trim(),
+            Description = dto.Description?.Trim(),
+            PointCost = dto.PointCost,
+            Stock = dto.Stock,
+            Category = dto.Category,
+            Icon = dto.Icon,
+            Color = dto.Color,
+            IsMonthlyMilestoneReward = dto.IsMonthlyMilestoneReward,
+            OrderIndex = dto.OrderIndex,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.RewardItems.Add(item);
+        await _context.SaveChangesAsync();
+        return Ok(ApiResponse<RewardItem>.Success(item, "Item hadiah berhasil ditambahkan ke katalog."));
+    }
+
+    [HttpPut("rewards/{id}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateRewardItem(int id, [FromBody] UpdateRewardItemDto dto)
+    {
+        var item = await _context.RewardItems.FindAsync(id);
+        if (item == null) return NotFound(ApiResponse<object>.Fail("Item hadiah tidak ditemukan."));
+
+        item.Name = dto.Name.Trim();
+        item.Description = dto.Description?.Trim();
+        item.PointCost = dto.PointCost;
+        item.Stock = dto.Stock;
+        item.Category = dto.Category;
+        item.Icon = dto.Icon;
+        item.Color = dto.Color;
+        item.IsActive = dto.IsActive;
+        item.IsMonthlyMilestoneReward = dto.IsMonthlyMilestoneReward;
+        item.OrderIndex = dto.OrderIndex;
+
+        await _context.SaveChangesAsync();
+        return Ok(ApiResponse<RewardItem>.Success(item, "Item hadiah berhasil diperbarui."));
+    }
+
+    [HttpDelete("rewards/{id}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> DeleteRewardItem(int id)
+    {
+        var item = await _context.RewardItems.FindAsync(id);
+        if (item == null) return NotFound(ApiResponse<object>.Fail("Item hadiah tidak ditemukan."));
+
+        _context.RewardItems.Remove(item);
+        await _context.SaveChangesAsync();
+        return Ok(ApiResponse<object>.Success(null, "Item hadiah berhasil dihapus dari katalog."));
+    }
+
+    [HttpPost("claim-item")]
+    public async Task<IActionResult> ClaimRewardItem([FromBody] ClaimRewardItemRequest req)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+        try
+        {
+            var claim = await _gamificationService.ClaimRewardItemAsync(userId, req);
+            return Ok(ApiResponse<RewardClaim>.Success(claim, "Klaim hadiah berhasil diajukan! Admin akan memvalidasi permohonan Anda."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+        }
+    }
+
+    // ── Legacy / Manual Claiming ──────────────────────────────────────────────
 
     [HttpPost("claim-reward")]
     public async Task<IActionResult> ClaimReward([FromBody] ClaimRewardRequest req)
@@ -367,16 +495,26 @@ public class GamificationApiController : ControllerBase
         if (req.Points <= 0)
             return BadRequest(ApiResponse<object>.Fail("Jumlah poin yang diklaim harus lebih besar dari 0."));
 
-        // Calculate current available points
-        var totalPoints = await _context.UserBadges
-            .Where(ub => ub.UserId == userId)
-            .SumAsync(ub => ub.Badge != null ? ub.Badge.Points : 0);
+        // If RewardItemId is provided, delegate to item claim
+        if (req.RewardItemId.HasValue)
+        {
+            try
+            {
+                var claimItem = await _gamificationService.ClaimRewardItemAsync(userId, new ClaimRewardItemRequest
+                {
+                    RewardItemId = req.RewardItemId.Value,
+                    AccountOrContactInfo = req.AccountOrContactInfo,
+                    UserNotes = req.UserNotes
+                });
+                return Ok(ApiResponse<RewardClaim>.Success(claimItem, "Klaim hadiah berhasil diajukan!"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ApiResponse<object>.Fail(ex.Message));
+            }
+        }
 
-        var activeClaimedPoints = await _context.RewardClaims
-            .Where(r => r.UserId == userId && r.Status != ClaimStatus.Rejected)
-            .SumAsync(r => r.PointsClaimed);
-
-        var availablePoints = totalPoints - activeClaimedPoints;
+        var availablePoints = await _gamificationService.GetAvailablePointsAsync(userId);
         if (req.Points > availablePoints)
         {
             return BadRequest(ApiResponse<object>.Fail($"Poin tidak mencukupi. Poin Anda yang tersedia untuk diklaim adalah {availablePoints} poin (Rp {(availablePoints * POINT_TO_RUPIAH_RATE):N0})."));
@@ -387,19 +525,19 @@ public class GamificationApiController : ControllerBase
         var claim = new RewardClaim
         {
             UserId = userId,
-            PointsClaimed = req.Points,
-            RupiahAmount = rupiahAmount,
+            PointsSpent = req.Points,
+            RupiahEquivalent = rupiahAmount,
             RewardType = req.RewardType,
             AccountOrContactInfo = req.AccountOrContactInfo?.Trim() ?? string.Empty,
             UserNotes = req.UserNotes?.Trim(),
             Status = ClaimStatus.Pending,
-            CreatedAt = DateTime.UtcNow
+            ClaimedAt = DateTime.UtcNow
         };
 
         _context.RewardClaims.Add(claim);
         await _context.SaveChangesAsync();
 
-        return Ok(ApiResponse<RewardClaim>.Success(claim, $"Permohonan klaim {req.Points} Poin (Rp {rupiahAmount:N0}) berhasil diajukan! Administrator akan segera memproses hadiah Anda."));
+        return Ok(ApiResponse<RewardClaim>.Success(claim, $"Permohonan klaim {req.Points} Poin (Rp {rupiahAmount:N0}) berhasil diajukan!"));
     }
 
     [HttpGet("claims")]
@@ -410,6 +548,7 @@ public class GamificationApiController : ControllerBase
 
         var query = _context.RewardClaims
             .Include(r => r.User)
+            .Include(r => r.RewardItem)
             .Include(r => r.ProcessedByUser)
             .AsQueryable();
 
@@ -428,7 +567,7 @@ public class GamificationApiController : ControllerBase
         }
 
         var claims = await query
-            .OrderByDescending(r => r.CreatedAt)
+            .OrderByDescending(r => r.ClaimedAt)
             .Select(r => new
             {
                 r.Id,
@@ -436,7 +575,12 @@ public class GamificationApiController : ControllerBase
                 UserName = r.User != null ? (r.User.FullName ?? r.User.UserName) : "Pengguna",
                 UserEmail = r.User != null ? r.User.Email : "",
                 UserAvatarColor = r.User != null ? r.User.AvatarColor : "#6366F1",
+                r.RewardItemId,
+                RewardItemName = r.RewardItem != null ? r.RewardItem.Name : "Pencairan Dana",
+                RewardItemIcon = r.RewardItem != null ? r.RewardItem.Icon : "Gift",
+                r.PointsSpent,
                 r.PointsClaimed,
+                r.RupiahEquivalent,
                 r.RupiahAmount,
                 RewardType = r.RewardType.ToString(),
                 r.AccountOrContactInfo,
@@ -446,7 +590,8 @@ public class GamificationApiController : ControllerBase
                 r.ProcessedByUserId,
                 ProcessedByName = r.ProcessedByUser != null ? (r.ProcessedByUser.FullName ?? r.ProcessedByUser.UserName) : null,
                 r.ProcessedAt,
-                r.CreatedAt
+                r.ClaimedAt,
+                CreatedAt = r.ClaimedAt
             })
             .ToListAsync();
 
@@ -465,6 +610,16 @@ public class GamificationApiController : ControllerBase
             return NotFound(ApiResponse<object>.Fail("Data klaim tidak ditemukan."));
 
         var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        // If rejected and had reward item, restore stock
+        if (req.Status == ClaimStatus.Rejected && claim.Status != ClaimStatus.Rejected && claim.RewardItemId.HasValue)
+        {
+            var item = await _context.RewardItems.FindAsync(claim.RewardItemId.Value);
+            if (item != null)
+            {
+                item.Stock += 1;
+            }
+        }
 
         claim.Status = req.Status;
         claim.AdminNotes = req.AdminNotes?.Trim();
@@ -575,10 +730,16 @@ public class AwardBadgeRequest
 
 public class ClaimRewardRequest
 {
+    public int? RewardItemId { get; set; }
     public int Points { get; set; }
     public RewardType RewardType { get; set; } = RewardType.CashTransfer;
     public string AccountOrContactInfo { get; set; } = string.Empty;
     public string? UserNotes { get; set; }
+}
+
+public class DailyCheckInRequest
+{
+    public string? Notes { get; set; }
 }
 
 public class ProcessClaimRequest

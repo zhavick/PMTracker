@@ -25,6 +25,10 @@ public class ApplicationUser : IdentityUser
     public int? CompanyId { get; set; }
     public Company? Company { get; set; }
 
+    public int CurrentStreak { get; set; } = 0;
+    public int LongestStreak { get; set; } = 0;
+    public int TotalPointsEarned { get; set; } = 0;
+
     public bool IsApproved { get; set; } = false;
     public DateTime? ApprovedAt { get; set; }
     public string? ApprovedByUserId { get; set; }

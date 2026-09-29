@@ -25,7 +25,11 @@ public enum BadgeTriggerType
     Auto_TicketsReported = 12,   // Issue berkualitas dilaporkan >= threshold
     Auto_WeekendWarrior = 13,    // Jam kerja/task di akhir pekan (Sabtu/Minggu)
     Auto_SpeedDemon = 14,        // Task selesai cepat (< 2 jam)
-    Auto_ZeroDefect = 15         // Critical/High tasks selesai tanpa kendala
+    Auto_ZeroDefect = 15,        // Critical/High tasks selesai tanpa kendala
+    Auto_CheckInStreak = 16,     // Presensi check-in beruntun >= threshold
+    Auto_TotalCheckIns = 17,     // Total check-in presensi >= threshold
+    Auto_TotalPoints = 18,       // Akumulasi poin >= threshold
+    Auto_MonthlyMilestone = 19   // Menembus 30 hari streak check-in
 }
 
 public enum RewardType

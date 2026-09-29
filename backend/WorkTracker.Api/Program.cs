@@ -43,6 +43,7 @@ builder.Services.AddScoped<ClosedXmlService>();
 builder.Services.AddScoped<TaskExcelImportService>();
 builder.Services.AddScoped<AuditLogActionFilter>();
 builder.Services.AddScoped<ISyncService, SyncService>();
+builder.Services.AddScoped<GamificationService>();
 
 // 4. JWT Bearer Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "WorkTrackerPro_SuperSecretKey_Production_2026_Minimum256BitsKey!";
