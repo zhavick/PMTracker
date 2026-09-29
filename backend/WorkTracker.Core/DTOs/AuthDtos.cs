@@ -40,6 +40,9 @@ public class RegisterRequestDto
 
     public int? ExistingCompanyId { get; set; }
 
+    [MaxLength(50)]
+    public string? ExistingCompanyCode { get; set; }
+
     [MaxLength(150)]
     public string? NewCompanyName { get; set; }
 
@@ -65,6 +68,7 @@ public class UserProfileDto
     public string? CoverPictureUrl { get; set; }
     public int? CompanyId { get; set; }
     public string? CompanyName { get; set; }
+    public string? CompanyCode { get; set; }
     public string Role { get; set; } = "User";
     public bool IsApproved { get; set; } = false;
 }

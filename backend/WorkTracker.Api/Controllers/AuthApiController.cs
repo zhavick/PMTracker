@@ -66,6 +66,7 @@ public class AuthApiController : ControllerBase
                 CoverPictureUrl = user.CoverPictureUrl,
                 CompanyId = user.CompanyId,
                 CompanyName = company?.Name,
+                CompanyCode = company?.Code,
                 Role = roles.FirstOrDefault() ?? "User",
                 IsApproved = user.IsApproved
             }
@@ -86,29 +87,46 @@ public class AuthApiController : ControllerBase
 
         int? companyId = null;
 
-        if (model.CompanyOption == "new" && !string.IsNullOrWhiteSpace(model.NewCompanyName))
+        if (model.CompanyOption == "new")
         {
+            if (string.IsNullOrWhiteSpace(model.NewCompanyName))
+                return BadRequest(ApiResponse<object>.Fail("Nama perusahaan baru wajib diisi."));
+
+            var cleanCode = (model.NewCompanyCode ?? "").Trim().ToUpper();
+            if (string.IsNullOrWhiteSpace(cleanCode) || cleanCode.Length < 3)
+                return BadRequest(ApiResponse<object>.Fail("Kode perusahaan baru minimal 3 karakter alfanumerik."));
+
+            var isDuplicate = await _context.Companies.AnyAsync(c => c.Code == cleanCode);
+            if (isDuplicate)
+                return BadRequest(ApiResponse<object>.Fail("Kode perusahaan ini sudah terdaftar. Silakan gunakan kode lain."));
+
             var newCompany = new Company
             {
                 Name = model.NewCompanyName.Trim(),
-                Code = string.IsNullOrWhiteSpace(model.NewCompanyCode) ? model.NewCompanyName.Substring(0, Math.Min(5, model.NewCompanyName.Length)).ToUpper() : model.NewCompanyCode.Trim().ToUpper(),
+                Code = cleanCode,
                 CreatedAt = DateTime.UtcNow
             };
             _context.Companies.Add(newCompany);
             await _context.SaveChangesAsync();
             companyId = newCompany.Id;
         }
-        else if (model.ExistingCompanyId.HasValue)
+        else
         {
-            var company = await _context.Companies.FindAsync(model.ExistingCompanyId.Value);
-            if (company != null) companyId = company.Id;
-        }
+            var cleanCode = (model.ExistingCompanyCode ?? "").Trim().ToUpper();
+            Company? company = null;
+            if (!string.IsNullOrWhiteSpace(cleanCode))
+            {
+                company = await _context.Companies.FirstOrDefaultAsync(c => c.Code == cleanCode);
+            }
+            else if (model.ExistingCompanyId.HasValue)
+            {
+                company = await _context.Companies.FindAsync(model.ExistingCompanyId.Value);
+            }
 
-        // Fallback to first company if none selected
-        if (!companyId.HasValue)
-        {
-            var defaultCompany = await _context.Companies.FirstOrDefaultAsync();
-            companyId = defaultCompany?.Id;
+            if (company == null)
+                return BadRequest(ApiResponse<object>.Fail("Kode perusahaan tidak ditemukan atau belum terdaftar. Silakan periksa kembali kode Anda."));
+
+            companyId = company.Id;
         }
 
         var newUser = new ApplicationUser
@@ -163,6 +181,7 @@ public class AuthApiController : ControllerBase
             CoverPictureUrl = user.CoverPictureUrl,
             CompanyId = user.CompanyId,
             CompanyName = company?.Name,
+            CompanyCode = company?.Code,
             Role = roles.FirstOrDefault() ?? "User",
             IsApproved = user.IsApproved
         };

@@ -180,7 +180,7 @@ export default function RegisterPage() {
                   borderColor: formData.companyOption === 'existing' ? 'var(--accent-primary)' : 'var(--border-color)'
                 }}
               >
-                Gabung Default (PT Elistec)
+                Gunakan Kode Perusahaan
               </button>
               <button
                 type="button"
@@ -193,31 +193,64 @@ export default function RegisterPage() {
                   borderColor: formData.companyOption === 'new' ? 'var(--accent-primary)' : 'var(--border-color)'
                 }}
               >
-                Buat Perusahaan Baru
+                Daftar Perusahaan Baru
               </button>
             </div>
 
-            {formData.companyOption === 'new' && (
+            {formData.companyOption === 'existing' ? (
+              <div className="p-3 rounded-xl border space-y-1.5" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+                <label className="block text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  Masukkan Kode Resmi Perusahaan Anda
+                </label>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-white dark:bg-zinc-800 text-xs" style={{ borderColor: 'var(--border-color)' }}>
+                  <Building size={14} style={{ color: 'var(--text-secondary)' }} />
+                  <input
+                    type="text"
+                    required
+                    name="existingCompanyCode"
+                    value={formData.existingCompanyCode || ''}
+                    onChange={(e) => setFormData({ ...formData, existingCompanyCode: e.target.value.toUpperCase() })}
+                    placeholder="Contoh: ELISTEC"
+                    className="w-full bg-transparent text-xs font-bold tracking-wider outline-none uppercase"
+                    style={{ color: 'var(--text-primary)' }}
+                  />
+                </div>
+                <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                  *Dapatkan kode perusahaan dari Administrator atau HR instansi Anda untuk bergabung ke ruang kerja tim.
+                </p>
+              </div>
+            ) : (
               <div className="space-y-2 p-3 rounded-xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-                <input
-                  type="text"
-                  required
-                  name="newCompanyName"
-                  value={formData.newCompanyName}
-                  onChange={handleChange}
-                  placeholder="Nama Perusahaan Baru"
-                  className="w-full p-2 rounded-lg border bg-white dark:bg-zinc-800 text-xs outline-none"
-                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-                />
-                <input
-                  type="text"
-                  name="newCompanyCode"
-                  value={formData.newCompanyCode}
-                  onChange={handleChange}
-                  placeholder="Kode Perusahaan (opsional, misal: ELISTEC)"
-                  className="w-full p-2 rounded-lg border bg-white dark:bg-zinc-800 text-xs outline-none"
-                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-                />
+                <div>
+                  <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    Nama Entitas / Perusahaan Baru
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    name="newCompanyName"
+                    value={formData.newCompanyName}
+                    onChange={handleChange}
+                    placeholder="Misal: PT Inovasi Solusi Digital"
+                    className="w-full p-2 rounded-lg border bg-white dark:bg-zinc-800 text-xs outline-none"
+                    style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    Kode Unik Perusahaan (Min. 3 Karakter Alfanumerik)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    name="newCompanyCode"
+                    value={formData.newCompanyCode}
+                    onChange={(e) => setFormData({ ...formData, newCompanyCode: e.target.value.toUpperCase() })}
+                    placeholder="Contoh: INOVASI"
+                    className="w-full p-2 rounded-lg border bg-white dark:bg-zinc-800 text-xs font-bold tracking-wider outline-none uppercase"
+                    style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
+                </div>
               </div>
             )}
           </div>

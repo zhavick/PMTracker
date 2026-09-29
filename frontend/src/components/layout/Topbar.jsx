@@ -30,20 +30,24 @@ export default function Topbar({ onOpenMobileDrawer, onOpenThemeModal, onOpenTou
         </button>
 
         <div className="flex items-center gap-2.5">
-          {/* Company Badge */}
-          {user?.companyName && (
-            <div 
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border"
-              style={{ 
-                backgroundColor: 'var(--bg-secondary)', 
-                borderColor: 'var(--border-color)',
-                color: 'var(--accent-primary)' 
-              }}
-            >
-              <Building2 size={13} />
-              <span className="max-w-[150px] truncate">{user.companyName}</span>
-            </div>
-          )}
+          {/* Tenant Company Badge */}
+          <div 
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-sm transition-all"
+            style={{ 
+              backgroundColor: 'var(--bg-secondary)', 
+              borderColor: 'var(--border-color)',
+              color: 'var(--accent-primary)' 
+            }}
+          >
+            <Building2 size={13} className="shrink-0" />
+            <span className="max-w-[220px] truncate">
+              {user?.role === 'Admin' 
+                ? '[ADMIN] Semua Tim / Perusahaan' 
+                : user?.companyCode 
+                  ? `[${user.companyCode}] ${user.companyName || 'Perusahaan'}` 
+                  : user?.companyName || 'Perusahaan'}
+            </span>
+          </div>
         </div>
       </div>
 
