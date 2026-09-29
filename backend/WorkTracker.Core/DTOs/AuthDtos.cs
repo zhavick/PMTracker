@@ -86,3 +86,36 @@ public class ChangePasswordDto
     [Compare(nameof(NewPassword))]
     public string ConfirmNewPassword { get; set; } = string.Empty;
 }
+
+public class ForgotPasswordRequestDto
+{
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+}
+
+public class ResetPasswordRequestDto
+{
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    public string Token { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(6)]
+    public string NewPassword { get; set; } = string.Empty;
+
+    [Required]
+    [Compare(nameof(NewPassword))]
+    public string ConfirmNewPassword { get; set; } = string.Empty;
+}
+
+public class ForgotPasswordResponseDto
+{
+    public string Email { get; set; } = string.Empty;
+    public string ResetToken { get; set; } = string.Empty;
+    public string ClaimUrl { get; set; } = string.Empty;
+    public bool EmailSent { get; set; }
+}

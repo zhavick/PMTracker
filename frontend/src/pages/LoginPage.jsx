@@ -329,7 +329,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Remember Me Checkbox */}
+            {/* Remember Me Checkbox & Forgot Password Link */}
             <div className="flex items-center justify-between pt-1">
               <label className="flex items-center gap-2.5 cursor-pointer group select-none">
                 <input
@@ -339,13 +339,16 @@ export default function LoginPage() {
                   className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
                 <span className="text-xs font-medium transition-colors" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
-                  Ingat sesi saya di perangkat ini
+                  Ingat sesi saya
                 </span>
               </label>
 
-              {/* <span className="text-[11px] opacity-75 font-mono" style={{ color: isDark ? '#64748B' : '#94A3B8' }}>
-                Default: admin@trackerkerja.com
-              </span> */}
+              <Link
+                to="/reset-password"
+                className="text-xs font-bold text-indigo-500 hover:text-indigo-400 hover:underline transition-colors"
+              >
+                Lupa kata sandi?
+              </Link>
             </div>
 
             {/* Submit Button */}

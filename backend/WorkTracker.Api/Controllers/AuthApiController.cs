@@ -35,9 +35,29 @@ public class AuthApiController : ControllerBase
         if (user == null)
             return Unauthorized(ApiResponse<object>.Fail("Email atau kata sandi tidak sesuai."));
 
+        // Check Lockout
+        if (await _userManager.IsLockedOutAsync(user))
+        {
+            var lockoutEnd = await _userManager.GetLockoutEndDateAsync(user);
+            var remainingMinutes = lockoutEnd.HasValue ? Math.Max(1, (int)(lockoutEnd.Value - DateTimeOffset.UtcNow).TotalMinutes) : 30;
+            return StatusCode(StatusCodes.Status423Locked, 
+                ApiResponse<object>.Fail($"Akun Anda sementara terkunci selama {remainingMinutes} menit karena 5 kali percobaan gagal berturut-turut demi alasan keamanan."));
+        }
+
         var isPasswordValid = await _userManager.CheckPasswordAsync(user, model.Password);
         if (!isPasswordValid)
-            return Unauthorized(ApiResponse<object>.Fail("Email atau kata sandi tidak sesuai."));
+        {
+            await _userManager.AccessFailedAsync(user);
+            if (await _userManager.IsLockedOutAsync(user))
+            {
+                return StatusCode(StatusCodes.Status423Locked, 
+                    ApiResponse<object>.Fail("Akun Anda telah terkunci selama 30 menit karena 5 kali percobaan gagal berturut-turut."));
+            }
+
+            var failedAttempts = await _userManager.GetAccessFailedCountAsync(user);
+            var remaining = Math.Max(0, 5 - failedAttempts);
+            return Unauthorized(ApiResponse<object>.Fail($"Email atau kata sandi tidak sesuai. Sisa kesempatan sebelum akun terkunci: {remaining} kali."));
+        }
 
         // Admin Approval Check
         if (!user.IsApproved)
@@ -45,6 +65,9 @@ public class AuthApiController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, 
                 ApiResponse<object>.Fail("Akun Anda sedang menunggu persetujuan (approval) dari Administrator. Silakan hubungi admin tim Anda."));
         }
+
+        // Reset lockout failed count upon success
+        await _userManager.ResetAccessFailedCountAsync(user);
 
         var roles = await _userManager.GetRolesAsync(user);
         var company = user.CompanyId.HasValue ? await _context.Companies.FindAsync(user.CompanyId.Value) : null;
@@ -234,5 +257,64 @@ public class AuthApiController : ControllerBase
         }
 
         return Ok(ApiResponse<object>.Success(null, "Kata sandi Anda berhasil diperbarui."));
+    }
+
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto model)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Fail("Alamat email tidak valid."));
+
+        var user = await _userManager.FindByEmailAsync(model.Email.Trim());
+        if (user == null)
+        {
+            return Ok(ApiResponse<object>.Success(new { email = model.Email }, "Jika email terdaftar, tautan reset kata sandi telah disiapkan."));
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var encodedToken = Uri.EscapeDataString(token);
+        var claimUrl = $"/reset-password?email={Uri.EscapeDataString(user.Email!)}&token={encodedToken}";
+
+        var response = new ForgotPasswordResponseDto
+        {
+            Email = user.Email!,
+            ResetToken = token,
+            ClaimUrl = claimUrl,
+            EmailSent = false
+        };
+
+        return Ok(ApiResponse<ForgotPasswordResponseDto>.Success(
+            response, 
+            "Tautan klaim reset kata sandi (User Claim Link) berhasil dibuat."));
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto model)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Fail("Data permohonan reset tidak valid."));
+
+        var user = await _userManager.FindByEmailAsync(model.Email.Trim());
+        if (user == null)
+            return NotFound(ApiResponse<object>.Fail("Pengguna tidak ditemukan."));
+
+        var token = model.Token.Trim();
+        var result = await _userManager.ResetPasswordAsync(user, token, model.NewPassword);
+        if (!result.Succeeded)
+        {
+            var unescapedToken = Uri.UnescapeDataString(token);
+            result = await _userManager.ResetPasswordAsync(user, unescapedToken, model.NewPassword);
+        }
+
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors.Select(e => e.Description).ToList();
+            return BadRequest(ApiResponse<object>.Fail("Gagal mereset kata sandi. Token reset kadaluarsa atau tidak valid.", errors));
+        }
+
+        await _userManager.SetLockoutEndDateAsync(user, null);
+        await _userManager.ResetAccessFailedCountAsync(user);
+
+        return Ok(ApiResponse<object>.Success(new { email = user.Email }, "Kata sandi Anda berhasil diatur ulang. Silakan login kembali."));
     }
 }
