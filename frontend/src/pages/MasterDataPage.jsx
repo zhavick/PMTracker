@@ -18,7 +18,8 @@ import {
   ShieldCheck,
   CalendarDays,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Gift
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
@@ -86,6 +87,7 @@ export default function MasterDataPage() {
   const [categories, setCategories] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [holidayYear, setHolidayYear] = useState(new Date().getFullYear());
+  const [rewards, setRewards] = useState([]);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -125,6 +127,9 @@ export default function MasterDataPage() {
       } else if (activeTab === 'holidays') {
         const res = await axiosClient.get('/api/master-data/holidays', { params: { year: holidayYear } });
         setHolidays(res.data?.data || []);
+      } else if (activeTab === 'rewards') {
+        const res = await axiosClient.get('/api/gamification/rewards');
+        setRewards(res.data?.data || []);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal memuat data.');
@@ -147,6 +152,8 @@ export default function MasterDataPage() {
     } else if (activeTab === 'holidays') {
       const today = new Date().toISOString().slice(0, 10);
       setFormData({ name: '', date: today, holidayType: 'National', color: '#EF4444', icon: 'Calendar', description: '', isRecurringYearly: false, isActive: true });
+    } else if (activeTab === 'rewards') {
+      setFormData({ name: '', description: '', pointCost: 100, stock: 10, category: 'Voucher', icon: 'Gift', color: '#6366F1', isMonthlyMilestoneReward: false, orderIndex: rewards.length + 1 });
     }
     setIsModalOpen(true);
   };
@@ -167,13 +174,25 @@ export default function MasterDataPage() {
     setError(null);
     setSuccessMsg('');
     try {
-      const endpoint = activeTab === 'holidays' ? `/api/master-data/holidays` : `/api/master-data/${activeTab}`;
+      const endpoint = activeTab === 'holidays' 
+        ? `/api/master-data/holidays` 
+        : activeTab === 'rewards'
+        ? `/api/gamification/rewards`
+        : `/api/master-data/${activeTab}`;
+
+      const payload = { ...formData };
+      if (activeTab === 'rewards') {
+        payload.pointCost = parseInt(payload.pointCost) || 0;
+        payload.stock = parseInt(payload.stock) || 0;
+        payload.orderIndex = parseInt(payload.orderIndex) || 0;
+      }
+
       if (modalMode === 'create') {
-        await axiosClient.post(endpoint, formData);
-        setSuccessMsg('Data master berhasil ditambahkan.');
+        await axiosClient.post(endpoint, payload);
+        setSuccessMsg(activeTab === 'rewards' ? 'Item hadiah berhasil ditambahkan ke katalog.' : 'Data master berhasil ditambahkan.');
       } else {
-        await axiosClient.put(`${endpoint}/${currentEditId}`, formData);
-        setSuccessMsg('Data master berhasil diperbarui.');
+        await axiosClient.put(`${endpoint}/${currentEditId}`, payload);
+        setSuccessMsg(activeTab === 'rewards' ? 'Item hadiah berhasil diperbarui.' : 'Data master berhasil diperbarui.');
       }
       setIsModalOpen(false);
       fetchActiveData();
@@ -192,6 +211,18 @@ export default function MasterDataPage() {
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal menghapus.');
+    }
+  };
+
+  const handleDeleteReward = async (id, name) => {
+    if (!confirm(`Hapus item hadiah "${name}"?`)) return;
+    try {
+      await axiosClient.delete(`/api/gamification/rewards/${id}`);
+      setSuccessMsg('Item hadiah berhasil dihapus dari katalog.');
+      fetchActiveData();
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal menghapus item hadiah.');
     }
   };
 
@@ -331,6 +362,20 @@ export default function MasterDataPage() {
         >
           <CalendarDays className="w-4 h-4" />
           Hari Libur {'&'} Cuti ({holidays.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('rewards')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+            activeTab === 'rewards' ? 'text-white shadow-sm' : 'hover:bg-slate-500/10'
+          }`}
+          style={{
+            backgroundColor: activeTab === 'rewards' ? 'var(--accent-primary)' : 'transparent',
+            color: activeTab === 'rewards' ? '#ffffff' : 'var(--text-secondary)'
+          }}
+        >
+          <Gift className="w-4 h-4" />
+          Katalog Hadiah & Poin ({rewards.length})
         </button>
       </div>
 
@@ -564,7 +609,7 @@ export default function MasterDataPage() {
             </button>
           </div>
         </div>
-      ) : (
+      ) : activeTab !== 'holidays' && activeTab !== 'rewards' ? (
         <div 
           className="rounded-2xl border shadow-sm overflow-hidden" 
           style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
@@ -749,7 +794,7 @@ export default function MasterDataPage() {
           </div>
         )}
       </div>
-      )}
+      ) : null}
 
       {/* Modal CRUD */}
 
@@ -847,6 +892,136 @@ export default function MasterDataPage() {
         </div>
       )}
 
+      {/* Rewards Tab */}
+      {activeTab === 'rewards' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <Gift className="w-5 h-5 text-indigo-500" />
+                Katalog Item Hadiah & Poin Gamifikasi
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Kelola item voucher, cuti, merchandise, atau reward milestone yang dapat ditukar oleh anggota tim dengan koin poin.
+              </p>
+            </div>
+            {isAdmin && (
+              <button
+                onClick={openCreateModal}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-md hover:opacity-95 transition-all"
+                style={{ backgroundColor: 'var(--accent-primary)' }}
+              >
+                <Plus className="w-4 h-4" /> Tambah Item Hadiah
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-2xl border shadow-sm overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+            {loading ? (
+              <div className="p-12 text-center">
+                <div className="w-8 h-8 border-3 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }} />
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Memuat katalog hadiah...</p>
+              </div>
+            ) : rewards.length === 0 ? (
+              <div className="p-12 text-center">
+                <Gift className="w-10 h-10 text-slate-400 opacity-40 mx-auto mb-3" />
+                <p className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Belum ada item hadiah di katalog</p>
+                <p className="text-xs text-slate-400 mt-1">Klik tombol Tambah Item Hadiah untuk menambahkan reward baru.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b text-xs uppercase tracking-wider font-semibold" style={{ backgroundColor: 'var(--bg-tertiary, rgba(0,0,0,0.02))', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}>
+                    <tr>
+                      <th className="px-6 py-3.5">Urutan</th>
+                      <th className="px-6 py-3.5">Item Hadiah</th>
+                      <th className="px-6 py-3.5">Kategori</th>
+                      <th className="px-6 py-3.5">Biaya Poin</th>
+                      <th className="px-6 py-3.5">Stok</th>
+                      <th className="px-6 py-3.5">Tipe Reward</th>
+                      <th className="px-6 py-3.5">Status</th>
+                      {isAdmin && <th className="px-6 py-3.5 text-right">Aksi</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                    {rewards.map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-500/5 transition-colors">
+                        <td className="px-6 py-4 font-mono font-medium" style={{ color: 'var(--text-secondary)' }}>
+                          #{r.orderIndex}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${r.color || '#6366F1'}20`, color: r.color || '#6366F1' }}>
+                              <Gift className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="font-semibold block" style={{ color: 'var(--text-primary)' }}>{r.name}</span>
+                              {r.description && <span className="text-xs line-clamp-1" style={{ color: 'var(--text-secondary)' }}>{r.description}</span>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-xs px-2.5 py-1 rounded-lg font-semibold bg-slate-500/10" style={{ color: 'var(--text-primary)' }}>
+                            {r.category || 'Voucher'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                            🪙 {r.pointCost} Poin
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${r.stock > 0 ? 'bg-slate-500/10 text-slate-300' : 'bg-rose-500/15 text-rose-500'}`}>
+                            {r.stock > 0 ? `${r.stock} unit` : 'Habis'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {r.isMonthlyMilestoneReward ? (
+                            <span className="text-[11px] px-2.5 py-1 rounded-full font-bold bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                              ⭐ Milestone 30 Hari
+                            </span>
+                          ) : (
+                            <span className="text-[11px] px-2.5 py-1 rounded-full font-medium bg-slate-500/10 text-slate-400">
+                              Katalog Umum
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${r.isActive ? 'text-emerald-500' : 'text-slate-400'}`}>
+                            <span className={`w-2 h-2 rounded-full ${r.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                            {r.isActive ? 'Aktif' : 'Non-aktif'}
+                          </span>
+                        </td>
+                        {isAdmin && (
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => openEditModal(r)}
+                                className="p-1.5 rounded-lg hover:bg-slate-500/10 transition-colors text-indigo-500"
+                                title="Edit Hadiah"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteReward(r.id, r.name)}
+                                className="p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors text-rose-500"
+                                title="Hapus Hadiah"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
           <div 
@@ -868,14 +1043,14 @@ export default function MasterDataPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                  {activeTab === 'holidays' ? 'Nama Hari Libur *' : 'Nama Label *'}
+                  {activeTab === 'holidays' ? 'Nama Hari Libur *' : activeTab === 'rewards' ? 'Nama Item Hadiah *' : 'Nama Label *'}
                 </label>
                 <input
                   type="text"
                   required
                   value={formData.name || ''}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Contoh: Sangat Mendesak / UAT / Selesai"
+                  placeholder={activeTab === 'rewards' ? 'Contoh: Voucher E-Wallet Rp 50.000' : 'Contoh: Sangat Mendesak / UAT / Selesai'}
                   className="w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 />
@@ -954,6 +1129,80 @@ export default function MasterDataPage() {
                 />
               </div>
 
+              {activeTab === 'rewards' && (
+                <div className="space-y-4 pt-1">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                        Biaya Poin (Point Cost) *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        value={formData.pointCost ?? 100}
+                        onChange={(e) => setFormData({ ...formData, pointCost: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border text-sm"
+                        style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                        Stok Tersedia (Unit) *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        value={formData.stock ?? 10}
+                        onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border text-sm"
+                        style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      Kategori Hadiah
+                    </label>
+                    <select
+                      value={formData.category || 'Voucher'}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="Voucher">Voucher & E-Wallet</option>
+                      <option value="Merchandise">Merchandise & Swag</option>
+                      <option value="Libur">Cuti & Hari Libur Ekstra</option>
+                      <option value="Gadget">Gadget & Perlengkapan Kerja</option>
+                      <option value="Donasi">Donasi & Traktir Tim</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-primary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.isMonthlyMilestoneReward || false}
+                        onChange={(e) => setFormData({ ...formData, isMonthlyMilestoneReward: e.target.checked })}
+                        className="w-4 h-4 rounded text-purple-600 accent-purple-600"
+                      />
+                      <span>Klaim Khusus Milestone 30 Hari Check-In</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-primary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.isActive !== false}
+                        onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                        className="w-4 h-4 rounded text-emerald-600 accent-emerald-600"
+                      />
+                      <span>Tersedia di Katalog (Aktif)</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {activeTab === 'holidays' && (
                 <div className="space-y-3">
@@ -1021,7 +1270,7 @@ export default function MasterDataPage() {
                 </div>
               )}
 
-              {activeTab !== 'categories' && activeTab !== 'holidays' && (
+              {activeTab !== 'categories' && activeTab !== 'holidays' && activeTab !== 'rewards' && (
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"

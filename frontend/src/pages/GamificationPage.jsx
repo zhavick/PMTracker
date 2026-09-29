@@ -1,58 +1,33 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Trophy, Star, Zap, Award, Crown, Flame, Target, Clock,
   TrendingUp, Users, Medal, Shield, BookOpen, Coffee, Moon,
-  RefreshCw, Plus, Edit2, Trash2, Rocket, Bug, LifeBuoy,
+  RefreshCw, Plus, Edit2, Trash2, Rocket,
   X, Save, AlertCircle, CheckCircle, Sparkles, BarChart2,
   Gift, Wallet, DollarSign, CheckCircle2, AlertTriangle,
-  ArrowRight, CreditCard, Utensils, Tag, ShieldCheck, HeartHandshake, Send
+  ArrowRight, CreditCard, Utensils, Tag, ShieldCheck,
+  Smartphone, ShoppingBag, Package, Shirt, Calendar, CalendarCheck,
+  Coins, Sun, Sunrise, Gem, Building, Building2, Compass
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
-
-// ── Helpers & Constants ──────────────────────────────────────────────────────
+import gamificationApi from '../api/gamification';
 
 const POINT_TO_RUPIAH = 100; // 1 Poin = Rp 100
 
 const RARITY_META = {
-  1: { label: 'Common',    bg: 'rgba(100,116,139,0.15)', border: 'rgba(100,116,139,0.4)', text: '#94A3B8', glow: 'none' },
-  2: { label: 'Rare',      bg: 'rgba(59,130,246,0.15)',  border: 'rgba(59,130,246,0.4)',  text: '#60A5FA', glow: '0 0 20px rgba(59,130,246,0.3)' },
-  3: { label: 'Epic',      bg: 'rgba(139,92,246,0.15)',  border: 'rgba(139,92,246,0.4)',  text: '#A78BFA', glow: '0 0 20px rgba(139,92,246,0.35)' },
-  4: { label: 'Legendary', bg: 'rgba(245,158,11,0.15)',  border: 'rgba(245,158,11,0.4)',  text: '#FBBF24', glow: '0 0 25px rgba(245,158,11,0.4)' },
+  1: { label: 'Perunggu (Common)',    bg: 'rgba(100,116,139,0.12)', border: 'rgba(100,116,139,0.35)', text: '#94A3B8', glow: 'none' },
+  2: { label: 'Perak (Rare)',         bg: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.35)',  text: '#60A5FA', glow: '0 0 20px rgba(59,130,246,0.25)' },
+  3: { label: 'Emas (Epic)',          bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.35)',  text: '#FBBF24', glow: '0 0 22px rgba(245,158,11,0.3)' },
+  4: { label: 'Platinum (Legendary)', bg: 'rgba(168,85,247,0.12)',  border: 'rgba(168,85,247,0.35)',  text: '#C084FC', glow: '0 0 25px rgba(168,85,247,0.35)' },
+  5: { label: 'Berlian (Special)',    bg: 'rgba(236,72,153,0.15)',  border: 'rgba(236,72,153,0.4)',   text: '#F472B6', glow: '0 0 30px rgba(236,72,153,0.4)' },
 };
-
-const TRIGGER_LABELS = {
-  0: 'Manual (Admin)',
-  1: 'Task Selesai >= N',
-  2: 'Jam Kerja >= N jam',
-  3: 'Kehadiran Beruntun >= N',
-  4: 'Top Task Bulanan (#1)',
-  5: 'Task >= 100 Total',
-  6: 'Lembur >= N Hari',
-  7: 'Catatan/Dokumen >= N',
-  8: 'Proyek Dikelola >= N',
-  9: 'Early Bird Streak (<07:30)',
-  10: 'Night Owl (>20:00) >= N',
-  11: 'Tiket Issue Selesai >= N',
-  12: 'Tiket Dilaporkan >= N',
-  13: 'Kerja Akhir Pekan >= N',
-  14: 'Speed Demon (< 2 Jam) >= N',
-  15: 'Zero Defect (High/Crit) >= N'
-};
-
-const REWARD_TYPES = [
-  { value: 1, label: 'Transfer Bank (Uang Tunai)', icon: <CreditCard className="w-4 h-4 text-emerald-400" />, desc: 'BCA, Mandiri, BNI, BRI, Jago' },
-  { value: 2, label: 'E-Wallet', icon: <Wallet className="w-4 h-4 text-sky-400" />, desc: 'GoPay, OVO, Dana, ShopeePay' },
-  { value: 3, label: 'Traktir Makan Siang / Malam Bersama', icon: <Utensils className="w-4 h-4 text-amber-400" />, desc: 'Makan bersama tim / admin' },
-  { value: 4, label: 'Traktir Kopi / Snack Favorit', icon: <Coffee className="w-4 h-4 text-amber-500" />, desc: 'Kopi Kenangan, Fore, Starbucks, Boba' },
-  { value: 5, label: 'Voucher Belanja / Pulsa', icon: <Tag className="w-4 h-4 text-purple-400" />, desc: 'Indomaret, Alfamart, Tokopedia' },
-  { value: 6, label: 'Hadiah Khusus Lainnya', icon: <Gift className="w-4 h-4 text-rose-400" />, desc: 'Sesuai kesepakatan' }
-];
 
 const BADGE_ICON_MAP = { 
   Award, Trophy, Star, Zap, Flame, Target, Clock, Shield, BookOpen, 
-  Coffee, Moon, Medal, Crown, TrendingUp, Users, Rocket, Bug, 
-  LifeBuoy, Sparkles, ShieldCheck 
+  Coffee, Moon, Medal, Crown, TrendingUp, Users, Rocket, Sparkles, 
+  ShieldCheck, CalendarCheck, Sun, Sunrise, Coins, Gem, Building, 
+  Building2, Compass, CheckCircle2, Gift
 };
 
 function BadgeIcon({ name, size = 20, color }) {
@@ -60,146 +35,42 @@ function BadgeIcon({ name, size = 20, color }) {
   return <Icon size={size} color={color} />;
 }
 
-function BadgeCard({ badge, unlocked, unlockedAt }) {
-  const rarity = RARITY_META[badge.rarity] || RARITY_META[1];
-  return (
-    <div
-      style={{
-        background: unlocked ? rarity.bg : 'var(--bg-secondary)',
-        border: `1.5px solid ${unlocked ? rarity.border : 'var(--border-color)'}`,
-        boxShadow: unlocked ? rarity.glow : 'none',
-        opacity: unlocked ? 1 : 0.45,
-        filter: unlocked ? 'none' : 'grayscale(80%)',
-        borderRadius: '1rem',
-        padding: '1.1rem',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        textAlign: 'center',
-        gap: '0.5rem',
-        transition: 'all 0.3s',
-        cursor: 'default',
-        position: 'relative',
-      }}
-    >
-      {unlocked && badge.rarity === 4 && (
-        <div style={{ position: 'absolute', top: -8, right: -8 }}>
-          <Sparkles size={18} style={{ color: '#FBBF24' }} />
-        </div>
-      )}
-
-      <div
-        style={{
-          width: 52, height: 52,
-          borderRadius: 14,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: unlocked ? badge.color + '22' : '#374151',
-          border: `2px solid ${unlocked ? badge.color + '60' : 'transparent'}`,
-        }}
-      >
-        <BadgeIcon name={badge.icon} size={24} color={unlocked ? badge.color : '#6B7280'} />
-      </div>
-
-      <div>
-        <p style={{ fontWeight: 700, fontSize: 13, color: unlocked ? 'var(--text-primary)' : 'var(--text-secondary)', lineHeight: 1.3 }}>
-          {badge.name}
-        </p>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: rarity.text }}>
-          {rarity.label}
-        </span>
-      </div>
-
-      <p style={{ fontSize: 11, lineHeight: 1.4, color: 'var(--text-secondary)' }}>{badge.description}</p>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 'auto', paddingTop: 6 }}>
-        <Star size={12} style={{ color: '#FBBF24' }} />
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#FBBF24' }}>{badge.points} pts</span>
-        <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>≈ Rp {(badge.points * POINT_TO_RUPIAH).toLocaleString('id-ID')}</span>
-      </div>
-
-      {unlocked && unlockedAt && (
-        <p style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
-          Diperoleh: {new Date(unlockedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
-        </p>
-      )}
-      {!unlocked && <p style={{ fontSize: 10, color: '#6B7280', fontStyle: 'italic' }}>Terkunci</p>}
-    </div>
-  );
-}
-
-function LeaderboardRow({ entry, isMe }) {
-  const rankEmoji = entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`;
-  return (
-    <div
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '10px 14px',
-        borderRadius: 12,
-        border: `1px solid ${isMe ? 'rgba(99,102,241,0.5)' : 'var(--border-color)'}`,
-        background: isMe ? 'rgba(99,102,241,0.08)' : 'transparent',
-        transition: 'background 0.2s',
-      }}
-    >
-      <div style={{ fontSize: 20, width: 36, textAlign: 'center', fontWeight: 700 }}>{rankEmoji}</div>
-      <div style={{ width: 36, height: 36, borderRadius: '50%', background: entry.avatarColor || '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
-        {(entry.fullName || 'U').charAt(0).toUpperCase()}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {entry.fullName} {isMe && <span style={{ color: '#818CF8', fontSize: 12 }}>(Anda)</span>}
-        </p>
-        <p style={{ fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.jobTitle || entry.email}</p>
-      </div>
-      <div style={{ display: 'flex', gap: 16, fontSize: 12, flexShrink: 0 }}>
-        <div style={{ textAlign: 'center' }}>
-          <p style={{ fontWeight: 700, color: '#34D399' }}>{entry.monthlyTasksDone}</p>
-          <p style={{ color: 'var(--text-secondary)' }}>Task</p>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <p style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{entry.monthlyHours}j</p>
-          <p style={{ color: 'var(--text-secondary)' }}>Jam</p>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <p style={{ fontWeight: 700, color: '#FBBF24' }}>{entry.badgeCount}</p>
-          <p style={{ color: 'var(--text-secondary)' }}>Badge</p>
-        </div>
-      </div>
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <p style={{ fontWeight: 900, fontSize: 16, color: '#818CF8' }}>{entry.score.toLocaleString()}</p>
-        <p style={{ fontSize: 10, color: 'var(--text-secondary)' }}>skor</p>
-      </div>
-    </div>
-  );
-}
-
 export default function GamificationPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
 
-  const [activeTab, setActiveTab] = useState('leaderboard'); // leaderboard, my-badges, all-badges, claims, admin-claims, manage
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('checkin'); // checkin | rewards | badges | leaderboard | claims | admin-claims
+  const [profile, setProfile] = useState(null);
+  const [rewards, setRewards] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [claims, setClaims] = useState([]);
+  const [adminClaims, setAdminClaims] = useState([]);
+  const [allBadges, setAllBadges] = useState([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [checkInNotes, setCheckInNotes] = useState('');
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState('');
 
-  const [leaderboard, setLeaderboard] = useState([]);
+  // Leaderboard filters
   const [lbYear, setLbYear] = useState(new Date().getFullYear());
   const [lbMonth, setLbMonth] = useState(new Date().getMonth() + 1);
-  const [myBadges, setMyBadges] = useState([]);
-  const [myStats, setMyStats] = useState(null);
-  const [allBadges, setAllBadges] = useState([]);
-  const [claims, setClaims] = useState([]);
 
-  // Modal Klaim Hadiah
-  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  // Rewards catalog filters
+  const [rewardCategory, setRewardCategory] = useState('Semua');
+  const [selectedRewardToClaim, setSelectedRewardToClaim] = useState(null);
   const [claimForm, setClaimForm] = useState({
-    points: 100,
-    rewardType: 1,
     accountOrContactInfo: '',
     userNotes: ''
   });
   const [submittingClaim, setSubmittingClaim] = useState(false);
 
-  // Modal Review Klaim (Admin)
+  // Badges filter
+  const [badgeFilterTier, setBadgeFilterTier] = useState('all');
+  const [badgeSearch, setBadgeSearch] = useState('');
+
+  // Admin Claim Review Modal
   const [selectedClaimForReview, setSelectedClaimForReview] = useState(null);
   const [adminProcessForm, setAdminProcessForm] = useState({
     status: 2, // Approved
@@ -207,125 +78,124 @@ export default function GamificationPage() {
   });
   const [submittingAdminProcess, setSubmittingAdminProcess] = useState(false);
 
-  // Modal Kelola Badge (Admin)
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState('create');
-  const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({
-    code: '',
-    name: '',
-    description: '',
-    category: 'Productivity',
-    icon: 'Award',
-    color: '#10B981',
-    points: 50,
-    rarity: 1,
-    triggerType: 0,
-    triggerThreshold: 0,
-    isActive: true,
-    orderIndex: 0
-  });
+  const showSuccess = (msg) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(''), 6000); };
+  const showError = (msg) => { setError(msg); setTimeout(() => setError(null), 7000); };
 
-  const showSuccess = (msg) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(''), 5000); };
-  const showError = (msg) => { setError(msg); setTimeout(() => setError(null), 6000); };
+  const fetchProfile = useCallback(async () => {
+    try {
+      const res = await gamificationApi.getProfile();
+      if (res.data?.data) {
+        setProfile(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load gamification profile:', err);
+    }
+  }, []);
+
+  const fetchRewards = useCallback(async () => {
+    try {
+      const res = await gamificationApi.getRewards();
+      if (res.data?.data) {
+        setRewards(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load rewards:', err);
+    }
+  }, []);
 
   const fetchLeaderboard = useCallback(async () => {
-    setLoading(true);
     try {
-      const res = await axiosClient.get('/api/gamification/leaderboard', { params: { year: lbYear, month: lbMonth } });
+      const res = await gamificationApi.getLeaderboard({ year: lbYear, month: lbMonth });
       setLeaderboard(res.data?.data?.leaderboard || []);
-    } catch { showError('Gagal memuat leaderboard.'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      console.error('Failed to load leaderboard:', err);
+    }
   }, [lbYear, lbMonth]);
-
-  const fetchMyData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [badgesRes, statsRes, allRes] = await Promise.all([
-        axiosClient.get('/api/gamification/my-badges'),
-        axiosClient.get('/api/gamification/my-stats'),
-        axiosClient.get('/api/gamification/badges'),
-      ]);
-      setMyBadges(badgesRes.data?.data || []);
-      setMyStats(statsRes.data?.data || null);
-      setAllBadges(allRes.data?.data || []);
-    } catch { showError('Gagal memuat data badge.'); }
-    finally { setLoading(false); }
-  }, []);
 
   const fetchClaims = useCallback(async () => {
-    setLoading(true);
     try {
-      const res = await axiosClient.get('/api/gamification/claims');
+      const res = await gamificationApi.getClaims();
       setClaims(res.data?.data || []);
-    } catch { showError('Gagal memuat riwayat klaim.'); }
-    finally { setLoading(false); }
-  }, []);
+      if (isAdmin) {
+        setAdminClaims(res.data?.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load claims:', err);
+    }
+  }, [isAdmin]);
 
-  const fetchAllBadges = useCallback(async () => {
-    setLoading(true);
+  const fetchBadges = useCallback(async () => {
     try {
-      const res = await axiosClient.get('/api/gamification/badges');
+      const res = await gamificationApi.getBadges();
       setAllBadges(res.data?.data || []);
-    } catch { showError('Gagal memuat badge.'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      console.error('Failed to load master badges:', err);
+    }
   }, []);
 
-  useEffect(() => {
-    if (activeTab === 'leaderboard') fetchLeaderboard();
-    else if (activeTab === 'my-badges') { fetchMyData(); }
-    else if (activeTab === 'all-badges') fetchAllBadges();
-    else if (activeTab === 'claims' || activeTab === 'admin-claims') fetchClaims();
-    else if (activeTab === 'manage') fetchAllBadges();
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (activeTab === 'leaderboard') fetchLeaderboard();
-  }, [lbYear, lbMonth]);
-
-  const handleCheckBadges = async () => {
-    try {
-      const res = await axiosClient.post('/api/gamification/check-badges');
-      showSuccess(res.data?.message || 'Pengecekan selesai.');
-      fetchMyData();
-    } catch { showError('Gagal cek badge.'); }
+  const loadAll = async () => {
+    setLoading(true);
+    await Promise.all([
+      fetchProfile(),
+      fetchRewards(),
+      fetchLeaderboard(),
+      fetchClaims(),
+      fetchBadges()
+    ]);
+    setLoading(false);
   };
 
-  const handleOpenClaimModal = () => {
-    const maxPoints = myStats?.availablePoints || 0;
-    setClaimForm({
-      points: maxPoints > 0 ? Math.min(100, maxPoints) : 50,
-      rewardType: 1,
-      accountOrContactInfo: '',
-      userNotes: ''
-    });
-    setIsClaimModalOpen(true);
+  useEffect(() => {
+    loadAll();
+  }, [fetchLeaderboard]);
+
+  // Handle Daily Check-In
+  const handleCheckIn = async (e) => {
+    if (e) e.preventDefault();
+    if (profile?.hasCheckedInToday) return;
+
+    setCheckInLoading(true);
+    try {
+      const res = await gamificationApi.dailyCheckIn(checkInNotes?.trim() || null);
+      showSuccess(res.data?.message || 'Daily check-in berhasil dicatat!');
+      setCheckInNotes('');
+      fetchProfile();
+      fetchLeaderboard();
+      // Auto check badges
+      gamificationApi.checkAndAwardBadges();
+    } catch (err) {
+      showError(err.response?.data?.message || 'Gagal melakukan daily check-in.');
+    } finally {
+      setCheckInLoading(false);
+    }
+  };
+
+  // Handle Claiming Item
+  const handleOpenClaimModal = (item) => {
+    setSelectedRewardToClaim(item);
+    setClaimForm({ accountOrContactInfo: '', userNotes: '' });
   };
 
   const handleSubmitClaim = async (e) => {
     e.preventDefault();
-    if (claimForm.points <= 0) {
-      showError('Jumlah poin harus lebih besar dari 0.');
-      return;
-    }
+    if (!selectedRewardToClaim) return;
     if (!claimForm.accountOrContactInfo.trim()) {
-      showError('Informasi akun / nomor rekening / kontak / tempat traktir wajib diisi.');
+      showError('Harap cantumkan nomor rekening / e-wallet / nomor kontak penerima.');
       return;
     }
 
     setSubmittingClaim(true);
     try {
-      const res = await axiosClient.post('/api/gamification/claim-reward', {
-        points: parseInt(claimForm.points),
-        rewardType: parseInt(claimForm.rewardType),
-        accountOrContactInfo: claimForm.accountOrContactInfo.trim(),
-        userNotes: claimForm.userNotes?.trim() || null
-      });
-
-      showSuccess(res.data?.message || 'Permohonan klaim berhasil dikirim!');
-      setIsClaimModalOpen(false);
-      fetchMyData();
-      if (activeTab === 'claims') fetchClaims();
+      const res = await gamificationApi.claimItem(
+        selectedRewardToClaim.id,
+        claimForm.accountOrContactInfo.trim(),
+        claimForm.userNotes?.trim() || null
+      );
+      showSuccess(res.data?.message || 'Permohonan klaim hadiah berhasil dikirim!');
+      setSelectedRewardToClaim(null);
+      fetchProfile();
+      fetchRewards();
+      fetchClaims();
     } catch (err) {
       showError(err.response?.data?.message || 'Gagal mengajukan klaim hadiah.');
     } finally {
@@ -333,20 +203,22 @@ export default function GamificationPage() {
     }
   };
 
-  const handleProcessClaim = async (e) => {
+  // Handle Admin Process Claim
+  const handleProcessClaimSubmit = async (e) => {
     e.preventDefault();
     if (!selectedClaimForReview) return;
 
     setSubmittingAdminProcess(true);
     try {
-      const res = await axiosClient.put(`/api/gamification/claims/${selectedClaimForReview.id}/process`, {
-        status: parseInt(adminProcessForm.status),
+      const res = await gamificationApi.processClaim(selectedClaimForReview.id, {
+        status: parseInt(adminProcessForm.status, 10),
         adminNotes: adminProcessForm.adminNotes?.trim() || null
       });
-
-      showSuccess(res.data?.message || 'Klaim berhasil diproses.');
+      showSuccess(res.data?.message || 'Status klaim berhasil diperbarui.');
       setSelectedClaimForReview(null);
       fetchClaims();
+      fetchRewards();
+      fetchProfile();
     } catch (err) {
       showError(err.response?.data?.message || 'Gagal memproses klaim.');
     } finally {
@@ -354,590 +226,901 @@ export default function GamificationPage() {
     }
   };
 
-  const openCreate = () => {
-    setModalMode('create'); setEditId(null);
-    setForm({ code: '', name: '', description: '', category: 'Productivity', icon: 'Award', color: '#10B981', points: 50, rarity: 1, triggerType: 0, triggerThreshold: 0, isActive: true, orderIndex: allBadges.length + 1 });
-    setIsModalOpen(true);
-  };
+  // Filtering Rewards
+  const filteredRewards = useMemo(() => {
+    if (rewardCategory === 'Semua') return rewards;
+    return rewards.filter(r => r.category.toLowerCase() === rewardCategory.toLowerCase());
+  }, [rewards, rewardCategory]);
 
-  const openEdit = (b) => {
-    setModalMode('edit'); setEditId(b.id); setForm({ ...b }); setIsModalOpen(true);
-  };
+  // Filtering Badges
+  const userUnlockedBadgeIds = useMemo(() => {
+    return new Set(profile?.badges?.map(b => b.badgeId) || []);
+  }, [profile]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (modalMode === 'create') await axiosClient.post('/api/gamification/badges', form);
-      else await axiosClient.put(`/api/gamification/badges/${editId}`, form);
-      showSuccess(modalMode === 'create' ? 'Badge dibuat.' : 'Badge diperbarui.');
-      setIsModalOpen(false);
-      fetchAllBadges();
-    } catch (err) { showError(err.response?.data?.message || 'Gagal menyimpan.'); }
-  };
+  const filteredBadges = useMemo(() => {
+    let list = allBadges;
+    if (badgeFilterTier !== 'all') {
+      const tierNum = parseInt(badgeFilterTier, 10);
+      list = list.filter(b => b.rarity === tierNum);
+    }
+    if (badgeSearch.trim()) {
+      const q = badgeSearch.toLowerCase();
+      list = list.filter(b => b.name.toLowerCase().includes(q) || b.description.toLowerCase().includes(q));
+    }
+    return list;
+  }, [allBadges, badgeFilterTier, badgeSearch]);
 
-  const handleDelete = async (id, name) => {
-    if (!confirm(`Hapus badge "${name}"?`)) return;
-    try {
-      await axiosClient.delete(`/api/gamification/badges/${id}`);
-      showSuccess('Badge dihapus.');
-      fetchAllBadges();
-    } catch (err) { showError(err.response?.data?.message || 'Gagal.'); }
-  };
-
-  const myBadgeIds = new Set(myBadges.map(ub => ub.badgeId));
-  const myBadgeMap = Object.fromEntries(myBadges.map(ub => [ub.badgeId, ub]));
+  const rewardCategoriesList = ['Semua', 'Kopi', 'E-Wallet', 'Voucher', 'Merchandise', 'Cuti', 'Traktir'];
   const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
-
-  const fieldStyle = { backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' };
-  const inputCls = 'w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
 
   const getClaimStatusBadge = (status) => {
     switch (status) {
       case 'Pending':
-        return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">Menunggu Admin</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30">Menunggu Admin</span>;
       case 'Approved':
-        return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-500/15 text-sky-400 border border-sky-500/30">Disetujui</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-sky-500/15 text-sky-500 border border-sky-500/30">Disetujui</span>;
       case 'PaidOrTreated':
-        return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Selesai Ditransfer / Ditraktir</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">Selesai Ditransfer / Ditraktir</span>;
       case 'Rejected':
-        return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30">Ditolak</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-500 border border-rose-500/30">Ditolak</span>;
       default:
-        return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-500/15 text-slate-400">{status}</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-500/15 text-slate-400">{status}</span>;
     }
   };
 
   return (
-    <div style={{ paddingBottom: 48 }} className="space-y-6 animate-fade-in">
-      {/* ── Gradient Hero ── */}
-      <div style={{ borderRadius: 24, padding: '28px 32px', background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 20% 60%, rgba(129,140,248,0.3), transparent 50%), radial-gradient(circle at 80% 20%, rgba(244,114,182,0.3), transparent 40%)' }} />
-        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Trophy size={30} style={{ color: '#FCD34D' }} />
-              Gamification, Badge & Reward Center
+    <div className="space-y-6 pb-12 animate-fade-in">
+      {/* ── Gradient Hero Banner ── */}
+      <div 
+        className="rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-xl"
+        style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 45%, #EC4899 100%)' }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-900/30 via-transparent to-pink-900/30 pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-amber-300 text-xs font-black tracking-wider uppercase">
+              <Sparkles className="w-3.5 h-3.5" /> Gamifikasi & Penghargaan v3.7
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-white flex items-center gap-3">
+              <Trophy className="w-8 h-8 text-amber-300 drop-shadow" />
+              Pusat Prestasi & Hadiah Karyawan
             </h1>
-            <p style={{ color: '#C7D2FE', marginTop: 4, fontSize: 14 }}>
-              Raih badge, kumpulkan poin prestasi, dan klaim hadiah uang tunai atau traktiran (<strong>1 Poin = Rp 100</strong>)
+            <p className="text-sm text-indigo-100 max-w-xl">
+              Pertahankan streak absensi, selesaikan tugas tepat waktu, dan buka 42 badge kreatif. 
+              Tukarkan poin prestasi Anda dengan saldo e-wallet, voucher kopi, merchandise, atau traktiran!
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            {myStats && (
-              <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', borderRadius: 14, padding: '10px 18px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.2)' }}>
-                <p style={{ fontSize: 22, fontWeight: 900, color: '#FCD34D' }}>{myStats.availablePoints || 0} pts</p>
-                <p style={{ fontSize: 11, color: '#C7D2FE' }}>Poin Siap Klaim (≈ Rp {((myStats.availablePoints || 0) * POINT_TO_RUPIAH).toLocaleString('id-ID')})</p>
+          {/* Quick Metrics Bar */}
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="px-5 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-amber-300">
+                <Flame className="w-5 h-5" />
+                <span className="text-xl sm:text-2xl font-black">{profile?.currentStreak || 0} Hari</span>
               </div>
-            )}
+              <p className="text-[11px] text-indigo-200 font-semibold mt-0.5">Current Streak</p>
+            </div>
+
+            <div className="px-5 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-amber-300">
+                <Coins className="w-5 h-5" />
+                <span className="text-xl sm:text-2xl font-black">
+                  {profile?.availablePoints || 0} Pts
+                </span>
+              </div>
+              <p className="text-[11px] text-indigo-200 font-semibold mt-0.5">
+                ≈ Rp {((profile?.availablePoints || 0) * POINT_TO_RUPIAH).toLocaleString('id-ID')}
+              </p>
+            </div>
 
             <button
-              onClick={handleOpenClaimModal}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm text-indigo-950 bg-amber-400 hover:bg-amber-300 shadow-xl transition-all transform hover:scale-105 active:scale-95"
+              onClick={() => setActiveTab('rewards')}
+              className="px-5 py-3 rounded-2xl font-black text-xs sm:text-sm text-indigo-950 bg-amber-400 hover:bg-amber-300 shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2"
             >
-              <Gift className="w-5 h-5 text-indigo-950" />
-              Klaim Hadiah / Uang 🎁
+              <Gift className="w-4 h-4" />
+              Tukar Hadiah 🎁
             </button>
           </div>
         </div>
       </div>
 
       {/* Alerts */}
-      {error && <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#F87171', display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}><AlertCircle size={16} />{error}</div>}
-      {successMsg && <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#34D399', display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}><CheckCircle size={16} />{successMsg}</div>}
+      {error && (
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 flex items-center gap-3 text-sm">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+      {successMsg && (
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 flex items-center gap-3 text-sm">
+          <CheckCircle className="w-5 h-5 flex-shrink-0" />
+          <span>{successMsg}</span>
+        </div>
+      )}
 
-      {/* Tab Nav */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border-color)', overflowX: 'auto' }}>
+      {/* ── Main Tab Navigation ── */}
+      <div 
+        className="flex items-center gap-2 p-1.5 rounded-2xl border overflow-x-auto select-none"
+        style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+      >
         {[
-          { id: 'leaderboard', label: 'Leaderboard', icon: <Crown size={15}/> },
-          { id: 'my-badges',   label: 'Badge Saya',  icon: <Medal size={15}/> },
-          { id: 'all-badges',  label: 'Semua Koleksi Badge', icon: <Trophy size={15}/> },
-          { id: 'claims',      label: 'Riwayat Klaim Hadiah', icon: <Gift size={15}/> },
+          { id: 'checkin',     label: 'Daily Check-In & Roadmap', icon: CalendarCheck, badge: profile?.hasCheckedInToday ? '✓ Done' : 'Hari Ini' },
+          { id: 'rewards',     label: 'Katalog Hadiah',          icon: Gift,          badge: `${rewards.length} Item` },
+          { id: 'badges',      label: '42 Koleksi Badge',        icon: Trophy,        badge: `${profile?.badges?.length || 0}/${allBadges.length}` },
+          { id: 'leaderboard', label: 'Leaderboard',             icon: Crown },
+          { id: 'claims',      label: 'Riwayat Klaim',           icon: Wallet,        badge: claims.length },
           ...(isAdmin ? [
-            { id: 'admin-claims', label: 'Kelola Klaim Tim (Admin)', icon: <Wallet size={15}/> },
-            { id: 'manage', label: 'Kelola Master Badge', icon: <Shield size={15}/> }
-          ] : []),
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            style={{ 
-              display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', 
-              fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', 
-              borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent', 
-              color: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--text-secondary)', 
-              background: 'none', border: 'none', cursor: 'pointer', transition: 'all 0.2s', marginBottom: -1 
-            }}
-          >
-            {tab.icon}{tab.label}
-          </button>
-        ))}
+            { id: 'admin-claims', label: 'Verifikasi Klaim Tim (Admin)', icon: ShieldCheck, badge: adminClaims.filter(c => c.status === 'Pending').length }
+          ] : [])
+        ].map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                isActive 
+                  ? 'bg-indigo-600 text-white shadow-md' 
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+              {tab.badge !== undefined && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-slate-500'
+                }`}>
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* ─────── LEADERBOARD ─────── */}
-      {activeTab === 'leaderboard' && (
-        <div className="space-y-4">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <select value={lbYear} onChange={e => setLbYear(+e.target.value)} className={inputCls} style={fieldStyle}>
-                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <select value={lbMonth} onChange={e => setLbMonth(+e.target.value)} className={inputCls} style={fieldStyle}>
-                {MONTHS_ID.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-              </select>
-              <button onClick={fetchLeaderboard} style={{ padding: '8px 10px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-              </button>
-            </div>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-              Kalkulasi Skor = Task×10 + Jam×3 + Badge×5 + Kehadiran×2
-            </p>
-          </div>
-
-          {/* Podium Top 3 */}
-          {leaderboard.length >= 3 && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, padding: '16px 0' }}>
-              {[leaderboard[1], leaderboard[0], leaderboard[2]].map((entry, idx) => {
-                if (!entry) return <div key={idx} />;
-                const podiumH = idx === 1 ? 110 : idx === 0 ? 80 : 60;
-                const grd = idx === 1 ? 'linear-gradient(180deg,#F59E0B,#D97706)' : idx === 0 ? 'linear-gradient(180deg,#94A3B8,#64748B)' : 'linear-gradient(180deg,#B45309,#92400E)';
-                const emoji = idx === 1 ? '🥇' : idx === 0 ? '🥈' : '🥉';
-                return (
-                  <div key={entry.userId} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 52, height: 52, borderRadius: '50%', background: entry.avatarColor || '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 20, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-                      {(entry.fullName || 'U').charAt(0).toUpperCase()}
-                    </div>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textAlign: 'center', maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.fullName}</p>
-                    <p style={{ fontSize: 12, fontWeight: 900, color: '#818CF8' }}>{entry.score} pts</p>
-                    <div style={{ width: '100%', height: podiumH, borderRadius: '12px 12px 0 0', background: grd, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
-                      {emoji}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Full list */}
-          <div style={{ borderRadius: 16, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-color)', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)' }}>
-              <BarChart2 size={16} style={{ color: '#818CF8' }} />
-              Peringkat Anggota — {MONTHS_ID[lbMonth - 1]} {lbYear}
-            </div>
-            {loading ? (
-              <div style={{ padding: 40, textAlign: 'center' }}><div style={{ width: 32, height: 32, border: '3px solid var(--accent-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} /></div>
-            ) : (
-              <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {leaderboard.map(entry => <LeaderboardRow key={entry.userId} entry={entry} isMe={entry.userId === user?.id} />)}
-                {leaderboard.length === 0 && <p style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)', fontSize: 14 }}>Belum ada data untuk periode ini.</p>}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ─────── MY BADGES & REWARD STATUS ─────── */}
-      {activeTab === 'my-badges' && (
+      {/* ─────── TAB 1: DAILY CHECK-IN & 30-DAY ROADMAP ─────── */}
+      {activeTab === 'checkin' && (
         <div className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-            <div className="p-4 rounded-2xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-              <span className="text-xs font-semibold text-slate-400">Total Poin Diperoleh</span>
-              <p className="text-2xl font-black mt-1 text-amber-400">{myStats?.totalPointsEarned || 0} pts</p>
-              <span className="text-xs text-slate-400">≈ Rp {((myStats?.totalPointsEarned || 0) * POINT_TO_RUPIAH).toLocaleString('id-ID')}</span>
-            </div>
-
-            <div className="p-4 rounded-2xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-              <span className="text-xs font-semibold text-slate-400">Poin Siap Diklaim</span>
-              <p className="text-2xl font-black mt-1 text-emerald-400">{myStats?.availablePoints || 0} pts</p>
-              <span className="text-xs text-slate-400">≈ Rp {((myStats?.availablePoints || 0) * POINT_TO_RUPIAH).toLocaleString('id-ID')}</span>
-            </div>
-
-            <div className="p-4 rounded-2xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-              <span className="text-xs font-semibold text-slate-400">Poin Dicairkan</span>
-              <p className="text-2xl font-black mt-1 text-sky-400">{myStats?.pointsClaimed || 0} pts</p>
-              <span className="text-xs text-slate-400">Selesai/Diproses</span>
-            </div>
-
-            <div className="p-4 rounded-2xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-              <span className="text-xs font-semibold text-slate-400">Koleksi Badge</span>
-              <p className="text-2xl font-black mt-1 text-purple-400">{myBadges.length} / {allBadges.length}</p>
-              <span className="text-xs text-slate-400">Pencapaian Karier</span>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>
-              Koleksi Badge Anda ({myBadges.length}/{allBadges.length})
-            </h2>
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={handleOpenClaimModal}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 text-xs font-bold transition-all border border-amber-500/30"
-              >
-                <Gift size={14} /> Ajukan Klaim Hadiah
-              </button>
-              <button 
-                onClick={handleCheckBadges} 
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: 'var(--accent-primary)', color: '#fff', fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer' }}
-              >
-                <Sparkles size={14} /> Cek / Sinkronkan Badge
-              </button>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 14 }}>
-            {allBadges.map(badge => (
-              <BadgeCard 
-                key={badge.id} 
-                badge={badge} 
-                unlocked={myBadgeIds.has(badge.id)} 
-                unlockedAt={myBadgeMap[badge.id]?.unlockedAt} 
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ─────── ALL BADGES CATALOG ─────── */}
-      {activeTab === 'all-badges' && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-2xl border bg-slate-500/5 text-xs text-slate-400 flex items-center justify-between">
-            <span>Katalog seluruh badge yang dapat diperoleh melalui penyelesaian tugas, jam timesheet, tiket kendala, dan presensi.</span>
-            <span className="font-semibold text-amber-400">1 Poin = Rp 100</span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 14 }}>
-            {allBadges.map(badge => <BadgeCard key={badge.id} badge={badge} unlocked={true} />)}
-            {!loading && allBadges.length === 0 && <p style={{ gridColumn: '1/-1', textAlign: 'center', padding: 40, color: 'var(--text-secondary)', fontSize: 14 }}>Belum ada badge.</p>}
-          </div>
-        </div>
-      )}
-
-      {/* ─────── CLAIMS HISTORY (USER) ─────── */}
-      {activeTab === 'claims' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Riwayat Klaim Hadiah Saya</h2>
-              <p className="text-xs text-slate-400">Pantau status pencairan uang tunai atau traktiran dari Administrator</p>
-            </div>
-            <button
-              onClick={handleOpenClaimModal}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-amber-400 text-indigo-950 hover:bg-amber-300 shadow-md"
-            >
-              <Plus className="w-4 h-4" /> Ajukan Klaim Baru
-            </button>
-          </div>
-
-          <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-            {claims.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 space-y-2">
-                <Gift className="w-10 h-10 mx-auto text-slate-500 opacity-60" />
-                <p className="text-sm font-semibold">Belum Ada Permohonan Klaim</p>
-                <p className="text-xs">Kumpulkan poin prestasi dari tugas dan badge untuk mengklaim hadiah uang atau traktir makan!</p>
+          {/* Daily Check-In Action Card */}
+          <div 
+            className="p-6 sm:p-8 rounded-3xl border shadow-sm relative overflow-hidden"
+            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+          >
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="space-y-2 text-center md:text-left">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <Flame className="w-4 h-4" /> Streak Disiplin Aktif
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black" style={{ color: 'var(--text-primary)' }}>
+                  Perjalanan 30 Hari Menuju Golden Milestone 🏆
+                </h2>
+                <p className="text-xs sm:text-sm max-w-xl" style={{ color: 'var(--text-secondary)' }}>
+                  Setiap check-in harian memberikan <strong>+10 Poin</strong>. Capai streak 30 hari tanpa putus 
+                  untuk mengklaim <strong>Golden Bonus +150 Poin</strong> dan membuka badge eksklusif Sultan Disiplin!
+                </p>
               </div>
-            ) : (
-              <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-                {claims.map((c) => (
-                  <div key={c.id} className="p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1.5 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {getClaimStatusBadge(c.status)}
-                        <span className="font-bold text-amber-400 text-sm">
-                          {c.pointsClaimed} Pts = Rp {c.rupiahAmount?.toLocaleString('id-ID')}
-                        </span>
-                        <span className="text-xs px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-300 border border-slate-700/30">
-                          {c.rewardType}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 font-medium">
-                        Info Rekening / Kontak: <span className="text-slate-100">{c.accountOrContactInfo}</span>
-                      </p>
-                      {c.userNotes && (
-                        <p className="text-xs text-slate-400 italic">" {c.userNotes} "</p>
-                      )}
-                      {c.adminNotes && (
-                        <div className="mt-2 p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs text-sky-300 space-y-0.5">
-                          <strong>Catatan Administrator:</strong>
-                          <p>{c.adminNotes}</p>
-                          {c.processedByName && (
-                            <span className="text-[10px] text-sky-400/70 block">
-                              Diproses oleh {c.processedByName} pada {new Date(c.processedAt).toLocaleString('id-ID')}
-                            </span>
-                          )}
+
+              {/* Action Button & Status */}
+              <div className="flex flex-col items-center md:items-end gap-3 flex-shrink-0">
+                {profile?.hasCheckedInToday ? (
+                  <div className="flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-black text-sm">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    <span>Sudah Check-In Hari Ini (+10 Pts)</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full">
+                    <input
+                      type="text"
+                      placeholder="Catatan hari ini (opsional)..."
+                      value={checkInNotes}
+                      onChange={(e) => setCheckInNotes(e.target.value)}
+                      className="px-4 py-2.5 rounded-xl border text-xs sm:text-sm w-full sm:w-60 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                    />
+                    <button
+                      onClick={handleCheckIn}
+                      disabled={checkInLoading}
+                      className="px-6 py-3 rounded-xl font-black text-sm text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 whitespace-nowrap flex items-center gap-2"
+                    >
+                      <Flame className="w-4 h-4" />
+                      <span>{checkInLoading ? 'Menyimpan...' : 'Check-In Sekarang (+10 Pts)'}</span>
+                    </button>
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-400">
+                  Total Absen 30 Hari Terakhir: <strong>{profile?.checkInDaysCount30Days || 0} hari</strong> • Rekor Terpanjang: <strong>{profile?.longestStreak || 0} hari</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 30-Day Visual Roadmap Grid */}
+          <div 
+            className="p-6 sm:p-8 rounded-3xl border shadow-sm space-y-4"
+            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+          >
+            <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <Calendar className="w-4 h-4 text-indigo-500" />
+                  Roadmap Streak Absensi (Siklus 30 Hari)
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Visualisasi perjalanan hari ke hari menuju kotak hadiah milestone ke-30.
+                </p>
+              </div>
+              <span className="text-xs font-bold text-amber-500 flex items-center gap-1">
+                <Gift className="w-4 h-4" /> Hari ke-30 = Golden Box (+160 Pts Total)
+              </span>
+            </div>
+
+            {/* 30 Cards Grid */}
+            <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-10 gap-2.5 pt-2">
+              {profile?.thirtyDayRoadmap?.map((day) => {
+                const isMilestone = day.isMilestone;
+                const isCheckedIn = day.isCheckedIn;
+                const isToday = day.isToday;
+
+                return (
+                  <div
+                    key={day.dayIndex}
+                    className={`rounded-2xl p-3 flex flex-col items-center justify-between text-center relative border transition-all ${
+                      isMilestone
+                        ? 'bg-gradient-to-b from-amber-500/20 to-orange-500/20 border-amber-500/50 shadow-md col-span-2 sm:col-span-2 md:col-span-1'
+                        : isCheckedIn
+                        ? 'bg-emerald-500/10 border-emerald-500/30'
+                        : isToday
+                        ? 'border-indigo-500 bg-indigo-500/10 shadow-sm ring-2 ring-indigo-500/30 animate-pulse'
+                        : 'bg-black/5 dark:bg-white/5 border-slate-200 dark:border-slate-800 opacity-60'
+                    }`}
+                  >
+                    {/* Day Number */}
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                      H-{day.dayIndex}
+                    </span>
+
+                    {/* Center Icon */}
+                    <div className="my-2">
+                      {isMilestone ? (
+                        <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center text-indigo-950 shadow">
+                          <Gift className="w-4 h-4" />
+                        </div>
+                      ) : isCheckedIn ? (
+                        <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                      ) : isToday ? (
+                        <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                          <Flame className="w-4 h-4" />
+                        </div>
+                      ) : (
+                        <div className="w-7 h-7 rounded-full bg-black/10 dark:bg-white/10 text-slate-400 flex items-center justify-center">
+                          <Clock className="w-3.5 h-3.5" />
                         </div>
                       )}
                     </div>
 
-                    <div className="text-right text-xs text-slate-400 self-end md:self-auto">
-                      <span>Diajukan: {new Date(c.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
+                    {/* Points Tag */}
+                    <span className={`text-[10px] font-bold ${
+                      isMilestone ? 'text-amber-500 font-black' : isCheckedIn ? 'text-emerald-500' : 'text-slate-400'
+                    }`}>
+                      +{day.points} pts
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
 
-      {/* ─────── ADMIN CLAIMS MANAGEMENT ─────── */}
-      {activeTab === 'admin-claims' && isAdmin && (
-        <div className="space-y-4">
+      {/* ─────── TAB 2: REWARDS CATALOG ─────── */}
+      {activeTab === 'rewards' && (
+        <div className="space-y-6">
+          {/* Header & Category Filter */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <Gift className="w-5 h-5 text-indigo-500" />
+                Katalog Hadiah & Tukar Poin
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Poin yang tersedia: <strong className="text-amber-500">{profile?.availablePoints || 0} Poin</strong> (≈ Rp {((profile?.availablePoints || 0) * POINT_TO_RUPIAH).toLocaleString('id-ID')})
+              </p>
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto select-none py-1">
+              {rewardCategoriesList.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setRewardCategory(cat)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                    rewardCategory === cat
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'border text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                  }`}
+                  style={{ borderColor: 'var(--border-color)' }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Rewards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {filteredRewards.map((item) => {
+              const canAfford = (profile?.availablePoints || 0) >= item.pointCost;
+              const hasStock = item.stock > 0;
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-3xl border shadow-sm hover:shadow-lg transition-all flex flex-col justify-between overflow-hidden"
+                  style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+                >
+                  <div className="p-5 space-y-3">
+                    {/* Top Category & Stock */}
+                    <div className="flex items-center justify-between">
+                      <span 
+                        className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
+                        style={{ backgroundColor: `${item.color}20`, color: item.color }}
+                      >
+                        {item.category}
+                      </span>
+                      <span className={`text-[11px] font-bold ${hasStock ? 'text-slate-400' : 'text-rose-500'}`}>
+                        {hasStock ? `Stok: ${item.stock}` : 'Habis'}
+                      </span>
+                    </div>
+
+                    {/* Icon & Title */}
+                    <div className="flex items-start space-x-3 pt-1">
+                      <div 
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm"
+                        style={{ backgroundColor: `${item.color}20`, color: item.color }}
+                      >
+                        <BadgeIcon name={item.icon} size={24} color={item.color} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm line-clamp-2" style={{ color: 'var(--text-primary)' }}>
+                          {item.name}
+                        </h4>
+                        <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                          {item.description || 'Hadiah apresiasi kerja resmi.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Cost & Action */}
+                  <div className="p-5 pt-0 border-t mt-2" style={{ borderColor: 'var(--border-color)' }}>
+                    <div className="flex items-center justify-between py-3">
+                      <div>
+                        <span className="text-base font-black text-amber-500">{item.pointCost} Poin</span>
+                        <p className="text-[10px] text-slate-400">
+                          ≈ Rp {(item.pointCost * POINT_TO_RUPIAH).toLocaleString('id-ID')}
+                        </p>
+                      </div>
+                      {item.isMonthlyMilestoneReward && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-500">
+                          Milestone Reward
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => handleOpenClaimModal(item)}
+                      disabled={!canAfford || !hasStock}
+                      className="w-full py-2.5 rounded-xl font-bold text-xs text-white transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                      style={{ 
+                        backgroundColor: canAfford && hasStock ? 'var(--accent-primary)' : '#6B7280',
+                        boxShadow: canAfford && hasStock ? 'var(--accent-glow)' : 'none'
+                      }}
+                    >
+                      <Gift className="w-3.5 h-3.5" />
+                      <span>{hasStock ? (canAfford ? 'Tukar Poin Ini' : 'Poin Kurang') : 'Stok Habis'}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─────── TAB 3: 42 BADGES SHOWCASE ─────── */}
+      {activeTab === 'badges' && (
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <Trophy className="w-5 h-5 text-amber-500" />
+                Koleksi 42 Badge Prestasi (5 Tier Tingkat Kesulitan)
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Koleksi Anda: <strong className="text-indigo-500">{userUnlockedBadgeIds.size}</strong> dari {allBadges.length} Badge telah terbuka.
+              </p>
+            </div>
+
+            {/* Filters */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <input
+                type="text"
+                placeholder="Cari nama atau deskripsi badge..."
+                value={badgeSearch}
+                onChange={(e) => setBadgeSearch(e.target.value)}
+                className="px-3.5 py-2 rounded-xl border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+              />
+
+              <select
+                value={badgeFilterTier}
+                onChange={(e) => setBadgeFilterTier(e.target.value)}
+                className="px-3.5 py-2 rounded-xl border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+                style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+              >
+                <option value="all">Semua Tier</option>
+                <option value="1">Tier 1: Perunggu (Common)</option>
+                <option value="2">Tier 2: Perak (Rare)</option>
+                <option value="3">Tier 3: Emas (Epic)</option>
+                <option value="4">Tier 4: Platinum (Legendary)</option>
+                <option value="5">Tier 5: Berlian (Special)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Badges Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {filteredBadges.map((badge) => {
+              const isUnlocked = userUnlockedBadgeIds.has(badge.id);
+              const meta = RARITY_META[badge.rarity] || RARITY_META[1];
+
+              return (
+                <div
+                  key={badge.id}
+                  className={`rounded-2xl p-4 flex flex-col items-center text-center relative border transition-all ${
+                    isUnlocked 
+                      ? 'shadow-md hover:scale-105' 
+                      : 'opacity-50 grayscale hover:opacity-75'
+                  }`}
+                  style={{
+                    backgroundColor: isUnlocked ? meta.bg : 'var(--card-bg)',
+                    borderColor: isUnlocked ? meta.border : 'var(--border-color)',
+                    boxShadow: isUnlocked ? meta.glow : 'none'
+                  }}
+                >
+                  {/* Badge Icon Circle */}
+                  <div 
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center my-1 shadow-sm"
+                    style={{ backgroundColor: `${badge.color}25`, color: badge.color }}
+                  >
+                    <BadgeIcon name={badge.icon} size={28} color={badge.color} />
+                  </div>
+
+                  {/* Title & Tier */}
+                  <h4 className="font-bold text-xs mt-2 line-clamp-1" style={{ color: 'var(--text-primary)' }}>
+                    {badge.name}
+                  </h4>
+                  <span className="text-[9px] font-black uppercase tracking-wider mt-0.5" style={{ color: meta.text }}>
+                    {meta.label.split(' ')[0]}
+                  </span>
+
+                  {/* Description */}
+                  <p className="text-[10px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                    {badge.description}
+                  </p>
+
+                  {/* Points Tag */}
+                  <div className="mt-3 pt-2 border-t w-full flex items-center justify-center gap-1" style={{ borderColor: 'var(--border-color)' }}>
+                    <Star className="w-3 h-3 text-amber-400" />
+                    <span className="text-[11px] font-bold text-amber-500">+{badge.points} pts</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─────── TAB 4: LEADERBOARD ─────── */}
+      {activeTab === 'leaderboard' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <Crown className="w-5 h-5 text-amber-500" />
+                Papan Peringkat Kinerja Tim (Leaderboard)
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Kalkulasi Skor: Tugas Selesai × 10 + Jam Kerja × 3 + Badge × 5 + Kehadiran × 2
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select 
+                value={lbYear} 
+                onChange={(e) => setLbYear(parseInt(e.target.value, 10))} 
+                className="px-3 py-1.5 rounded-xl border text-xs font-semibold"
+                style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+              >
+                {[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <select 
+                value={lbMonth} 
+                onChange={(e) => setLbMonth(parseInt(e.target.value, 10))} 
+                className="px-3 py-1.5 rounded-xl border text-xs font-semibold"
+                style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+              >
+                {MONTHS_ID.map((m, idx) => <option key={idx} value={idx + 1}>{m}</option>)}
+              </select>
+              <button 
+                onClick={fetchLeaderboard} 
+                className="p-2 rounded-xl border hover:bg-black/5 dark:hover:bg-white/5"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Top 3 Podium */}
+          {leaderboard.length >= 3 && (
+            <div className="grid grid-cols-3 gap-3 sm:gap-6 py-6 max-w-xl mx-auto items-end">
+              {/* Rank 2 */}
+              <div className="flex flex-col items-center text-center">
+                <div 
+                  className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-white font-black text-lg shadow-lg border-2 border-slate-300"
+                  style={{ backgroundColor: leaderboard[1]?.avatarColor || '#64748B' }}
+                >
+                  {(leaderboard[1]?.fullName || 'U').charAt(0)}
+                </div>
+                <h4 className="font-bold text-xs sm:text-sm mt-2 line-clamp-1" style={{ color: 'var(--text-primary)' }}>
+                  {leaderboard[1]?.fullName}
+                </h4>
+                <span className="text-xs font-black text-indigo-500">{leaderboard[1]?.score} pts</span>
+                <div className="w-full h-24 rounded-t-2xl bg-gradient-to-t from-slate-400 to-slate-300 flex items-center justify-center text-2xl font-black text-white mt-2 shadow">
+                  🥈 2
+                </div>
+              </div>
+
+              {/* Rank 1 */}
+              <div className="flex flex-col items-center text-center">
+                <div 
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-white font-black text-xl shadow-xl border-4 border-amber-300 animate-bounce"
+                  style={{ backgroundColor: leaderboard[0]?.avatarColor || '#F59E0B' }}
+                >
+                  {(leaderboard[0]?.fullName || 'U').charAt(0)}
+                </div>
+                <h4 className="font-bold text-sm sm:text-base mt-2 line-clamp-1 text-amber-500">
+                  {leaderboard[0]?.fullName}
+                </h4>
+                <span className="text-xs font-black text-amber-500">{leaderboard[0]?.score} pts</span>
+                <div className="w-full h-32 rounded-t-2xl bg-gradient-to-t from-amber-500 to-amber-400 flex items-center justify-center text-3xl font-black text-white mt-2 shadow-lg">
+                  👑 1
+                </div>
+              </div>
+
+              {/* Rank 3 */}
+              <div className="flex flex-col items-center text-center">
+                <div 
+                  className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-white font-black text-lg shadow-lg border-2 border-amber-600"
+                  style={{ backgroundColor: leaderboard[2]?.avatarColor || '#B45309' }}
+                >
+                  {(leaderboard[2]?.fullName || 'U').charAt(0)}
+                </div>
+                <h4 className="font-bold text-xs sm:text-sm mt-2 line-clamp-1" style={{ color: 'var(--text-primary)' }}>
+                  {leaderboard[2]?.fullName}
+                </h4>
+                <span className="text-xs font-black text-indigo-500">{leaderboard[2]?.score} pts</span>
+                <div className="w-full h-20 rounded-t-2xl bg-gradient-to-t from-amber-700 to-amber-600 flex items-center justify-center text-2xl font-black text-white mt-2 shadow">
+                  🥉 3
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Full Leaderboard Table */}
+          <div 
+            className="rounded-2xl border overflow-hidden shadow-sm"
+            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+          >
+            <table className="w-full text-left text-xs sm:text-sm">
+              <thead className="bg-black/5 dark:bg-white/5 font-semibold text-slate-500 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                <tr>
+                  <th className="p-4 w-16 text-center">Rank</th>
+                  <th className="p-4">Anggota Tim</th>
+                  <th className="p-4 text-center">Tugas Selesai</th>
+                  <th className="p-4 text-center">Jam Kerja</th>
+                  <th className="p-4 text-center">Presensi</th>
+                  <th className="p-4 text-right">Skor Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                {leaderboard.map((u) => (
+                  <tr key={u.userId} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                    <td className="p-4 text-center font-bold">
+                      {u.rank === 1 ? '🥇 1' : u.rank === 2 ? '🥈 2' : u.rank === 3 ? '🥉 3' : `#${u.rank}`}
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <div 
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs"
+                          style={{ backgroundColor: u.avatarColor || '#6366F1' }}
+                        >
+                          {(u.fullName || 'U').charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{u.fullName}</p>
+                          <p className="text-[11px] text-slate-400">{u.jobTitle || u.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4 text-center font-semibold">{u.monthlyTasksDone} task</td>
+                    <td className="p-4 text-center font-semibold">{u.monthlyHours} jam</td>
+                    <td className="p-4 text-center font-semibold">{u.attendanceDays} hari</td>
+                    <td className="p-4 text-right font-black text-indigo-600 dark:text-indigo-400">
+                      {u.score} pts
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ─────── TAB 5: RIWAYAT KLAIM ─────── */}
+      {activeTab === 'claims' && (
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Kelola Permohonan Klaim Tim (Admin)</h2>
-              <p className="text-xs text-slate-400">Verifikasi, approve, atau konfirmasi transfer uang tunai dan traktiran anggota tim</p>
+              <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <Wallet className="w-5 h-5 text-indigo-500" />
+                Riwayat Klaim Hadiah Saya
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Daftar permohonan penukaran poin Anda beserta status verifikasi oleh Administrator.
+              </p>
             </div>
-            <button onClick={fetchClaims} className="p-2 rounded-xl border border-slate-700/40 hover:bg-slate-500/10 text-slate-300">
+            <button 
+              onClick={fetchClaims} 
+              className="p-2 rounded-xl border hover:bg-black/5 dark:hover:bg-white/5"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+            >
               <RefreshCw className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-500/10 text-slate-400 uppercase font-semibold border-b" style={{ borderColor: 'var(--border-color)' }}>
-                  <tr>
-                    <th className="p-3.5">Anggota Tim</th>
-                    <th className="p-3.5">Poin & Rupiah</th>
-                    <th className="p-3.5">Jenis Hadiah</th>
-                    <th className="p-3.5">Nomor Rekening / Info Traktiran</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5 text-right">Aksi Admin</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-                  {claims.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="text-center py-8 text-slate-400">Belum ada data klaim hadiah dari tim.</td>
-                    </tr>
-                  ) : (
-                    claims.map((c) => (
-                      <tr key={c.id} className="hover:bg-slate-500/5 transition-colors">
-                        <td className="p-3.5 font-medium">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white font-bold" style={{ backgroundColor: c.userAvatarColor || '#6366F1' }}>
-                              {c.userName?.slice(0, 1)}
-                            </div>
-                            <div>
-                              <p className="font-semibold text-slate-200">{c.userName}</p>
-                              <p className="text-[10px] text-slate-400">{c.userEmail}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-3.5">
-                          <strong className="text-amber-400 font-bold">{c.pointsClaimed} pts</strong>
-                          <span className="block text-[11px] text-emerald-400 font-semibold">Rp {c.rupiahAmount?.toLocaleString('id-ID')}</span>
-                        </td>
-                        <td className="p-3.5 text-slate-300 font-medium">{c.rewardType}</td>
-                        <td className="p-3.5">
-                          <p className="text-slate-200">{c.accountOrContactInfo}</p>
-                          {c.userNotes && <p className="text-[11px] text-slate-400 italic">"{c.userNotes}"</p>}
-                        </td>
-                        <td className="p-3.5">{getClaimStatusBadge(c.status)}</td>
-                        <td className="p-3.5 text-right">
-                          <button
-                            onClick={() => {
-                              setSelectedClaimForReview(c);
-                              setAdminProcessForm({
-                                status: c.status === 'Pending' ? 2 : (c.status === 'Approved' ? 3 : 2),
-                                adminNotes: c.adminNotes || ''
-                              });
-                            }}
-                            className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold transition-all text-xs"
-                          >
-                            Proses / Verifikasi
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+          {claims.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl border" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}>
+              <Gift className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Belum ada riwayat penukaran hadiah.</p>
+              <p className="text-xs text-slate-400 mt-1">Kumpulkan poin prestasi Anda dan tukarkan di tab Katalog Hadiah!</p>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {claims.map((claim) => (
+                <div 
+                  key={claim.id} 
+                  className="p-5 rounded-2xl border shadow-sm space-y-3"
+                  style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+                        {claim.rewardItemName || 'Klaim Poin Hadiah'}
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {new Date(claim.claimedAt).toLocaleString('id-ID')}
+                      </p>
+                    </div>
+                    {getClaimStatusBadge(claim.status)}
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs py-2 border-y" style={{ borderColor: 'var(--border-color)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Poin Ditukar:</span>
+                    <strong className="text-amber-500 font-bold">{claim.pointsSpent} Pts (Rp {claim.rupiahEquivalent?.toLocaleString('id-ID')})</strong>
+                  </div>
+
+                  <div className="text-xs space-y-1">
+                    <p style={{ color: 'var(--text-secondary)' }}>
+                      Kontak / Rekening: <strong style={{ color: 'var(--text-primary)' }}>{claim.accountOrContactInfo}</strong>
+                    </p>
+                    {claim.userNotes && (
+                      <p className="text-slate-400 italic">"{claim.userNotes}"</p>
+                    )}
+                    {claim.adminNotes && (
+                      <div className="p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border text-[11px] mt-2" style={{ borderColor: 'var(--border-color)' }}>
+                        <span className="font-bold text-indigo-500">Catatan Admin: </span>
+                        <span>{claim.adminNotes}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* ─────── MANAGE (ADMIN) ─────── */}
-      {activeTab === 'manage' && isAdmin && (
-        <div className="space-y-4">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>Kelola Master Badge & Aturan Otomatis</h2>
-            <button onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: 'var(--accent-primary)', color: '#fff', fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer' }}>
-              <Plus size={14} /> Tambah Badge Baru
+      {/* ─────── TAB 6: ADMIN CLAIM REVIEW ─────── */}
+      {isAdmin && activeTab === 'admin-claims' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <ShieldCheck className="w-5 h-5 text-indigo-500" />
+                Pusat Persetujuan Klaim Hadiah Tim (Admin)
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Tinjau permohonan klaim dari seluruh anggota tim, setujui transfer / traktiran, atau tolak dengan alasan.
+              </p>
+            </div>
+            <button 
+              onClick={fetchClaims} 
+              className="p-2 rounded-xl border hover:bg-black/5 dark:hover:bg-white/5"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+            >
+              <RefreshCw className="w-4 h-4" />
             </button>
           </div>
-          <div style={{ borderRadius: 16, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: 'rgba(0,0,0,0.03)', borderBottom: '1px solid var(--border-color)' }}>
-                    {['Badge', 'Trigger', 'Rarity', 'Poin', 'Nilai Rp', 'Aktif', 'Aksi'].map(h => (
-                      <th key={h} style={{ padding: '10px 14px', textAlign: h === 'Poin' || h === 'Nilai Rp' || h === 'Aktif' ? 'center' : h === 'Aksi' ? 'right' : 'left', color: 'var(--text-secondary)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
-                    ))}
+
+          <div 
+            className="rounded-2xl border overflow-hidden shadow-sm"
+            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+          >
+            <table className="w-full text-left text-xs sm:text-sm">
+              <thead className="bg-black/5 dark:bg-white/5 font-semibold text-slate-500 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                <tr>
+                  <th className="p-4">Anggota Tim</th>
+                  <th className="p-4">Hadiah & Poin</th>
+                  <th className="p-4">Info Pembayaran / Kontak</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                {adminClaims.map((claim) => (
+                  <tr key={claim.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                    <td className="p-4">
+                      <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{claim.userName}</p>
+                      <p className="text-[11px] text-slate-400">{claim.userEmail}</p>
+                    </td>
+                    <td className="p-4">
+                      <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{claim.rewardItemName}</p>
+                      <p className="text-[11px] text-amber-500 font-bold">{claim.pointsSpent} Pts (Rp {claim.rupiahEquivalent?.toLocaleString('id-ID')})</p>
+                    </td>
+                    <td className="p-4">
+                      <p className="font-medium text-xs" style={{ color: 'var(--text-primary)' }}>{claim.accountOrContactInfo}</p>
+                      {claim.userNotes && <p className="text-[11px] text-slate-400 italic">"{claim.userNotes}"</p>}
+                    </td>
+                    <td className="p-4">
+                      {getClaimStatusBadge(claim.status)}
+                    </td>
+                    <td className="p-4 text-right">
+                      <button
+                        onClick={() => {
+                          setSelectedClaimForReview(claim);
+                          setAdminProcessForm({
+                            status: claim.status === 'Approved' ? 3 : 2,
+                            adminNotes: claim.adminNotes || ''
+                          });
+                        }}
+                        className="px-3 py-1.5 rounded-xl border text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+                        style={{ borderColor: 'var(--border-color)' }}
+                      >
+                        Proses Klaim
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {allBadges.map(badge => {
-                    const rarity = RARITY_META[badge.rarity] || RARITY_META[1];
-                    return (
-                      <tr key={badge.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '10px 14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{ width: 36, height: 36, borderRadius: 10, background: badge.color + '20', border: `1.5px solid ${badge.color}50`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <BadgeIcon name={badge.icon} size={18} color={badge.color} />
-                            </div>
-                            <div>
-                              <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{badge.name}</p>
-                              <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{badge.code}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontSize: 12 }}>
-                          {TRIGGER_LABELS[badge.triggerType] || 'Manual'}
-                          {badge.triggerThreshold > 0 && <span style={{ marginLeft: 4, fontWeight: 700, color: '#818CF8' }}>&ge;{badge.triggerThreshold}</span>}
-                        </td>
-                        <td style={{ padding: '10px 14px' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: rarity.text }}>{rarity.label}</span>
-                        </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, color: '#FBBF24' }}>{badge.points} pts</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 600, color: '#10B981', fontSize: 11 }}>Rp {(badge.points * POINT_TO_RUPIAH).toLocaleString('id-ID')}</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                          <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: badge.isActive ? '#34D399' : '#6B7280' }} />
-                        </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                            <button onClick={() => openEdit(badge)} style={{ padding: '6px', borderRadius: 8, background: 'rgba(99,102,241,0.1)', border: 'none', cursor: 'pointer', color: '#818CF8' }}><Edit2 size={14} /></button>
-                            <button onClick={() => handleDelete(badge.id, badge.name)} style={{ padding: '6px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: 'none', cursor: 'pointer', color: '#F87171' }}><Trash2 size={14} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {!loading && allBadges.length === 0 && <p style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)', fontSize: 14 }}>Belum ada badge.</p>}
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* ─────── MODAL AJUKAN KLAIM REWARD (USER) ─────── */}
-      {isClaimModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
-          <div style={{ borderRadius: 24, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', width: '100%', maxWidth: 540, boxShadow: '0 25px 60px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid var(--border-color)' }}>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
-                  <Gift size={20} />
+      {/* ── MODAL: CLAIM REWARD ITEM ── */}
+      {selectedRewardToClaim && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div 
+            className="w-full max-w-md rounded-3xl border shadow-2xl overflow-hidden animate-scale-up"
+            style={{ backgroundColor: 'var(--card-bg, #FFFFFF)', borderColor: 'var(--border-color)' }}
+          >
+            <div 
+              className="flex items-center justify-between px-6 py-4 border-b"
+              style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}
+            >
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-xl bg-amber-400 text-indigo-950 font-bold">
+                  <Gift className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 style={{ fontWeight: 800, fontSize: 17, color: 'var(--text-primary)' }}>Klaim Hadiah / Poin Prestasi</h3>
-                  <p className="text-xs text-slate-400">Nilai Konversi Resmi: <strong>1 Poin = Rp 100</strong></p>
+                  <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                    Konfirmasi Penukaran Hadiah
+                  </h3>
+                  <p className="text-xs text-slate-400">{selectedRewardToClaim.name}</p>
                 </div>
               </div>
-              <button onClick={() => setIsClaimModalOpen(false)} style={{ padding: 6, borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button 
+                onClick={() => setSelectedRewardToClaim(null)}
+                className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <form onSubmit={handleSubmitClaim} style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Point input & Rupiah calculator */}
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-300">Poin Anda Tersedia:</span>
-                  <strong className="text-amber-400">{myStats?.availablePoints || 0} pts</strong>
+            <form onSubmit={handleSubmitClaim} className="p-6 space-y-4">
+              {/* Cost Summary */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Poin Dibutuhkan:</span>
+                  <strong className="text-amber-500 font-bold">{selectedRewardToClaim.pointCost} Poin</strong>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Jumlah Poin Diklaim *</label>
-                    <input
-                      type="number"
-                      required
-                      min={10}
-                      max={myStats?.availablePoints || 100000}
-                      value={claimForm.points}
-                      onChange={(e) => setClaimForm({ ...claimForm, points: e.target.value })}
-                      className={inputCls}
-                      style={fieldStyle}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Setara Uang Rupiah:</label>
-                    <div className="px-3.5 py-2 rounded-xl border text-sm font-bold text-emerald-400 bg-emerald-500/10 border-emerald-500/30">
-                      Rp {((parseInt(claimForm.points) || 0) * POINT_TO_RUPIAH).toLocaleString('id-ID')}
-                    </div>
-                  </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Nilai Setara:</span>
+                  <strong className="text-slate-800 dark:text-slate-200 font-bold">Rp {(selectedRewardToClaim.pointCost * POINT_TO_RUPIAH).toLocaleString('id-ID')}</strong>
+                </div>
+                <div className="flex justify-between text-xs pt-1.5 border-t border-amber-500/20">
+                  <span className="text-slate-500">Sisa Poin Anda:</span>
+                  <strong className="text-indigo-600 dark:text-indigo-400 font-bold">
+                    {(profile?.availablePoints || 0) - selectedRewardToClaim.pointCost} Poin
+                  </strong>
                 </div>
               </div>
 
+              {/* Account / Contact Input */}
               <div>
-                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">Pilih Bentuk Hadiah *</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  {REWARD_TYPES.map((rt) => (
-                    <div
-                      key={rt.value}
-                      onClick={() => setClaimForm({ ...claimForm, rewardType: rt.value })}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${
-                        claimForm.rewardType === rt.value 
-                          ? 'border-amber-500 bg-amber-500/10 shadow-sm' 
-                          : 'border-slate-700/40 hover:bg-slate-500/5'
-                      }`}
-                    >
-                      <div className="mt-0.5">{rt.icon}</div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-200">{rt.label}</p>
-                        <p className="text-[10px] text-slate-400">{rt.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
-                  {claimForm.rewardType === 1 ? 'Nomor Rekening & Nama Bank / Pemilik *'
-                    : claimForm.rewardType === 2 ? 'Nomor HP & Jenis E-Wallet (GoPay/OVO/Dana) *'
-                    : claimForm.rewardType === 3 ? 'Nama Restoran / Tempat Makan Rekomendasi *'
-                    : claimForm.rewardType === 4 ? 'Nama Kedai Kopi / Menu Minuman Favorit *'
-                    : 'Nomor Kontak / Detail Informasi Penerima *'}
+                <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  Nomor Rekening / No. HP E-Wallet / Kontak <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
+                  placeholder="Contoh: BCA 1234567890 a.n Budi / GoPay 0812345678"
                   value={claimForm.accountOrContactInfo}
-                  onChange={(e) => setClaimForm({ ...claimForm, accountOrContactInfo: e.target.value })}
-                  placeholder={
-                    claimForm.rewardType === 1 ? 'Contoh: BCA 1234567890 a/n Ahmad Fajar'
-                    : claimForm.rewardType === 2 ? 'Contoh: GoPay 081234567890 (Ahmad Fajar)'
-                    : claimForm.rewardType === 3 ? 'Contoh: Rumah Makan Padang Sederhana / Solaria'
-                    : claimForm.rewardType === 4 ? 'Contoh: Kopi Kenangan Mantan Large x2'
-                    : 'Masukkan detail akun / kontak...'
-                  }
-                  className={inputCls}
-                  style={fieldStyle}
+                  onChange={(e) => setClaimForm(prev => ({ ...prev, accountOrContactInfo: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 />
               </div>
 
+              {/* Notes Input */}
               <div>
-                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">Pesan / Catatan ke Administrator (Opsional)</label>
+                <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  Catatan Tambahan (Opsional)
+                </label>
                 <textarea
                   rows={2}
+                  placeholder="Informasi tambahan untuk admin..."
                   value={claimForm.userNotes}
-                  onChange={(e) => setClaimForm({ ...claimForm, userNotes: e.target.value })}
-                  placeholder="Catatan tambahan untuk admin (misal: jam makan siang yang luang, dll)..."
-                  className={inputCls}
-                  style={{ ...fieldStyle, resize: 'none' }}
+                  onChange={(e) => setClaimForm(prev => ({ ...prev, userNotes: e.target.value }))}
+                  className="w-full px-4 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: 10, paddingTop: 10, borderTop: '1px solid var(--border-color)' }}>
-                <button type="button" onClick={() => setIsClaimModalOpen(false)} style={{ flex: 1, padding: '11px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>Batal</button>
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRewardToClaim(null)}
+                  className="px-4 py-2 rounded-xl border text-xs font-bold transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+                >
+                  Batal
+                </button>
                 <button
                   type="submit"
-                  disabled={submittingClaim || (myStats?.availablePoints || 0) < 10}
-                  className="flex-1 px-5 py-2.5 rounded-xl font-bold text-sm text-indigo-950 bg-amber-400 hover:bg-amber-300 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  disabled={submittingClaim}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white shadow-md transition-all disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--accent-primary)', boxShadow: 'var(--accent-glow)' }}
                 >
-                  {submittingClaim ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  Ajukan Klaim Sekarang
+                  {submittingClaim ? 'Mengirim...' : 'Ajukan Penukaran Sekarang'}
                 </button>
               </div>
             </form>
@@ -945,132 +1128,90 @@ export default function GamificationPage() {
         </div>
       )}
 
-      {/* ─────── MODAL REVIEW KLAIM (ADMIN) ─────── */}
+      {/* ── MODAL: ADMIN PROCESS CLAIM ── */}
       {selectedClaimForReview && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
-          <div style={{ borderRadius: 24, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', width: '100%', maxWidth: 520, boxShadow: '0 25px 60px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid var(--border-color)' }}>
-              <h3 style={{ fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>Proses Klaim Hadiah Anggota</h3>
-              <button onClick={() => setSelectedClaimForReview(null)} style={{ padding: 6, borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div 
+            className="w-full max-w-md rounded-3xl border shadow-2xl overflow-hidden animate-scale-up"
+            style={{ backgroundColor: 'var(--card-bg, #FFFFFF)', borderColor: 'var(--border-color)' }}
+          >
+            <div 
+              className="flex items-center justify-between px-6 py-4 border-b"
+              style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}
+            >
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-xl bg-indigo-600 text-white font-bold">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                    Verifikasi Klaim Hadiah
+                  </h3>
+                  <p className="text-xs text-slate-400">Pemohon: {selectedClaimForReview.userName}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedClaimForReview(null)}
+                className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <form onSubmit={handleProcessClaim} style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="p-3.5 rounded-xl bg-slate-500/10 border border-slate-700/30 text-xs space-y-1">
-                <p>Pemohon: <strong>{selectedClaimForReview.userName}</strong> ({selectedClaimForReview.userEmail})</p>
-                <p>Poin: <strong className="text-amber-400">{selectedClaimForReview.pointsClaimed} Pts</strong> (≈ <strong className="text-emerald-400">Rp {selectedClaimForReview.rupiahAmount?.toLocaleString('id-ID')}</strong>)</p>
-                <p>Tipe: <strong>{selectedClaimForReview.rewardType}</strong></p>
-                <p>Rekening / Kontak: <strong className="text-slate-200">{selectedClaimForReview.accountOrContactInfo}</strong></p>
-                {selectedClaimForReview.userNotes && <p className="italic">"{selectedClaimForReview.userNotes}"</p>}
+            <form onSubmit={handleProcessClaimSubmit} className="p-6 space-y-4">
+              <div className="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border text-xs space-y-1" style={{ borderColor: 'var(--border-color)' }}>
+                <p>Hadiah: <strong>{selectedClaimForReview.rewardItemName}</strong></p>
+                <p>Poin: <strong className="text-amber-500">{selectedClaimForReview.pointsSpent} Pts (Rp {selectedClaimForReview.rupiahEquivalent?.toLocaleString('id-ID')})</strong></p>
+                <p>Kontak / Rekening: <strong>{selectedClaimForReview.accountOrContactInfo}</strong></p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">Status Permohonan *</label>
+                <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  Status Keputusan
+                </label>
                 <select
                   value={adminProcessForm.status}
-                  onChange={(e) => setAdminProcessForm({ ...adminProcessForm, status: e.target.value })}
-                  className={inputCls}
-                  style={fieldStyle}
+                  onChange={(e) => setAdminProcessForm(prev => ({ ...prev, status: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-xl border text-sm font-semibold"
+                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 >
-                  <option value={2}>Disetujui (Approved) - Masuk antrean transfer / traktir</option>
-                  <option value={3}>Selesai Ditransfer / Telah Ditraktir (Paid / Treated)</option>
-                  <option value={4}>Tolak (Rejected) - Kembalikan saldo poin ke user</option>
+                  <option value={2}>🔵 Disetujui (Approved)</option>
+                  <option value={3}>🟢 Selesai Ditransfer / Ditraktir (PaidOrTreated)</option>
+                  <option value={4}>🔴 Ditolak (Kembalikan Stok Hadiah)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">Catatan Admin / Bukti Transfer / Info Traktir</label>
+                <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  Catatan Admin untuk Pemohon
+                </label>
                 <textarea
                   rows={3}
+                  placeholder="Contoh: Bukti transfer terlampir / silakan ambil merchandise di meja HR..."
                   value={adminProcessForm.adminNotes}
-                  onChange={(e) => setAdminProcessForm({ ...adminProcessForm, adminNotes: e.target.value })}
-                  placeholder="Contoh: Sudah ditransfer via BCA No Ref #TRX9988123 / Ditraktir makan siang bersama di Resto X..."
-                  className={inputCls}
-                  style={{ ...fieldStyle, resize: 'none' }}
+                  onChange={(e) => setAdminProcessForm(prev => ({ ...prev, adminNotes: e.target.value }))}
+                  className="w-full px-4 py-2 rounded-xl border text-sm"
+                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: 10, paddingTop: 10, borderTop: '1px solid var(--border-color)' }}>
-                <button type="button" onClick={() => setSelectedClaimForReview(null)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>Batal</button>
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedClaimForReview(null)}
+                  className="px-4 py-2 rounded-xl border text-xs font-bold"
+                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+                >
+                  Tutup
+                </button>
                 <button
                   type="submit"
                   disabled={submittingAdminProcess}
-                  className="flex-1 px-4 py-2 rounded-xl font-bold text-xs bg-sky-600 hover:bg-sky-500 text-white transition-all disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white shadow-md disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--accent-primary)', boxShadow: 'var(--accent-glow)' }}
                 >
-                  {submittingAdminProcess ? 'Menyimpan...' : 'Simpan Status Klaim'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ─────── BADGE MODAL (ADMIN) ─────── */}
-      {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
-          <div style={{ borderRadius: 20, border: '1px solid var(--border-color)', background: 'var(--bg-card)', width: '100%', maxWidth: 520, boxShadow: '0 25px 60px rgba(0,0,0,0.5)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid var(--border-color)' }}>
-              <h3 style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>{modalMode === 'create' ? 'Tambah Badge Baru' : 'Edit Badge'}</h3>
-              <button onClick={() => setIsModalOpen(false)} style={{ padding: 6, borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
-            </div>
-            <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '75vh', overflowY: 'auto' }}>
-              {[
-                { key: 'code', label: 'Kode Badge', placeholder: 'TASK_FIRST', required: true },
-                { key: 'name', label: 'Nama Badge', placeholder: 'Langkah Pertama', required: true },
-              ].map(({ key, label, placeholder, required }) => (
-                <div key={key}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>{label}</label>
-                  <input required={required} value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} placeholder={placeholder} className={inputCls} style={fieldStyle} />
-                </div>
-              ))}
-
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Deskripsi</label>
-                <textarea value={form.description || ''} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={2} className={inputCls} style={{ ...fieldStyle, resize: 'none' }} />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Trigger Otomatis</label>
-                  <select value={form.triggerType} onChange={e => setForm(p => ({ ...p, triggerType: +e.target.value }))} className={inputCls} style={fieldStyle}>
-                    {Object.entries(TRIGGER_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Threshold (N)</label>
-                  <input type="number" min={0} value={form.triggerThreshold || 0} onChange={e => setForm(p => ({ ...p, triggerThreshold: +e.target.value }))} className={inputCls} style={fieldStyle} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Rarity</label>
-                  <select value={form.rarity} onChange={e => setForm(p => ({ ...p, rarity: +e.target.value }))} className={inputCls} style={fieldStyle}>
-                    {[1, 2, 3, 4].map(r => <option key={r} value={r}>{RARITY_META[r].label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Poin</label>
-                  <input type="number" min={1} value={form.points || 50} onChange={e => setForm(p => ({ ...p, points: +e.target.value }))} className={inputCls} style={fieldStyle} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Ikon (Lucide Name)</label>
-                  <input value={form.icon || 'Award'} onChange={e => setForm(p => ({ ...p, icon: e.target.value }))} placeholder="Award" className={inputCls} style={fieldStyle} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Warna</label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input type="color" value={form.color || '#10B981'} onChange={e => setForm(p => ({ ...p, color: e.target.value }))} style={{ width: 40, height: 40, border: '1px solid var(--border-color)', borderRadius: 8, cursor: 'pointer', padding: 2 }} />
-                    <input value={form.color || '#10B981'} onChange={e => setForm(p => ({ ...p, color: e.target.value }))} className={inputCls} style={fieldStyle} />
-                  </div>
-                </div>
-              </div>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--text-primary)', cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.isActive} onChange={e => setForm(p => ({ ...p, isActive: e.target.checked }))} style={{ accentColor: 'var(--accent-primary)', width: 16, height: 16 }} />
-                Badge Aktif
-              </label>
-
-              <div style={{ display: 'flex', gap: 10, paddingTop: 8 }}>
-                <button type="button" onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>Batal</button>
-                <button type="submit" style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  <Save size={14} />{modalMode === 'create' ? 'Simpan Badge' : 'Perbarui'}
+                  {submittingAdminProcess ? 'Menyimpan...' : 'Simpan Keputusan'}
                 </button>
               </div>
             </form>

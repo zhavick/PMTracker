@@ -4,7 +4,7 @@ import {
   CheckSquare, Clock, AlertTriangle, TrendingUp, 
   Briefcase, Users, Calendar, ArrowRight, Play, CheckCircle2,
   Database, RefreshCw, BarChart3, Layers, UserCheck, Shield,
-  BarChart2, List
+  BarChart2, List, Flame, Gift, Sparkles
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { Link } from 'react-router-dom';
@@ -29,6 +29,8 @@ export default function DashboardPage() {
   const [teamWorkload, setTeamWorkload] = useState([]);
   const [projectsOverview, setProjectsOverview] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
+  const [gamification, setGamification] = useState(null);
+  const [checkInLoading, setCheckInLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [workloadViewMode, setWorkloadViewMode] = useState('vertical-bar'); // 'vertical-bar' | 'list'
@@ -37,11 +39,12 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     try {
       setIsRefreshing(true);
-      const [statsRes, workloadRes, projectsRes, recentRes] = await Promise.all([
+      const [statsRes, workloadRes, projectsRes, recentRes, gamificationRes] = await Promise.all([
         axiosClient.get(`/api/dashboard/stats?excludeAdmin=${excludeAdmin}`),
         axiosClient.get(`/api/dashboard/workload?excludeAdmin=${excludeAdmin}`),
         axiosClient.get('/api/dashboard/projects-overview'),
-        axiosClient.get('/api/dashboard/recent-activities')
+        axiosClient.get('/api/dashboard/recent-activities'),
+        axiosClient.get('/api/gamification/profile').catch(() => null)
       ]);
 
       const sData = statsRes?.data?.data ?? statsRes?.data ?? statsRes;
@@ -63,11 +66,29 @@ export default function DashboardPage() {
       if (Array.isArray(rData)) {
         setRecentActivities(rData);
       }
+
+      const gData = gamificationRes?.data?.data ?? gamificationRes?.data;
+      if (gData && typeof gData === 'object') {
+        setGamification(gData);
+      }
     } catch (e) {
       console.error('Error fetching dashboard data:', e);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
+    }
+  };
+
+  const handleQuickCheckIn = async () => {
+    setCheckInLoading(true);
+    try {
+      const res = await axiosClient.post('/api/gamification/check-in');
+      alert(res.data?.message || 'Daily check-in berhasil!');
+      fetchDashboardData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Gagal melakukan daily check-in.');
+    } finally {
+      setCheckInLoading(false);
     }
   };
 
@@ -115,6 +136,14 @@ export default function DashboardPage() {
       color: '#8B5CF6', 
       desc: `Total ${stats.totalWorkHoursAllTime} jam tercatat`,
       badge: 'Multi-Timer'
+    },
+    { 
+      title: 'Daily Streak & Poin', 
+      value: `${gamification?.currentStreak || 0} Hari`, 
+      icon: Flame, 
+      color: '#EC4899', 
+      desc: gamification?.hasCheckedInToday ? '✓ Sudah Check-In Hari Ini' : 'Belum Check-In Hari Ini',
+      badge: `${gamification?.availablePoints || 0} Pts`
     }
   ];
 
@@ -191,8 +220,43 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 5 Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* Smart Daily Check-In Reminder Banner */}
+      {gamification && !gamification.hasCheckedInToday && (
+        <div className="p-4 rounded-2xl border bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-rose-500/10 border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm animate-fade-in">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md flex-shrink-0 animate-bounce">
+              <Flame className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm sm:text-base text-amber-600 dark:text-amber-400">
+                Daily Check-In Hari Ini Belum Diambil!
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Pertahankan streak aktif Anda ({gamification.currentStreak} hari) dan kumpulkan +10 Poin. Menuju Golden Milestone +150 Poin di Hari ke-30!
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2.5 w-full sm:w-auto justify-end">
+            <button
+              onClick={handleQuickCheckIn}
+              disabled={checkInLoading}
+              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-md hover:shadow-lg transition-all flex items-center space-x-1.5 disabled:opacity-50"
+            >
+              <span>{checkInLoading ? 'Memproses...' : '⚡ Check-In Sekarang (+10 Pts)'}</span>
+            </button>
+            <Link
+              to="/gamification"
+              className="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold border hover:bg-black/5 dark:hover:bg-white/5 transition-all text-slate-600 dark:text-slate-300"
+              style={{ borderColor: 'var(--border-color)' }}
+            >
+              Lihat Hadiah
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* 6 Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {statCards.map((card, idx) => {
           const Icon = card.icon;
           return (
