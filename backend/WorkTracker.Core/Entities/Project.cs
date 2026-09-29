@@ -24,6 +24,18 @@ public class Project
     public int? CompanyId { get; set; }
     public Company? Company { get; set; }
 
+    [MaxLength(200)]
+    public string? ClientName { get; set; }
+
+    public string? ProjectManagerId { get; set; }
+    public ApplicationUser? ProjectManager { get; set; }
+
+    public decimal Budget { get; set; } = 0;
+    public decimal ActualCost { get; set; } = 0;
+
+    [MaxLength(500)]
+    public string? Tags { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties

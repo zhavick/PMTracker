@@ -30,6 +30,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<SqlHistory> SqlHistories => Set<SqlHistory>();
     public DbSet<JsonHistory> JsonHistories => Set<JsonHistory>();
     public DbSet<MasterHoliday> MasterHolidays => Set<MasterHoliday>();
+    public DbSet<DailyCheckIn> DailyCheckIns => Set<DailyCheckIn>();
+    public DbSet<RewardItem> RewardItems => Set<RewardItem>();
     public DbSet<RewardClaim> RewardClaims => Set<RewardClaim>();
     public DbSet<Ticket> Tickets => Set<Ticket>();
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
@@ -40,6 +42,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
 
         // Explicit Table Names to match MySQL schema
         builder.Entity<Company>().ToTable("Companies");
+        builder.Entity<Company>().HasIndex(c => c.Code).IsUnique();
         builder.Entity<Project>().ToTable("Projects");
         builder.Entity<Category>().ToTable("Categories");
         builder.Entity<WorkTask>().ToTable("Tasks");
@@ -59,6 +62,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         builder.Entity<SqlHistory>().ToTable("SqlHistories");
         builder.Entity<JsonHistory>().ToTable("JsonHistories");
         builder.Entity<MasterHoliday>().ToTable("MasterHolidays");
+        builder.Entity<DailyCheckIn>().ToTable("DailyCheckIns");
+        builder.Entity<RewardItem>().ToTable("RewardItems");
         builder.Entity<RewardClaim>().ToTable("RewardClaims");
         builder.Entity<Ticket>().ToTable("Tickets");
         builder.Entity<TicketComment>().ToTable("TicketComments");
@@ -154,12 +159,32 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .HasForeignKey(ub => ub.BadgeId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Project Manager relationship
+        builder.Entity<Project>()
+            .HasOne(p => p.ProjectManager)
+            .WithMany()
+            .HasForeignKey(p => p.ProjectManagerId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // DailyCheckIn relationships
+        builder.Entity<DailyCheckIn>()
+            .HasOne(d => d.User)
+            .WithMany()
+            .HasForeignKey(d => d.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // RewardClaim relationships
         builder.Entity<RewardClaim>()
             .HasOne(r => r.User)
             .WithMany()
             .HasForeignKey(r => r.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<RewardClaim>()
+            .HasOne(r => r.RewardItem)
+            .WithMany()
+            .HasForeignKey(r => r.RewardItemId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.Entity<RewardClaim>()
             .HasOne(r => r.ProcessedByUser)
