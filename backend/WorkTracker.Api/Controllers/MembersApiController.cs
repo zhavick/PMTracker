@@ -93,6 +93,9 @@ public class MembersApiController : ControllerBase
                 Department = u.Company?.Name ?? "Tim Teknis",
                 CompanyId = u.CompanyId,
                 CompanyName = u.Company?.Name,
+                CompanyCode = u.Company?.Code,
+                CurrentStreak = u.CurrentStreak,
+                TotalPointsEarned = u.TotalPointsEarned,
                 PhoneNumber = u.PhoneNumber,
                 Role = mainRole,
                 IsApproved = u.IsApproved,
@@ -387,6 +390,15 @@ public class MembersApiController : ControllerBase
 
         var sessions = await _context.Sessions.Where(s => s.UserId == id).ToListAsync();
         _context.Sessions.RemoveRange(sessions);
+
+        var checkins = await _context.DailyCheckIns.Where(c => c.UserId == id).ToListAsync();
+        _context.DailyCheckIns.RemoveRange(checkins);
+
+        var claims = await _context.RewardClaims.Where(r => r.UserId == id).ToListAsync();
+        _context.RewardClaims.RemoveRange(claims);
+
+        var userBadges = await _context.UserBadges.Where(b => b.UserId == id).ToListAsync();
+        _context.UserBadges.RemoveRange(userBadges);
 
         await _context.SaveChangesAsync();
 

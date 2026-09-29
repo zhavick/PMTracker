@@ -19,6 +19,9 @@ public class MemberDto
     public string? AvatarColor { get; set; }
     public int? CompanyId { get; set; }
     public string? CompanyName { get; set; }
+    public string? CompanyCode { get; set; }
+    public int CurrentStreak { get; set; }
+    public int TotalPointsEarned { get; set; }
     public int TotalTasksAssigned { get; set; }
     public double TotalHoursLogged { get; set; }
     public DateTime CreatedAt { get; set; }
