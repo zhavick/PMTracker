@@ -33,6 +33,7 @@ public class ProjectsApiController : ControllerBase
 
         var query = _context.Projects
             .Include(p => p.Company)
+            .Include(p => p.ProjectManager)
             .Include(p => p.Tasks)
                 .ThenInclude(t => t.Sessions)
             .AsNoTracking();
@@ -79,6 +80,7 @@ public class ProjectsApiController : ControllerBase
                 ? (int)Math.Round(p.Tasks.Average(t => (double)t.Progress)) 
                 : 0;
             var totalSeconds = p.Tasks.SelectMany(t => t.Sessions).Sum(s => s.Duration);
+            var burnRate = p.Budget > 0 ? (int)Math.Round((double)(p.ActualCost / p.Budget * 100)) : 0;
 
             return new ProjectDto
             {
@@ -95,7 +97,14 @@ public class ProjectsApiController : ControllerBase
                 CompletedTasks = completedTasks,
                 InProgressTasks = inProgressTasks,
                 ProgressPercent = progressPercent,
-                TotalSecondsLogged = totalSeconds
+                TotalSecondsLogged = totalSeconds,
+                ClientName = p.ClientName,
+                ProjectManagerId = p.ProjectManagerId,
+                ProjectManagerName = p.ProjectManager != null ? p.ProjectManager.FullName : null,
+                Budget = p.Budget,
+                ActualCost = p.ActualCost,
+                BurnRatePercent = burnRate,
+                Tags = p.Tags
             };
         }).ToList();
 
@@ -136,6 +145,7 @@ public class ProjectsApiController : ControllerBase
 
         var query = _context.Projects
             .Include(x => x.Company)
+            .Include(x => x.ProjectManager)
             .Include(x => x.Tasks)
                 .ThenInclude(t => t.Sessions)
             .AsNoTracking();
@@ -157,6 +167,7 @@ public class ProjectsApiController : ControllerBase
             ? (int)Math.Round(p.Tasks.Average(t => (double)t.Progress)) 
             : 0;
         var totalSeconds = p.Tasks.SelectMany(t => t.Sessions).Sum(s => s.Duration);
+        var burnRate = p.Budget > 0 ? (int)Math.Round((double)(p.ActualCost / p.Budget * 100)) : 0;
 
         var dto = new ProjectDto
         {
@@ -173,7 +184,14 @@ public class ProjectsApiController : ControllerBase
             CompletedTasks = completedTasks,
             InProgressTasks = inProgressTasks,
             ProgressPercent = progressPercent,
-            TotalSecondsLogged = totalSeconds
+            TotalSecondsLogged = totalSeconds,
+            ClientName = p.ClientName,
+            ProjectManagerId = p.ProjectManagerId,
+            ProjectManagerName = p.ProjectManager != null ? p.ProjectManager.FullName : null,
+            Budget = p.Budget,
+            ActualCost = p.ActualCost,
+            BurnRatePercent = burnRate,
+            Tags = p.Tags
         };
 
         return Ok(ApiResponse<ProjectDto>.Success(dto));
@@ -197,6 +215,11 @@ public class ProjectsApiController : ControllerBase
             Deadline = dto.Deadline,
             Status = dto.Status,
             CompanyId = targetCompanyId,
+            ClientName = dto.ClientName?.Trim(),
+            ProjectManagerId = dto.ProjectManagerId,
+            Budget = dto.Budget,
+            ActualCost = dto.ActualCost,
+            Tags = dto.Tags?.Trim(),
             CreatedAt = DateTime.UtcNow
         };
 
@@ -204,6 +227,8 @@ public class ProjectsApiController : ControllerBase
         await _context.SaveChangesAsync();
 
         var comp = targetCompanyId.HasValue ? await _context.Companies.FindAsync(targetCompanyId.Value) : null;
+        var pm = !string.IsNullOrEmpty(project.ProjectManagerId) ? await _context.Users.FindAsync(project.ProjectManagerId) : null;
+        var burnRate = project.Budget > 0 ? (int)Math.Round((double)(project.ActualCost / project.Budget * 100)) : 0;
 
         var resultDto = new ProjectDto
         {
@@ -220,7 +245,14 @@ public class ProjectsApiController : ControllerBase
             CompletedTasks = 0,
             InProgressTasks = 0,
             ProgressPercent = 0,
-            TotalSecondsLogged = 0
+            TotalSecondsLogged = 0,
+            ClientName = project.ClientName,
+            ProjectManagerId = project.ProjectManagerId,
+            ProjectManagerName = pm?.FullName,
+            Budget = project.Budget,
+            ActualCost = project.ActualCost,
+            BurnRatePercent = burnRate,
+            Tags = project.Tags
         };
 
         return CreatedAtAction(nameof(GetProjectById), new { id = project.Id }, ApiResponse<ProjectDto>.Success(resultDto, "Proyek berhasil dibuat."));
@@ -243,6 +275,12 @@ public class ProjectsApiController : ControllerBase
         project.Color = string.IsNullOrWhiteSpace(dto.Color) ? "#6366F1" : dto.Color.Trim();
         project.Deadline = dto.Deadline;
         project.Status = dto.Status;
+        project.ClientName = dto.ClientName?.Trim();
+        project.ProjectManagerId = dto.ProjectManagerId;
+        project.Budget = dto.Budget;
+        project.ActualCost = dto.ActualCost;
+        project.Tags = dto.Tags?.Trim();
+
         if (isAdmin && dto.CompanyId.HasValue)
         {
             project.CompanyId = dto.CompanyId.Value;
@@ -251,6 +289,35 @@ public class ProjectsApiController : ControllerBase
         await _context.SaveChangesAsync();
 
         return Ok(ApiResponse<object>.Success(new { id = project.Id }, "Proyek berhasil diperbarui."));
+    }
+
+    [HttpPost("{id}/assign-tasks")]
+    public async Task<IActionResult> AssignTasks(int id, [FromBody] BulkAssignTasksDto dto)
+    {
+        if (dto.TaskIds == null || dto.TaskIds.Length == 0)
+            return BadRequest(ApiResponse<object>.Fail("Tidak ada tugas yang dipilih untuk dialokasikan."));
+
+        var isAdmin = User.IsInRole("Admin") || User.IsInRole("System Analyst");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
+        var project = await _context.Projects.FindAsync(id);
+
+        if (project == null || (!isAdmin && userCompanyId.HasValue && project.CompanyId != userCompanyId.Value))
+            return NotFound(ApiResponse<object>.Fail("Proyek tidak ditemukan."));
+
+        var tasks = await _context.Tasks
+            .Where(t => dto.TaskIds.Contains(t.Id))
+            .ToListAsync();
+
+        foreach (var task in tasks)
+        {
+            task.ProjectId = id;
+            task.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(ApiResponse<object>.Success(
+            new { projectId = id, assignedCount = tasks.Count }, 
+            $"{tasks.Count} tugas berhasil dialokasikan ke proyek."));
     }
 
     [HttpDelete("{id}")]

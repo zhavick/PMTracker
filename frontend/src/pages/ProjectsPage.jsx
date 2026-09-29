@@ -18,7 +18,13 @@ import {
   ChevronDown,
   ChevronUp,
   LayoutGrid,
-  Filter
+  Filter,
+  DollarSign,
+  UserCheck,
+  CheckSquare,
+  Square,
+  ListPlus,
+  Tag
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
@@ -62,6 +68,9 @@ export default function ProjectsPage() {
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState('all');
   const [collapsedCompanies, setCollapsedCompanies] = useState({});
 
+  // Team Members for PM Selection
+  const [members, setMembers] = useState([]);
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState(null);
@@ -71,10 +80,22 @@ export default function ProjectsPage() {
     color: '#6366F1',
     deadline: '',
     status: 0,
-    companyId: ''
+    companyId: '',
+    clientName: '',
+    projectManagerId: '',
+    budget: 0,
+    actualCost: 0,
+    tags: ''
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
+
+  // Bulk Task Assignment Modal State
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [assignProject, setAssignProject] = useState(null);
+  const [availableTasks, setAvailableTasks] = useState([]);
+  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+  const [assignLoading, setAssignLoading] = useState(false);
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -107,8 +128,20 @@ export default function ProjectsPage() {
     }
   };
 
+  const fetchMembers = async () => {
+    try {
+      const res = await axiosClient.get('/api/members');
+      if (res.data?.data) {
+        setMembers(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load members:', err);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
+    fetchMembers();
   }, [search, selectedCompanyFilter]);
 
   useEffect(() => {
@@ -132,7 +165,12 @@ export default function ProjectsPage() {
       color: '#6366F1',
       deadline: '',
       status: 0,
-      companyId: companies.length > 0 ? companies[0].id : ''
+      companyId: companies.length > 0 ? companies[0].id : '',
+      clientName: '',
+      projectManagerId: '',
+      budget: 0,
+      actualCost: 0,
+      tags: ''
     });
     setFormError(null);
     setIsModalOpen(true);
@@ -144,12 +182,51 @@ export default function ProjectsPage() {
       name: project.name || '',
       description: project.description || '',
       color: project.color || '#6366F1',
-      deadline: project.deadline ? project.deadline.split('T')[0] : '',
+      deadline: project.deadline ? project.deadline.substring(0, 10) : '',
       status: project.status ?? 0,
-      companyId: project.companyId || (companies.length > 0 ? companies[0].id : '')
+      companyId: project.companyId || '',
+      clientName: project.clientName || '',
+      projectManagerId: project.projectManagerId || '',
+      budget: project.budget || 0,
+      actualCost: project.actualCost || 0,
+      tags: project.tags || ''
     });
     setFormError(null);
     setIsModalOpen(true);
+  };
+
+  const handleOpenAssignModal = async (project) => {
+    setAssignProject(project);
+    setSelectedTaskIds([]);
+    setIsAssignModalOpen(true);
+    try {
+      const res = await axiosClient.get('/api/tasks');
+      if (res.data?.data) {
+        // Show tasks not yet in this project or unassigned
+        setAvailableTasks(res.data.data.filter(t => t.projectId !== project.id));
+      }
+    } catch (err) {
+      console.error('Failed to fetch available tasks:', err);
+    }
+  };
+
+  const handleAssignSubmit = async (e) => {
+    e.preventDefault();
+    if (!assignProject || selectedTaskIds.length === 0) return;
+
+    setAssignLoading(true);
+    try {
+      await axiosClient.post(`/api/projects/${assignProject.id}/assign-tasks`, {
+        taskIds: selectedTaskIds
+      });
+      setIsAssignModalOpen(false);
+      fetchProjects();
+    } catch (err) {
+      console.error('Failed to assign tasks:', err);
+      alert('Gagal mengalokasikan tugas ke proyek.');
+    } finally {
+      setAssignLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -169,7 +246,12 @@ export default function ProjectsPage() {
         color: formData.color,
         deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
         status: parseInt(formData.status, 10),
-        companyId: isAdmin && formData.companyId ? parseInt(formData.companyId, 10) : undefined
+        companyId: isAdmin && formData.companyId ? parseInt(formData.companyId, 10) : undefined,
+        clientName: formData.clientName?.trim() || null,
+        projectManagerId: formData.projectManagerId ? parseInt(formData.projectManagerId, 10) : null,
+        budget: parseFloat(formData.budget) || 0,
+        actualCost: parseFloat(formData.actualCost) || 0,
+        tags: formData.tags?.trim() || null
       };
 
       if (projectToEdit) {
@@ -256,17 +338,51 @@ export default function ProjectsPage() {
             </div>
 
             {/* Company Badge for Admin / Quick Info */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
                 <Building2 className="w-3 h-3" />
                 {project.companyName || 'Perusahaan Mandiri'}
               </span>
+              {project.clientName && (
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                  Klien: {project.clientName}
+                </span>
+              )}
+              {project.projectManagerName && (
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                  PM: {project.projectManagerName}
+                </span>
+              )}
             </div>
 
             <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
               {project.description || 'Tidak ada deskripsi tambahan.'}
             </p>
           </div>
+
+          {/* Financial Burn Rate Card */}
+          {(project.budget > 0 || project.actualCost > 0) && (
+            <div className="p-3 rounded-xl border space-y-1.5" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+              <div className="flex justify-between items-center text-[11px] font-semibold">
+                <span style={{ color: 'var(--text-secondary)' }}>Serapan Finansial (Burn Rate)</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                  project.burnRatePercent > 100 
+                    ? 'bg-rose-500/10 text-rose-600 border-rose-500/30' 
+                    : project.burnRatePercent >= 80 
+                    ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' 
+                    : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                }`}>
+                  {project.burnRatePercent}% {project.burnRatePercent > 100 ? 'Overbudget' : ''}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-[11px] opacity-75">Pagu: Rp {Number(project.budget || 0).toLocaleString('id-ID')}</span>
+                <span className="font-bold text-[11px]" style={{ color: 'var(--text-primary)' }}>
+                  Aktual: Rp {Number(project.actualCost || 0).toLocaleString('id-ID')}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Progress Bar */}
           <div className="space-y-1.5">
@@ -311,6 +427,14 @@ export default function ProjectsPage() {
             </div>
 
             <div className="flex items-center space-x-1">
+              <button
+                onClick={() => handleOpenAssignModal(project)}
+                className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-gray-500 hover:text-emerald-600 transition-colors"
+                title="Alokasikan Tugas Massal ke Proyek"
+              >
+                <Layers className="w-4 h-4" />
+              </button>
+
               <button
                 onClick={() => handleOpenEdit(project)}
                 className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-gray-500 hover:text-indigo-600 transition-colors"
@@ -734,6 +858,92 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
+              {/* Client Name & Project Manager (PIC) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    Klien / Pemilik Proyek
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.clientName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, clientName: e.target.value }))}
+                    placeholder="Contoh: PT Surya Utama"
+                    className="w-full px-4 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    Project Manager (PIC)
+                  </label>
+                  <select
+                    value={formData.projectManagerId}
+                    onChange={(e) => setFormData(prev => ({ ...prev, projectManagerId: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">-- Pilih Project Manager --</option>
+                    {members.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.fullName || m.name || m.userName} ({m.role || 'Member'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Budget & Actual Cost (Financial Tracking) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    Anggaran (Budget Rp)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={formData.budget}
+                    onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                    placeholder="0"
+                    className="w-full px-4 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    Realisasi Biaya (Actual Cost Rp)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={formData.actualCost}
+                    onChange={(e) => setFormData(prev => ({ ...prev, actualCost: e.target.value }))}
+                    placeholder="0"
+                    className="w-full px-4 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+              </div>
+
+              {/* Project Tags */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  Label / Tag (Pisahkan dengan koma)
+                </label>
+                <input
+                  type="text"
+                  value={formData.tags}
+                  onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
+                  placeholder="e.g. Prioritas, Q3, Mobile, Internal"
+                  className="w-full px-4 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
               {/* Form Buttons */}
               <div className="flex items-center justify-end space-x-3 pt-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
                 <button
@@ -753,6 +963,137 @@ export default function ProjectsPage() {
                   <Save className="w-4 h-4" />
                   <span>{formLoading ? 'Menyimpan...' : 'Simpan Proyek'}</span>
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Bulk Task Assignment */}
+      {isAssignModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div 
+            className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden animate-scale-up"
+            style={{ backgroundColor: 'var(--card-bg, var(--bg-card, #FFFFFF))', borderColor: 'var(--border-color)' }}
+          >
+            <div 
+              className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
+              style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}
+            >
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-xl bg-indigo-600 text-white">
+                  <ListPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                    Alokasikan Tugas ke Proyek
+                  </h3>
+                  <p className="text-xs text-indigo-500 font-medium">
+                    {assignProject?.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAssignModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignSubmit} className="p-6 space-y-4">
+              {availableTasks.length === 0 ? (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-10 h-10 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    Tidak ada tugas lain yang tersedia untuk dialokasikan.
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Semua tugas sudah masuk ke dalam proyek ini atau belum ada tugas yang dibuat.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between pb-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                      Pilih tugas yang ingin dipindahkan ke proyek ini:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedTaskIds.length === availableTasks.length) {
+                          setSelectedTaskIds([]);
+                        } else {
+                          setSelectedTaskIds(availableTasks.map(t => t.id));
+                        }
+                      }}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                    >
+                      {selectedTaskIds.length === availableTasks.length ? 'Batal Semua' : 'Pilih Semua'}
+                    </button>
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                    {availableTasks.map(task => {
+                      const isSelected = selectedTaskIds.includes(task.id);
+                      return (
+                        <div
+                          key={task.id}
+                          onClick={() => {
+                            setSelectedTaskIds(prev => 
+                              isSelected ? prev.filter(id => id !== task.id) : [...prev, task.id]
+                            );
+                          }}
+                          className={`flex items-center justify-between p-3 rounded-xl border text-sm cursor-pointer transition-all ${
+                            isSelected 
+                              ? 'border-indigo-500 bg-indigo-500/10' 
+                              : 'border-slate-200 dark:border-slate-800 hover:bg-black/5 dark:hover:bg-white/5'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            {isSelected ? (
+                              <CheckSquare className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                            )}
+                            <div>
+                              <p className="font-semibold text-sm line-clamp-1" style={{ color: 'var(--text-primary)' }}>
+                                {task.title}
+                              </p>
+                              {task.projectName && (
+                                <p className="text-[11px] text-slate-400">
+                                  Sebelumnya: {task.projectName}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAssignModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+                >
+                  Tutup
+                </button>
+                {availableTasks.length > 0 && (
+                  <button
+                    type="submit"
+                    disabled={assignLoading || selectedTaskIds.length === 0}
+                    className="flex items-center space-x-2 px-5 py-2 rounded-xl text-sm font-semibold text-white shadow-md transition-all disabled:opacity-50"
+                    style={{ backgroundColor: 'var(--accent-primary)', boxShadow: 'var(--accent-glow)' }}
+                  >
+                    <span>{assignLoading ? 'Menyimpan...' : `Alokasikan (${selectedTaskIds.length}) Tugas`}</span>
+                  </button>
+                )}
               </div>
             </form>
           </div>

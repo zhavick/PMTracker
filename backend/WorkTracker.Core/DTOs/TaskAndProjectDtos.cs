@@ -19,6 +19,13 @@ public class ProjectDto
     public int InProgressTasks { get; set; }
     public int ProgressPercent { get; set; }
     public long TotalSecondsLogged { get; set; }
+    public string? ClientName { get; set; }
+    public string? ProjectManagerId { get; set; }
+    public string? ProjectManagerName { get; set; }
+    public decimal Budget { get; set; }
+    public decimal ActualCost { get; set; }
+    public int BurnRatePercent { get; set; }
+    public string? Tags { get; set; }
 }
 
 public class CreateProjectDto
@@ -36,6 +43,17 @@ public class CreateProjectDto
     public DateTime? Deadline { get; set; }
     public ProjectStatus Status { get; set; } = ProjectStatus.Active;
     public int? CompanyId { get; set; }
+
+    [MaxLength(200)]
+    public string? ClientName { get; set; }
+
+    public string? ProjectManagerId { get; set; }
+
+    public decimal Budget { get; set; } = 0;
+    public decimal ActualCost { get; set; } = 0;
+
+    [MaxLength(500)]
+    public string? Tags { get; set; }
 }
 
 public class UpdateProjectDto
@@ -53,6 +71,23 @@ public class UpdateProjectDto
     public DateTime? Deadline { get; set; }
     public ProjectStatus Status { get; set; }
     public int? CompanyId { get; set; }
+
+    [MaxLength(200)]
+    public string? ClientName { get; set; }
+
+    public string? ProjectManagerId { get; set; }
+
+    public decimal Budget { get; set; } = 0;
+    public decimal ActualCost { get; set; } = 0;
+
+    [MaxLength(500)]
+    public string? Tags { get; set; }
+}
+
+public class BulkAssignTasksDto
+{
+    [Required]
+    public int[] TaskIds { get; set; } = Array.Empty<int>();
 }
 
 public class WorkTaskDto
