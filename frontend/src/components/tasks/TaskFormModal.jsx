@@ -28,6 +28,7 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [members, setMembers] = useState([]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -37,6 +38,7 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
     priority: 1, // 0: Low, 1: Medium, 2: High, 3: Critical
     progress: 0,
     projectId: defaultProjectId || '',
+    assignedToUserId: '',
     milestone: 'Implementation',
     obstacle: '',
     solution: '',
@@ -52,6 +54,7 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
   useEffect(() => {
     if (isOpen) {
       fetchProjects();
+      fetchMembers();
       if (taskToEdit) {
         setFormData({
           title: taskToEdit.title || '',
@@ -60,6 +63,7 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
           priority: taskToEdit.priority ?? 1,
           progress: taskToEdit.progress ?? 0,
           projectId: taskToEdit.projectId || '',
+          assignedToUserId: taskToEdit.assignedToUserId || '',
           milestone: taskToEdit.milestone || 'Implementation',
           obstacle: taskToEdit.obstacle || '',
           solution: taskToEdit.solution || '',
@@ -78,6 +82,7 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
           priority: 1,
           progress: 0,
           projectId: defaultProjectId || '',
+          assignedToUserId: '',
           milestone: 'Implementation',
           obstacle: '',
           solution: '',
@@ -102,6 +107,16 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
       }
     } catch (err) {
       console.error('Failed to load projects for dropdown:', err);
+    }
+  };
+
+  const fetchMembers = async () => {
+    try {
+      const res = await axiosClient.get('/api/members');
+      const raw = res?.data?.data ?? res?.data ?? res;
+      setMembers(Array.isArray(raw) ? raw : (raw?.items || []));
+    } catch (err) {
+      console.error('Failed to load members for dropdown:', err);
     }
   };
 
@@ -151,6 +166,7 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
         priority: parseInt(formData.priority, 10),
         progress: parseInt(formData.progress, 10),
         projectId: formData.projectId ? parseInt(formData.projectId, 10) : null,
+        assignedToUserId: formData.assignedToUserId ? formData.assignedToUserId : null,
         milestone: formData.milestone,
         obstacle: formData.obstacle.trim() || null,
         solution: formData.solution.trim() || null,
@@ -295,8 +311,8 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
                 />
               </div>
 
-              {/* Project & Milestone */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Project, PIC, & Milestone */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                     Proyek Terkait
@@ -315,6 +331,30 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
                     <option value="">-- Tanpa Proyek --</option>
                     {projects.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    Penanggung Jawab (PIC)
+                  </label>
+                  <select
+                    name="assignedToUserId"
+                    value={formData.assignedToUserId}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    style={{ 
+                      backgroundColor: 'var(--input-bg)', 
+                      borderColor: 'var(--border-color)', 
+                      color: 'var(--text-primary)' 
+                    }}
+                  >
+                    <option value="">-- Belum Ditugaskan --</option>
+                    {members.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.fullName || m.userName} {m.jobTitle ? `(${m.jobTitle})` : ''}
+                      </option>
                     ))}
                   </select>
                 </div>

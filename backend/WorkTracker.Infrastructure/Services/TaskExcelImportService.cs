@@ -124,10 +124,12 @@ public class TaskExcelImportService
             int lastRow = ws.LastRowUsed()?.RowNumber() ?? 0;
             if (lastRow < 2) continue;
 
+            var colMap = ParseHeaderColumns(ws);
+
             for (int r = 2; r <= lastRow; r++)
             {
                 var row = ws.Row(r);
-                var title = row.Cell(4).GetString()?.Trim();
+                var title = row.Cell(colMap["title"]).GetString()?.Trim();
 
                 if (string.IsNullOrWhiteSpace(title))
                 {
@@ -138,8 +140,8 @@ public class TaskExcelImportService
 
                 try
                 {
-                    // Nama project menggunakan Kolom 2. Jika belum ada di sistem, import nama project tersebut.
-                    var projectName = row.Cell(2).GetString()?.Trim();
+                    // Nama project menggunakan lookup kolom
+                    var projectName = row.Cell(colMap["project"]).GetString()?.Trim();
                     int? projectId = null;
 
                     if (!string.IsNullOrWhiteSpace(projectName))
@@ -164,7 +166,7 @@ public class TaskExcelImportService
                     }
 
                     // Extract Status
-                    var statusStr = row.Cell(5).GetString()?.Trim().ToUpperInvariant() ?? "";
+                    var statusStr = row.Cell(colMap["status"]).GetString()?.Trim().ToUpperInvariant() ?? "";
                     var status = statusStr switch
                     {
                         "DONE" or "SELESAI" or "COMPLETED" => WorkTaskStatus.Done,
@@ -175,7 +177,7 @@ public class TaskExcelImportService
                     };
 
                     // Extract Priority
-                    var priorityStr = row.Cell(6).GetString()?.Trim().ToUpperInvariant() ?? "";
+                    var priorityStr = row.Cell(colMap["priority"]).GetString()?.Trim().ToUpperInvariant() ?? "";
                     var priority = priorityStr switch
                     {
                         "CRITICAL" or "URGENT" => TaskPriority.Critical,
@@ -184,13 +186,13 @@ public class TaskExcelImportService
                         _ => TaskPriority.Medium
                     };
 
-                    // Milestone from jenis_task (Col 7)
-                    var jenisTask = row.Cell(7).GetString()?.Trim();
+                    // Milestone from jenis_task
+                    var jenisTask = row.Cell(colMap["jenis_task"]).GetString()?.Trim();
                     var milestone = !string.IsNullOrWhiteSpace(jenisTask) ? jenisTask : "Implementation";
 
-                    // Progress (Col 10)
+                    // Progress
                     int progress = 0;
-                    var cellProg = row.Cell(10);
+                    var cellProg = row.Cell(colMap["progress"]);
                     if (cellProg.TryGetValue<double>(out var pDbl))
                     {
                         progress = pDbl <= 1.0 ? (int)Math.Round(pDbl * 100) : (int)Math.Min(100, Math.Round(pDbl));
@@ -205,20 +207,63 @@ public class TaskExcelImportService
                         progress = 100;
                     }
 
-                    // Dates (Col 11, 12, 13)
+                    // Dates
                     DateTime? startDate = null;
-                    if (row.Cell(11).TryGetValue<DateTime>(out var sDate)) startDate = sDate;
+                    if (row.Cell(colMap["start_date"]).TryGetValue<DateTime>(out var sDate)) startDate = sDate;
 
                     DateTime? dueDate = null;
-                    if (row.Cell(12).TryGetValue<DateTime>(out var dDate)) dueDate = dDate;
+                    if (row.Cell(colMap["due_date"]).TryGetValue<DateTime>(out var dDate)) dueDate = dDate;
 
                     DateTime? completedDate = null;
-                    if (row.Cell(13).TryGetValue<DateTime>(out var cDate)) completedDate = cDate;
+                    if (row.Cell(colMap["completed_date"]).TryGetValue<DateTime>(out var cDate)) completedDate = cDate;
+
+                    // Extract Kendala (Obstacle) & Solusi (Solution)
+                    var rawObstacle = row.Cell(colMap["kendala"]).GetString()?.Trim();
+                    var rawSolution = row.Cell(colMap["solusi"]).GetString()?.Trim();
+
+                    string? obstacle = null;
+                    if (!string.IsNullOrWhiteSpace(rawObstacle) && 
+                        !rawObstacle.Equals("none", StringComparison.OrdinalIgnoreCase) && 
+                        !rawObstacle.Equals("-", StringComparison.OrdinalIgnoreCase))
+                    {
+                        obstacle = rawObstacle;
+                    }
+
+                    string? solution = null;
+                    if (!string.IsNullOrWhiteSpace(rawSolution) && 
+                        !rawSolution.Equals("none", StringComparison.OrdinalIgnoreCase) && 
+                        !rawSolution.Equals("-", StringComparison.OrdinalIgnoreCase))
+                    {
+                        solution = rawSolution;
+                    }
+
+                    // Resolve PIC for this task
+                    ApplicationUser taskUser = picUser;
+                    if (colMap.TryGetValue("pic", out var picCol) && picCol > 0)
+                    {
+                        var rowPicVal = row.Cell(picCol).GetString()?.Trim();
+                        if (!string.IsNullOrWhiteSpace(rowPicVal) && rowPicVal.Contains('@'))
+                        {
+                            var cleanEmail = rowPicVal.Split(new[] { ',', ';', ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim().Trim('"', '\'', '<', '>');
+                            if (cleanEmail.Contains('@') && cleanEmail.Contains('.'))
+                            {
+                                if (userCache.TryGetValue(cleanEmail, out var cachedUser))
+                                {
+                                    taskUser = cachedUser;
+                                }
+                                else
+                                {
+                                    var rowFullName = DeriveFullName("", cleanEmail);
+                                    taskUser = await EnsureUserAsync(cleanEmail, rowFullName, "Software Engineer", "User", companyId, userCache, result);
+                                }
+                            }
+                        }
+                    }
 
                     // Metadata for Description
-                    var reqCode = row.Cell(3).GetString()?.Trim();
-                    var moduleName = row.Cell(8).GetString()?.Trim();
-                    var bugType = row.Cell(9).GetString()?.Trim();
+                    var reqCode = row.Cell(colMap["req_code"]).GetString()?.Trim();
+                    var moduleName = row.Cell(colMap["module"]).GetString()?.Trim();
+                    var bugType = row.Cell(colMap["bug_type"]).GetString()?.Trim();
 
                     var descParts = new List<string>();
                     if (!string.IsNullOrEmpty(moduleName)) descParts.Add($"Modul: {moduleName}");
@@ -228,12 +273,21 @@ public class TaskExcelImportService
                     
                     var description = descParts.Count > 0 ? string.Join(" | ", descParts) : null;
 
-                    // Check if task already exists (update if exists, add if new)
+                    // Check if task already exists for this user and project (or unassigned)
                     var existingTask = await _context.Tasks.FirstOrDefaultAsync(t =>
                         t.Title == title &&
                         t.ProjectId == projectId &&
-                        t.CompanyId == companyId &&
-                        t.AssignedToUserId == picUser.Id);
+                        t.AssignedToUserId == taskUser.Id &&
+                        (t.CompanyId == companyId || t.CompanyId == null));
+
+                    if (existingTask == null)
+                    {
+                        existingTask = await _context.Tasks.FirstOrDefaultAsync(t =>
+                            t.Title == title &&
+                            t.ProjectId == projectId &&
+                            t.AssignedToUserId == null &&
+                            (t.CompanyId == companyId || t.CompanyId == null));
+                    }
 
                     if (existingTask != null)
                     {
@@ -243,6 +297,9 @@ public class TaskExcelImportService
                         existingTask.Milestone = milestone;
                         existingTask.StartDate = startDate;
                         existingTask.DueDate = dueDate;
+                        if (!string.IsNullOrWhiteSpace(obstacle)) existingTask.Obstacle = obstacle;
+                        if (!string.IsNullOrWhiteSpace(solution)) existingTask.Solution = solution;
+                        existingTask.AssignedToUserId = taskUser.Id;
                         if (!string.IsNullOrEmpty(description)) existingTask.Description = description;
                         existingTask.UpdatedAt = DateTime.UtcNow;
                     }
@@ -256,9 +313,11 @@ public class TaskExcelImportService
                             Priority = priority,
                             Progress = progress,
                             Milestone = milestone,
+                            Obstacle = obstacle,
+                            Solution = solution,
                             ProjectId = projectId,
                             CompanyId = companyId,
-                            AssignedToUserId = picUser.Id,
+                            AssignedToUserId = taskUser.Id,
                             StartDate = startDate,
                             DueDate = dueDate,
                             CreatedAt = DateTime.UtcNow,
@@ -308,8 +367,60 @@ public class TaskExcelImportService
         return result;
     }
 
+    private static Dictionary<string, int> ParseHeaderColumns(IXLWorksheet ws)
+    {
+        var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var headerRow = ws.Row(1);
+        int lastCol = ws.LastColumnUsed()?.ColumnNumber() ?? 25;
+
+        for (int c = 1; c <= lastCol; c++)
+        {
+            var header = headerRow.Cell(c).GetString()?.Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(header)) continue;
+
+            if (header.Contains("project") || header.Contains("proyek")) map["project"] = c;
+            else if (header.Contains("req")) map["req_code"] = c;
+            else if (header.Contains("title") || header.Contains("judul") || header.Contains("tugas")) map["title"] = c;
+            else if (header.Contains("status")) map["status"] = c;
+            else if (header.Contains("priorit")) map["priority"] = c;
+            else if (header.Contains("jenis") || header.Contains("milestone") || header.Contains("activity")) map["jenis_task"] = c;
+            else if (header.Contains("module") || header.Contains("modul")) map["module"] = c;
+            else if (header.Contains("bug")) map["bug_type"] = c;
+            else if (header.Contains("progress") || header.Contains("kemajuan")) map["progress"] = c;
+            else if (header.Contains("start") || header.Contains("mulai")) map["start_date"] = c;
+            else if (header.Contains("due") || header.Contains("tenggat") || header.Contains("deadline")) map["due_date"] = c;
+            else if (header.Contains("complet") || header.Contains("selesai")) map["completed_date"] = c;
+            else if (header.Contains("kendala") || header.Contains("obstacle") || header.Contains("hambatan") || header.Contains("masalah")) map["kendala"] = c;
+            else if (header.Contains("solusi") || header.Contains("solution") || header.Contains("tindak")) map["solusi"] = c;
+            else if (header.Contains("evidence") || header.Contains("bukti")) map["evidence"] = c;
+            else if (header.Equals("pic") || header.Equals("pic_email") || header.Contains("penanggung") || header.Equals("assignee") || header.Equals("assigned_to") || header.Equals("pic_emails")) map["pic"] = c;
+        }
+
+        if (!map.ContainsKey("project")) map["project"] = 2;
+        if (!map.ContainsKey("req_code")) map["req_code"] = 3;
+        if (!map.ContainsKey("title")) map["title"] = 4;
+        if (!map.ContainsKey("status")) map["status"] = 5;
+        if (!map.ContainsKey("priority")) map["priority"] = 6;
+        if (!map.ContainsKey("jenis_task")) map["jenis_task"] = 7;
+        if (!map.ContainsKey("module")) map["module"] = 8;
+        if (!map.ContainsKey("bug_type")) map["bug_type"] = 9;
+        if (!map.ContainsKey("progress")) map["progress"] = 10;
+        if (!map.ContainsKey("start_date")) map["start_date"] = 11;
+        if (!map.ContainsKey("due_date")) map["due_date"] = 12;
+        if (!map.ContainsKey("completed_date")) map["completed_date"] = 13;
+        if (!map.ContainsKey("kendala")) map["kendala"] = 22;
+        if (!map.ContainsKey("solusi")) map["solusi"] = 23;
+
+        return map;
+    }
+
     private static string FindEmailForSheet(IXLWorksheet ws, string sheetName)
     {
+        if (MemberProfiles.TryGetValue(sheetName, out var profile))
+        {
+            return profile.Email;
+        }
+
         var candidateEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int lastRow = ws.LastRowUsed()?.RowNumber() ?? 0;
         int checkRows = Math.Min(lastRow, 100);
@@ -342,11 +453,6 @@ public class TaskExcelImportService
             return matched;
         }
 
-        if (MemberProfiles.TryGetValue(sheetName, out var profile))
-        {
-            return profile.Email;
-        }
-
         if (candidateEmails.Count > 0)
         {
             return candidateEmails.First();
@@ -357,7 +463,7 @@ public class TaskExcelImportService
 
     private static string DeriveFullName(string sheetName, string email)
     {
-        if (MemberProfiles.TryGetValue(sheetName, out var profile) && !string.IsNullOrWhiteSpace(profile.FullName))
+        if (!string.IsNullOrWhiteSpace(sheetName) && MemberProfiles.TryGetValue(sheetName, out var profile) && !string.IsNullOrWhiteSpace(profile.FullName))
         {
             return profile.FullName;
         }
@@ -371,7 +477,7 @@ public class TaskExcelImportService
             if (!string.IsNullOrWhiteSpace(name)) return name;
         }
 
-        return sheetName;
+        return !string.IsNullOrWhiteSpace(sheetName) ? sheetName : "Team Member";
     }
 
     private async Task<ApplicationUser> EnsureUserAsync(
@@ -385,6 +491,26 @@ public class TaskExcelImportService
     {
         if (userCache.TryGetValue(email, out var existingUser))
         {
+            bool needsUpdate = false;
+            if (string.IsNullOrWhiteSpace(existingUser.FullName) || existingUser.FullName.Equals(existingUser.UserName, StringComparison.OrdinalIgnoreCase))
+            {
+                existingUser.FullName = fullName;
+                needsUpdate = true;
+            }
+            if (string.IsNullOrWhiteSpace(existingUser.JobTitle) && !string.IsNullOrWhiteSpace(jobTitle))
+            {
+                existingUser.JobTitle = jobTitle;
+                needsUpdate = true;
+            }
+            if (existingUser.CompanyId == null)
+            {
+                existingUser.CompanyId = companyId;
+                needsUpdate = true;
+            }
+            if (needsUpdate)
+            {
+                await _userManager.UpdateAsync(existingUser);
+            }
             await ResetPasswordToDefaultAsync(existingUser);
             return existingUser;
         }
@@ -417,18 +543,27 @@ public class TaskExcelImportService
                 result.UsersCreated++;
                 result.CreatedUserEmails.Add(email);
             }
+            else
+            {
+                var errors = string.Join(", ", createRes.Errors.Select(e => e.Description));
+                result.Errors.Add($"Gagal membuat user {email}: {errors}");
+            }
         }
         else
         {
             user.IsApproved = true;
             user.ApprovedAt ??= DateTime.UtcNow;
-            if (string.IsNullOrWhiteSpace(user.FullName) || user.FullName == user.UserName)
+            if (string.IsNullOrWhiteSpace(user.FullName) || user.FullName.Equals(user.UserName, StringComparison.OrdinalIgnoreCase))
             {
                 user.FullName = fullName;
             }
             if (string.IsNullOrWhiteSpace(user.JobTitle))
             {
                 user.JobTitle = jobTitle;
+            }
+            if (user.CompanyId == null)
+            {
+                user.CompanyId = companyId;
             }
             await _userManager.UpdateAsync(user);
             await ResetPasswordToDefaultAsync(user);

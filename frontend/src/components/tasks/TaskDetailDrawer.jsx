@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Calendar, 
@@ -14,8 +14,10 @@ import {
   Layers, 
   ShieldAlert, 
   Lightbulb,
-  ExternalLink
+  ExternalLink,
+  Mail
 } from 'lucide-react';
+import axiosClient from '../../api/axiosClient';
 import { useTimer } from '../../context/TimerContext';
 
 const STATUS_MAP = {
@@ -48,16 +50,39 @@ function formatDuration(seconds) {
 
 export default function TaskDetailDrawer({ task, isOpen, onClose, onEdit }) {
   const { startTimer, activeTimers } = useTimer();
+  const [currentTask, setCurrentTask] = useState(task);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEffect(() => {
+    if (task) {
+      setCurrentTask(task);
+    }
+    if (isOpen && task?.id) {
+      setLoadingDetail(true);
+      axiosClient.get(`/api/tasks/${task.id}`)
+        .then(res => {
+          const fresh = res?.data?.data || res?.data;
+          if (fresh) setCurrentTask(fresh);
+        })
+        .catch(err => {
+          console.error('Failed to load fresh task details:', err);
+        })
+        .finally(() => {
+          setLoadingDetail(false);
+        });
+    }
+  }, [isOpen, task?.id]);
 
   if (!isOpen || !task) return null;
 
-  const isTimerRunning = activeTimers?.some(t => t.taskId === task.id);
-  const statusInfo = STATUS_MAP[task.status] || STATUS_MAP[0];
-  const priorityInfo = PRIORITY_MAP[task.priority] || PRIORITY_MAP[1];
-  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 2;
+  const activeTask = currentTask || task;
+  const isTimerRunning = activeTimers?.some(t => t.taskId === activeTask.id);
+  const statusInfo = STATUS_MAP[activeTask.status] || STATUS_MAP[0];
+  const priorityInfo = PRIORITY_MAP[activeTask.priority] || PRIORITY_MAP[1];
+  const isOverdue = activeTask.dueDate && new Date(activeTask.dueDate) < new Date() && activeTask.status !== 2;
 
   const handleStartTimer = () => {
-    startTimer(task.id, task.title, task.projectName);
+    startTimer(activeTask.id, activeTask.title, activeTask.projectName);
     onClose();
   };
 
@@ -88,11 +113,11 @@ export default function TaskDetailDrawer({ task, isOpen, onClose, onEdit }) {
                 <span 
                   className="px-2.5 py-1 rounded-full text-xs font-bold"
                   style={{ 
-                    backgroundColor: `${task.projectColor || '#3B82F6'}20`, 
-                    color: task.projectColor || '#3B82F6' 
+                    backgroundColor: `${activeTask.projectColor || '#3B82F6'}20`, 
+                    color: activeTask.projectColor || '#3B82F6' 
                   }}
                 >
-                  {task.projectName || 'Tanpa Proyek'}
+                  {activeTask.projectName || 'Tanpa Proyek'}
                 </span>
 
                 <span 
@@ -111,7 +136,7 @@ export default function TaskDetailDrawer({ task, isOpen, onClose, onEdit }) {
               </div>
 
               <h2 className="text-xl font-black leading-snug tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                {task.title}
+                {activeTask.title}
               </h2>
             </div>
 
@@ -134,16 +159,16 @@ export default function TaskDetailDrawer({ task, isOpen, onClose, onEdit }) {
             >
               <div className="flex items-center justify-between font-bold text-xs">
                 <span style={{ color: 'var(--text-secondary)' }}>Progres Penyelesaian</span>
-                <span style={{ color: task.progress === 100 ? '#10B981' : 'var(--accent-primary)' }}>
-                  {task.progress || 0}%
+                <span style={{ color: activeTask.progress === 100 ? '#10B981' : 'var(--accent-primary)' }}>
+                  {activeTask.progress || 0}%
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 h-2.5 rounded-full overflow-hidden">
                 <div 
                   className="h-full rounded-full transition-all duration-500"
                   style={{ 
-                    width: `${task.progress || 0}%`,
-                    backgroundColor: task.progress === 100 ? '#10B981' : 'var(--accent-primary)'
+                    width: `${activeTask.progress || 0}%`,
+                    backgroundColor: activeTask.progress === 100 ? '#10B981' : 'var(--accent-primary)'
                   }}
                 />
               </div>
@@ -161,18 +186,24 @@ export default function TaskDetailDrawer({ task, isOpen, onClose, onEdit }) {
                 </span>
                 <div className="flex items-center gap-2.5">
                   <div 
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-sm"
-                    style={{ backgroundColor: task.projectColor || '#3B82F6' }}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-sm shrink-0"
+                    style={{ backgroundColor: activeTask.projectColor || 'var(--accent-primary, #3B82F6)' }}
                   >
-                    {(task.assignedToName || 'U').charAt(0)}
+                    {(activeTask.assignedToName || activeTask.assignedToEmail || 'U').charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <div className="font-bold text-xs" style={{ color: 'var(--text-primary)' }}>
-                      {task.assignedToName || 'Belum Ditugaskan'}
+                  <div className="min-w-0">
+                    <div className="font-bold text-xs leading-snug truncate" style={{ color: 'var(--text-primary)' }} title={activeTask.assignedToName}>
+                      {activeTask.assignedToName || activeTask.assignedToEmail || 'Belum Ditugaskan'}
                     </div>
-                    <div className="text-[11px] opacity-70" style={{ color: 'var(--text-secondary)' }}>
-                      {task.milestone || 'Pelaksana Tugas'}
+                    <div className="text-[11px] opacity-75 truncate" style={{ color: 'var(--text-secondary)' }}>
+                      {activeTask.assignedToJobTitle || (activeTask.assignedToName ? 'Anggota Tim' : 'Belum Ada PIC')}
                     </div>
+                    {activeTask.assignedToEmail && activeTask.assignedToEmail !== activeTask.assignedToName && (
+                      <div className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1 truncate mt-0.5">
+                        <Mail size={11} className="shrink-0" />
+                        <span className="truncate">{activeTask.assignedToEmail}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -187,7 +218,7 @@ export default function TaskDetailDrawer({ task, isOpen, onClose, onEdit }) {
                 </span>
                 <div className="flex items-center gap-2 font-bold text-xs" style={{ color: 'var(--text-primary)' }}>
                   <Layers size={16} style={{ color: 'var(--accent-primary)' }} />
-                  <span>{task.milestone || 'Implementation'}</span>
+                  <span>{activeTask.milestone || 'Implementation'}</span>
                 </div>
                 <div className="text-[11px] opacity-70" style={{ color: 'var(--text-secondary)' }}>
                   Waterfall Phase
@@ -204,7 +235,7 @@ export default function TaskDetailDrawer({ task, isOpen, onClose, onEdit }) {
                 </span>
                 <div className="flex items-center gap-2 font-bold text-xs" style={{ color: 'var(--text-primary)' }}>
                   <Calendar size={16} style={{ color: '#3B82F6' }} />
-                  <span>{formatDate(task.startDate)}</span>
+                  <span>{formatDate(activeTask.startDate)}</span>
                 </div>
               </div>
 
@@ -225,7 +256,7 @@ export default function TaskDetailDrawer({ task, isOpen, onClose, onEdit }) {
                 </div>
                 <div className="flex items-center gap-2 font-bold text-xs" style={{ color: isOverdue ? '#EF4444' : 'var(--text-primary)' }}>
                   <Clock size={16} style={{ color: isOverdue ? '#EF4444' : '#F59E0B' }} />
-                  <span>{formatDate(task.dueDate)}</span>
+                  <span>{formatDate(activeTask.dueDate)}</span>
                 </div>
               </div>
             </div>
@@ -239,42 +270,65 @@ export default function TaskDetailDrawer({ task, isOpen, onClose, onEdit }) {
                 className="p-4 rounded-2xl border leading-relaxed text-xs sm:text-sm whitespace-pre-wrap"
                 style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
               >
-                {task.description ? task.description : 'Tidak ada keterangan tambahan pada tugas ini.'}
+                {activeTask.description ? activeTask.description : 'Tidak ada keterangan tambahan pada tugas ini.'}
               </div>
             </div>
 
-            {/* Obstacles & Solutions */}
-            {(task.obstacle || task.solution) && (
-              <div className="space-y-3">
+            {/* Obstacles & Solutions - Always Visible Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
                 <h3 className="font-bold text-xs uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                  Catatan Kendala & Solusi
+                  Catatan Kendala & Solusi Teknis
                 </h3>
-                
-                {task.obstacle && (
-                  <div className="p-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400">
-                      <ShieldAlert size={15} />
-                      <span>Kendala yang Dihadapi:</span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-rose-900 dark:text-rose-200">
-                      {task.obstacle}
-                    </p>
-                  </div>
-                )}
-
-                {task.solution && (
-                  <div className="p-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      <Lightbulb size={15} />
-                      <span>Solusi / Tindak Lanjut:</span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-emerald-900 dark:text-emerald-200">
-                      {task.solution}
-                    </p>
-                  </div>
+                {(activeTask.obstacle || activeTask.solution) ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    Terdapat Catatan
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    Lancar
+                  </span>
                 )}
               </div>
-            )}
+              
+              {activeTask.obstacle ? (
+                <div className="p-4 rounded-2xl border border-rose-500/30 bg-rose-500/5 space-y-1.5 shadow-xs">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400">
+                    <ShieldAlert size={15} />
+                    <span>Kendala yang Dihadapi:</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-rose-950 dark:text-rose-100 whitespace-pre-wrap leading-relaxed">
+                    {activeTask.obstacle}
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <CheckCircle2 size={15} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      Tidak Ada Kendala Dilaporkan
+                    </div>
+                    <div className="text-[11px] opacity-70" style={{ color: 'var(--text-secondary)' }}>
+                      Pengerjaan tugas berjalan lancar tanpa hambatan teknis.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTask.solution && (
+                <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-1.5 shadow-xs">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    <Lightbulb size={15} />
+                    <span>Solusi / Tindak Lanjut:</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-emerald-950 dark:text-emerald-100 whitespace-pre-wrap leading-relaxed">
+                    {activeTask.solution}
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* Work Time Summary */}
             <div 
@@ -295,7 +349,7 @@ export default function TaskDetailDrawer({ task, isOpen, onClose, onEdit }) {
                 </div>
               </div>
               <div className="text-sm font-black" style={{ color: 'var(--accent-primary)' }}>
-                {formatDuration(task.totalSecondsSpent)}
+                {formatDuration(activeTask.totalSecondsSpent)}
               </div>
             </div>
 
@@ -323,7 +377,7 @@ export default function TaskDetailDrawer({ task, isOpen, onClose, onEdit }) {
               <button
                 onClick={() => {
                   onClose();
-                  onEdit(task);
+                  onEdit(activeTask);
                 }}
                 className="px-4 py-2.5 rounded-xl font-bold text-xs text-white shadow-md transition-all hover:opacity-95 active:scale-95 flex items-center gap-1.5"
                 style={{ backgroundColor: 'var(--accent-primary)' }}

@@ -41,7 +41,8 @@ export default function TaskKanbanBoard({
   onEditTask, 
   onUnifiedSave, 
   onTaskUpdated,
-  onAddNewTask 
+  onAddNewTask,
+  onViewTaskDetail
 }) {
   const [showCompleted, setShowCompleted] = useState(false); // Secara default tidak muncul
   const [mobileActiveColumn, setMobileActiveColumn] = useState(0);
@@ -339,14 +340,36 @@ export default function TaskKanbanBoard({
                           </div>
                         </div>
 
-                        {/* Footer Info & Move Buttons */}
+                        {/* Footer Info, PIC & Action Buttons */}
                         <div className="flex items-center justify-between pt-2 border-t text-xs" style={{ borderColor: 'var(--border-color)' }}>
-                          <span className="flex items-center space-x-1 text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                            <Clock className="w-3 h-3" />
-                            <span>{formatSeconds(task.totalSecondsSpent)}</span>
-                          </span>
+                          <div className="flex items-center gap-1.5 min-w-0 max-w-[130px]" title={task.assignedToName || 'Belum Ditugaskan'}>
+                            <div 
+                              className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0 shadow-xs"
+                              style={{ backgroundColor: task.projectColor || 'var(--accent-primary, #3B82F6)' }}
+                            >
+                              {(task.assignedToName || task.assignedToEmail || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                              {task.assignedToName || 'Unassigned'}
+                            </span>
+                          </div>
 
                           <div className="flex items-center space-x-1">
+                            <span className="flex items-center space-x-0.5 text-[10px] font-semibold mr-1" style={{ color: 'var(--text-secondary)' }}>
+                              <Clock className="w-3 h-3" />
+                              <span>{formatSeconds(task.totalSecondsSpent)}</span>
+                            </span>
+
+                            {/* View Detail Drawer */}
+                            <button
+                              type="button"
+                              onClick={() => onViewTaskDetail ? onViewTaskDetail(task) : onEditTask(task)}
+                              className="p-1 rounded hover:bg-blue-500/10 text-blue-600 transition-colors"
+                              title="Lihat Detail Tugas"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+
                             {/* Unified Save */}
                             <button
                               type="button"

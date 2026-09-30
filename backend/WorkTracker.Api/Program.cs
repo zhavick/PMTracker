@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 1. Database Configuration (Pomelo MySQL)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "Server=localhost;Port=3306;Database=worktracker_db;User=tracker_user;Password=TrackerPassword2026!;CharSet=utf8mb4;";
+    ?? "Server=127.0.0.1;Port=3306;Database=worktracker_db;User=tracker_user;Password=TrackerPassword2026!;CharSet=utf8mb4;";
 
 ServerVersion serverVersion;
 try
@@ -199,6 +199,20 @@ using (var scope = app.Services.CreateScope())
 
         // Seed initial data
         await DatabaseSeeder.SeedAsync(dbContext, userManager, roleManager);
+
+        // Optional CLI Excel Import Tooling
+        if (args.Contains("--import-excel"))
+        {
+            var excelArg = args.SkipWhile(a => a != "--import-excel").Skip(1).FirstOrDefault();
+            var excelPath = !string.IsNullOrWhiteSpace(excelArg) && !excelArg.StartsWith("--")
+                ? excelArg 
+                : @"C:\Users\WAHANA 24\Downloads\Task Tracker v2.xlsx";
+
+            var importService = services.GetRequiredService<TaskExcelImportService>();
+            var res = await importService.ImportTasksFromFilePathAsync(excelPath, null);
+            Console.WriteLine($"[EXCEL_IMPORT_RESULT] TotalRows={res.TotalRows}, Success={res.SuccessRows}, Failed={res.FailedRows}, ProjectsCreated={res.ProjectsCreated}, UsersCreated={res.UsersCreated}");
+            return;
+        }
     }
     catch (Exception ex)
     {

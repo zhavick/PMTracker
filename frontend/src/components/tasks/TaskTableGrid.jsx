@@ -438,7 +438,7 @@ export default function TaskTableGrid({
                     >
                       {task.title}
                     </h4>
-                    <div className="flex items-center space-x-2 mt-1">
+                    <div className="flex items-center space-x-2 mt-1 flex-wrap gap-y-1">
                       {task.projectName && (
                         <span 
                           className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
@@ -450,6 +450,17 @@ export default function TaskTableGrid({
                       <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
                         {task.milestone}
                       </span>
+                      {task.assignedToName && (
+                        <span className="text-[11px] font-semibold inline-flex items-center gap-1" style={{ color: 'var(--text-primary)' }}>
+                          <span 
+                            className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] font-bold shrink-0"
+                            style={{ backgroundColor: task.projectColor || '#3B82F6' }}
+                          >
+                            {task.assignedToName.charAt(0)}
+                          </span>
+                          <span className="truncate max-w-[100px]">{task.assignedToName}</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -488,7 +499,7 @@ export default function TaskTableGrid({
                   <option value={2}>✅ Completed</option>
                 </select>
 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
                   <span className="flex items-center space-x-1 font-semibold" style={{ color: 'var(--text-secondary)' }}>
                     <Clock className="w-3.5 h-3.5" />
                     <span>{formatSeconds(task.totalSecondsSpent)}</span>
@@ -499,10 +510,20 @@ export default function TaskTableGrid({
                       type="button"
                       onClick={() => setActiveObstacleTask(task)}
                       className="p-1 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      title="Lihat Kendala"
                     >
                       <AlertTriangle className="w-3.5 h-3.5" />
                     </button>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => onViewTaskDetail ? onViewTaskDetail(task) : onEditTask(task)}
+                    className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-500/10"
+                    title="Lihat Detail Tugas"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
 
                   <button
                     type="button"
@@ -517,6 +538,7 @@ export default function TaskTableGrid({
                     type="button"
                     onClick={() => onEditTask(task)}
                     className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600"
+                    title="Edit Tugas"
                   >
                     <Edit3 className="w-4 h-4" />
                   </button>

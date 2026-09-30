@@ -106,6 +106,8 @@ public class WorkTaskDto
     public int? CompanyId { get; set; }
     public string? AssignedToUserId { get; set; }
     public string? AssignedToName { get; set; }
+    public string? AssignedToEmail { get; set; }
+    public string? AssignedToJobTitle { get; set; }
     public int? ParentTaskId { get; set; }
     public string? ParentTaskTitle { get; set; }
     public int SubtaskCount { get; set; }

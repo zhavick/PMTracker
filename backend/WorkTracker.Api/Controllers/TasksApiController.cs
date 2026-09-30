@@ -358,6 +358,8 @@ public class TasksApiController : ControllerBase
             CompanyId = t.CompanyId,
             AssignedToUserId = t.AssignedToUserId,
             AssignedToName = t.AssignedToUser?.FullName ?? t.AssignedToUser?.UserName,
+            AssignedToEmail = t.AssignedToUser?.Email,
+            AssignedToJobTitle = t.AssignedToUser?.JobTitle,
             ParentTaskId = t.ParentTaskId,
             ParentTaskTitle = t.ParentTask?.Title,
             SubtaskCount = t.ChildTasks?.Count ?? 0,

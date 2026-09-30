@@ -572,6 +572,7 @@ export default function TasksPage() {
           loading={loading}
           onEditTask={handleEditTask}
           onUnifiedSave={handleUnifiedSave}
+          onViewTaskDetail={handleViewTaskDetail}
           onTaskUpdated={() => fetchTasks(true)}
           onAddNewTask={handleAddNew}
         />
