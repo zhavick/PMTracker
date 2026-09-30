@@ -618,35 +618,45 @@ Modul Ticketing (`/Ticketing`) memungkinkan Anda melaporkan kendala sistem, perm
 
 ---
 
-## 15. Modul Gamifikasi, Badge Prestasi & Reward Poin
+## 15. Modul Gamifikasi, Daily Check-In, Aturan Streak & Katalog Hadiah (v3.7)
 
-Modul Gamifikasi (`/Gamification`) menghadirkan sistem pencapaian dan penghargaan yang memotivasi anggota tim untuk terus produktif.
+Modul Gamifikasi (`/gamification`) menghadirkan sistem kedisiplinan dan penghargaan komprehensif yang memotivasi anggota tim untuk konsisten bekerja produktif melalui presensi harian, streak reward, lencana prestasi (*badges*), dan katalog penukaran hadiah nyata.
 
-### 15.1 Melihat Badge & Pencapaian Pribadi
-- Buka menu **Gamifikasi** atau halaman **Profil Akun** untuk melihat badge yang Anda miliki.
-- **Badge Otomatis**: Badge diberikan secara otomatis saat Anda mencapai milestone produktivitas:
-  - Contoh: *"Task Crusher"* — Menyelesaikan 10 tugas, *"Time Master"* — Mencatat 100 jam kerja
-  - Contoh: *"Note Keeper"* — Membuat 20 catatan kerja
-- **Tingkat Kelangkaan Badge**: Common 🟢, Rare 🔵, Epic 🟣, Legendary 🟡
-- **Badge Pilihan (Featured)**: Pilih badge favorit untuk ditampilkan menonjol di profil Anda dengan klik ikon ⭐ pada badge.
-- **Poin**: Setiap badge memberikan poin yang diakumulasi di profil Anda.
-- **Leaderboard**: Lihat peringkat poin produktivitas Anda dibandingkan rekan tim.
+### 15.1 Daily Check-In Harian & Aturan Streak (Toleransi 2 Hari)
+- **1x Check-In per Hari**: Setiap hari kerja, pengguna dapat melakukan check-in melalui tombol pada **Dashboard** (Kartu Metrik ke-5 & Banner Cerdas) atau tab **Roadmap** di halaman Gamifikasi.
+- **Poin Check-In**: Setiap check-in sukses memberikan **+10 Poin** langsung ke saldo akumulasi Anda.
+- **Hitungan Streak Berurutan**: Jika Anda check-in setiap hari, nilai `StreakDay` bertambah `+1` setiap hari.
+- **Aturan Toleransi & Reset**: Jika Anda melewatkan check-in selama 2 hari berturut-turut (`gap >= 2 hari`), hitungan streak otomatis kembali ke Hari 1. Jika selisihnya 1 hari (kemarin check-in, hari ini check-in), streak tetap berlanjut aman.
+- **Monthly Milestone Bonus (Streak 30 Hari)**:
+  - Menyelesaikan streak 30 hari penuh membuka status pencapaian bulanan (`IsMonthlyMilestone = true`).
+  - Memberikan bonus besar **+500 Poin Tambahan** secara instan.
+  - Membuka hak akses untuk mengklaim hadiah eksklusif bertanda *Milestone Spesial*.
 
-### 15.2 Mengajukan Klaim Reward Poin
-Poin yang Anda kumpulkan dapat ditukarkan dengan reward nyata:
-1. Buka menu **Gamifikasi** dan pilih tab **Klaim Reward**.
-2. Masukkan **Jumlah Poin** yang ingin diklaim.
-   - Nilai konversi: **1 Poin = Rp 100**
-3. Pilih **Jenis Reward**:
-   - 💰 **Cash Transfer**: Transfer langsung ke rekening bank atau e-wallet.
-   - 🍜 **Traktiran**: Ditraktir makan/minum oleh perusahaan.
-4. Isi **Informasi Rekening/Kontak** dan **Catatan Request**.
-5. Klik **Ajukan Klaim Reward**. Klaim akan masuk dengan status **Pending** menunggu verifikasi Administrator.
-6. Setelah Administrator menyetujui dan memproses, status berubah ke **Approved** dan reward akan direalisasikan.
+### 15.2 Koleksi 42+ Master Badge Gaul & Modern
+- Sistem memantau seluruh aktivitas kerja Anda secara otomatis dan menganugerahi lencana berpenamaan modern khas anak muda:
+  - **Kategori Tugas**: *Langkah Pertama* (1 task), *Pekerja Keras* (10 task), *Si Paling Eksekutor*, *Dewa Produktif* (250 task).
+  - **Kategori Timesheet**: *Dedikasi Penuh* (40 jam), *Zen Master* (1000 jam), *Jawara Timesheet*.
+  - **Kategori Presensi**: *Langkah Awal*, *Dewa Disiplin Abadi* (100 hari streak presensi).
+  - **Kategori Manajemen**: *Arsitek Solusi* (PM 3 proyek), *Pilar Perusahaan* (PM 5 proyek).
+  - **Kategori Spesial**: *Dewa Kecepatan*, *Sultan Gamifikasi*, *Kolektor Milestone*.
+- **Tingkat Kelangkaan (*Rarity*)**: Common 🟢, Rare 🔵, Epic 🟣, Legendary 🟡.
 
-### 15.3 Leaderboard Tim
-- Halaman **Leaderboard** menampilkan peringkat seluruh anggota tim berdasarkan total poin yang dikumpulkan.
-- Motivasi untuk terus aktif menyelesaikan tugas, mencatat jam kerja, dan berkontribusi pada proyek tim.
+### 15.3 Katalog Hadiah & Penukaran Poin ke Rupiah
+Poin yang Anda kumpulkan dapat langsung ditukarkan dengan hadiah nyata pada tab **Katalog Hadiah**:
+- **Nilai Tukar Poin**: Secara default **1 Poin = Rp 100** (Contoh: 250 Poin = Rp 25.000, 500 Poin = Rp 50.000).
+- **Pilihan Hadiah Riil**:
+  - ☕ **Voucher Kopi**: Janji Jiwa, Kopi Kenangan, Point Coffee (250 Poin).
+  - 💳 **Saldo E-Wallet**: GoPay, OVO, ShopeePay, DANA (500 Poin s/d 1.000 Poin).
+  - 📱 **Pulsa & Paket Data**: Seluruh operator seluler Indonesia (250 Poin).
+- **Alur Penukaran**:
+  1. Pilih item hadiah yang Anda inginkan pada katalog, lalu klik tombol **Tukar Poin**.
+  2. Masukkan nomor kontak / akun e-wallet penerima dan catatan opsional pada modal konfirmasi.
+  3. Klik **Konfirmasi Penukaran**. Sistem seketika mengunci (*reserve*) stok barang, memotong saldo poin Anda, dan membuat tiket klaim berstatus **Pending**.
+  4. Administrator akan memverifikasi permohonan Anda dan mengirimkan hadiah (status: **Approved / Completed**). Jika permohonan ditolak, stok barang dan saldo poin Anda otomatis dikembalikan penuh.
+
+### 15.4 Leaderboard Tim
+- Halaman **Leaderboard** menampilkan peringkat seluruh anggota tim berdasarkan akumulasi poin gamifikasi.
+- Mendorong semangat kompetisi sehat, transparansi pencapaian, dan apresiasi kinerja antar rekan kerja.
 
 ---
 

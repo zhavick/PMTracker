@@ -86,6 +86,19 @@
 
 ---
 
+## 🔑 Akun Default Administrator & Kredensial Sistem
+
+| Keterangan | Nilai Kredensial |
+| :--- | :--- |
+| **Email / Username** | `admin@trackerkerja.com` |
+| **Kata Sandi Default** | `Admin@123!` |
+| **Peran (Role)** | `Admin` (Superuser / Hak Akses Penuh) |
+| **Kode Perusahaan Default** | `ELISTEC` (PT Elistec Teknologi) |
+| **URL Frontend Web App** | [http://localhost:5173/login](http://localhost:5173/login) |
+| **URL REST API & Swagger** | [http://localhost:5000/swagger](http://localhost:5000/swagger) |
+
+---
+
 ## 🚀 Panduan Menjalankan Aplikasi
 
 ### 🐳 1. Menjalankan Menggunakan Docker (Sangat Disarankan)
@@ -113,10 +126,17 @@ Pastikan [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) telah 
 git clone https://github.com/zhavick/PMTracker.git
 cd PMTracker
 
-# Jalankan backend API
+# Jalankan backend API (port 5000)
 cd backend/WorkTracker.Api
 dotnet run
-# API berjalan di http://localhost:5000
+# API berjalan di http://localhost:5000 dan Swagger di http://localhost:5000/swagger
+```
+
+**Import Data Excel (CLI Tooling):**
+Untuk mengimpor data tugas riil dari file spreadsheet berformat ARMS / Multi-sheet:
+```bash
+# Jalankan import tugas Excel langsung ke MySQL
+dotnet run --project backend/WorkTracker.Api -- --import-excel "C:\path\to\Task Tracker v2.xlsx"
 ```
 
 **Frontend (React SPA):**
