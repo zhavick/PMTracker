@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -130,6 +131,31 @@ public class SyncApiController : ControllerBase
             return BadRequest(ApiResponse<SyncResultDto>.Fail(result.Message, new List<string> { result.Message }));
         }
         return Ok(ApiResponse<SyncResultDto>.Success(result, result.Message));
+    }
+
+    /// <summary>
+    /// Melakukan sinkronisasi granular/selektif per modul (Notes, Attendance, Gamification) ke/dari Server Induk.
+    /// Memerlukan hak akses Admin.
+    /// </summary>
+    [HttpPost("modules")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(ApiResponse<SyncModulesResultDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SyncModules([FromBody] SyncModulesRequestDto dto)
+    {
+        if (dto == null)
+        {
+            return BadRequest(ApiResponse<SyncModulesResultDto>.Fail("Parameter permintaan sinkronisasi modular tidak boleh kosong."));
+        }
+
+        var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var result = await _syncService.SyncModulesAsync(dto, currentUserId);
+        
+        if (!result.Success)
+        {
+            return BadRequest(ApiResponse<SyncModulesResultDto>.Fail(result.Message, result.Details));
+        }
+
+        return Ok(ApiResponse<SyncModulesResultDto>.Success(result, result.Message));
     }
 
     /// <summary>

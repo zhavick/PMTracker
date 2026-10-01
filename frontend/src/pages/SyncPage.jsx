@@ -24,7 +24,14 @@ import {
   Save,
   Check,
   Sliders,
-  FolderArchive
+  FolderArchive,
+  Award,
+  Calendar,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ChevronUp,
+  Zap
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 
@@ -50,6 +57,22 @@ export default function SyncPage() {
   const [importType, setImportType] = useState('sql'); // 'sql' | 'pkg'
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState(null);
+
+  // Granular Module Sync State (FSD v3.7)
+  const [modSyncSettings, setModSyncSettings] = useState({
+    targetHostUrl: 'https://tracker.saidilmuna.space',
+    email: 'admin@trackerkerja.com',
+    password: 'Password123!',
+    syncDirection: 'Pull', // 'Pull', 'Push'
+    syncNotes: true,
+    syncAttendance: true,
+    syncGamification: true,
+    showPassword: false
+  });
+  const [modSyncLoading, setModSyncLoading] = useState(false);
+  const [modSyncResult, setModSyncResult] = useState(null);
+  const [modSyncError, setModSyncError] = useState(null);
+  const [showLogDetails, setShowLogDetails] = useState(false);
 
   // Fetch initial local status & settings
   const fetchInitialData = async () => {
@@ -241,6 +264,47 @@ export default function SyncPage() {
       });
     } finally {
       setImportLoading(false);
+    }
+  };
+
+  // Handle Granular Module Sync (Selective Sync)
+  const handleGranularModuleSync = async (e) => {
+    if (e) e.preventDefault();
+    if (!modSyncSettings.syncNotes && !modSyncSettings.syncAttendance && !modSyncSettings.syncGamification) {
+      alert('Pilih setidaknya satu modul (Catatan, Presensi, atau Gamifikasi) untuk disinkronkan.');
+      return;
+    }
+
+    setModSyncLoading(true);
+    setModSyncResult(null);
+    setModSyncError(null);
+
+    try {
+      const payload = {
+        targetHostUrl: modSyncSettings.targetHostUrl.trim(),
+        email: modSyncSettings.email.trim(),
+        password: modSyncSettings.password,
+        syncDirection: modSyncSettings.syncDirection,
+        syncNotes: modSyncSettings.syncNotes,
+        syncAttendance: modSyncSettings.syncAttendance,
+        syncGamification: modSyncSettings.syncGamification,
+        timeoutSeconds: 30
+      };
+
+      const res = await axiosClient.post('/api/sync/modules', payload);
+      if (res.data?.success && res.data?.data) {
+        setModSyncResult(res.data.data);
+        fetchInitialData();
+      } else {
+        setModSyncError(res.data?.message || 'Sinkronisasi granular gagal.');
+      }
+    } catch (err) {
+      console.error('Modular sync error', err);
+      const msg = err.response?.data?.message || err.message || 'Terjadi kesalahan saat sinkronisasi modul.';
+      const details = err.response?.data?.errors || err.response?.data?.data?.details || [];
+      setModSyncError({ message: msg, details: Array.isArray(details) ? details : [details] });
+    } finally {
+      setModSyncLoading(false);
     }
   };
 
@@ -556,6 +620,304 @@ export default function SyncPage() {
                 </p>
               )}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* SINKRONISASI GRANULAR PER MODUL (SELECTIVE SYNC - FSD v3.7) */}
+      <div 
+        className="rounded-2xl border p-6 shadow-sm space-y-6"
+        style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/15 text-indigo-500 font-bold">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                  Sinkronisasi Granular per Modul (Selective Sync)
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/20">
+                  FSD v3.7
+                </span>
+              </div>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                Sinkronkan data secara spesifik untuk modul Catatan Kerja, Presensi Tim, atau Gamifikasi tanpa me-replace seluruh database.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium px-2.5 py-1 rounded-lg border flex items-center gap-1.5" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}>
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              REST API Direct Mode
+            </span>
+          </div>
+        </div>
+
+        <form onSubmit={handleGranularModuleSync} className="space-y-5">
+          {/* Target Host & Credentials Form */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                Target Server Induk (Host URL)
+              </label>
+              <input
+                type="url"
+                required
+                value={modSyncSettings.targetHostUrl}
+                onChange={(e) => setModSyncSettings({ ...modSyncSettings, targetHostUrl: e.target.value })}
+                placeholder="https://tracker.saidilmuna.space"
+                className="w-full px-3.5 py-2.5 rounded-xl border text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                Email Akun Administrator Remote
+              </label>
+              <input
+                type="email"
+                required
+                value={modSyncSettings.email}
+                onChange={(e) => setModSyncSettings({ ...modSyncSettings, email: e.target.value })}
+                placeholder="admin@trackerkerja.com"
+                className="w-full px-3.5 py-2.5 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                Kata Sandi Administrator Remote
+              </label>
+              <div className="relative">
+                <input
+                  type={modSyncSettings.showPassword ? 'text' : 'password'}
+                  required
+                  value={modSyncSettings.password}
+                  onChange={(e) => setModSyncSettings({ ...modSyncSettings, password: e.target.value })}
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl border text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setModSyncSettings({ ...modSyncSettings, showPassword: !modSyncSettings.showPassword })}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                >
+                  {modSyncSettings.showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Module Selector & Direction Selector */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-1">
+            {/* Pilihan Modul */}
+            <div className="p-4 rounded-xl border space-y-3" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
+              <span className="text-xs font-bold block" style={{ color: 'var(--text-primary)' }}>
+                1. Pilih Modul yang Ingin Disinkronkan:
+              </span>
+              <div className="space-y-2.5">
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer hover:opacity-90 transition-all text-xs" style={{ borderColor: modSyncSettings.syncNotes ? 'var(--accent-primary)' : 'var(--border-color)', backgroundColor: modSyncSettings.syncNotes ? 'rgba(99, 102, 241, 0.08)' : 'transparent' }}>
+                  <input
+                    type="checkbox"
+                    checked={modSyncSettings.syncNotes}
+                    onChange={(e) => setModSyncSettings({ ...modSyncSettings, syncNotes: e.target.checked })}
+                    className="w-4 h-4 rounded text-indigo-600"
+                  />
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-amber-500/15 text-amber-500 flex-shrink-0">
+                    <FileText className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <span className="font-semibold block" style={{ color: 'var(--text-primary)' }}>Catatan Kerja & Dokumentasi (Notes)</span>
+                    <span className="text-[11px] block" style={{ color: 'var(--text-secondary)' }}>Sinkronkan judul, konten HTML, kategori, pin, dan lampiran catatan</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer hover:opacity-90 transition-all text-xs" style={{ borderColor: modSyncSettings.syncAttendance ? 'var(--accent-primary)' : 'var(--border-color)', backgroundColor: modSyncSettings.syncAttendance ? 'rgba(99, 102, 241, 0.08)' : 'transparent' }}>
+                  <input
+                    type="checkbox"
+                    checked={modSyncSettings.syncAttendance}
+                    onChange={(e) => setModSyncSettings({ ...modSyncSettings, syncAttendance: e.target.checked })}
+                    className="w-4 h-4 rounded text-indigo-600"
+                  />
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-blue-500/15 text-blue-500 flex-shrink-0">
+                    <Calendar className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <span className="font-semibold block" style={{ color: 'var(--text-primary)' }}>Presensi Kehadiran Tim (Attendance)</span>
+                    <span className="text-[11px] block" style={{ color: 'var(--text-secondary)' }}>Sinkronkan rekap check-in/out, durasi kerja, dan catatan per user</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer hover:opacity-90 transition-all text-xs" style={{ borderColor: modSyncSettings.syncGamification ? 'var(--accent-primary)' : 'var(--border-color)', backgroundColor: modSyncSettings.syncGamification ? 'rgba(99, 102, 241, 0.08)' : 'transparent' }}>
+                  <input
+                    type="checkbox"
+                    checked={modSyncSettings.syncGamification}
+                    onChange={(e) => setModSyncSettings({ ...modSyncSettings, syncGamification: e.target.checked })}
+                    className="w-4 h-4 rounded text-indigo-600"
+                  />
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-emerald-500/15 text-emerald-500 flex-shrink-0">
+                    <Award className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <span className="font-semibold block" style={{ color: 'var(--text-primary)' }}>Gamifikasi & Lencana Prestasi (Master Badges)</span>
+                    <span className="text-[11px] block" style={{ color: 'var(--text-secondary)' }}>Katalog 40+ lencana prestasi, poin reward, dan trigger otomatis</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Arah Sinkronisasi */}
+            <div className="p-4 rounded-xl border space-y-3 flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
+              <div>
+                <span className="text-xs font-bold block mb-3" style={{ color: 'var(--text-primary)' }}>
+                  2. Pilih Arah Replikasi Data:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setModSyncSettings({ ...modSyncSettings, syncDirection: 'Pull' })}
+                    className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all ${
+                      modSyncSettings.syncDirection === 'Pull' 
+                        ? 'border-indigo-500 bg-indigo-500/10' 
+                        : 'border-slate-500/20 hover:bg-slate-500/5'
+                    }`}
+                  >
+                    <ArrowDownLeft className={`w-4 h-4 mt-0.5 ${modSyncSettings.syncDirection === 'Pull' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                    <div>
+                      <span className="text-xs font-bold block" style={{ color: 'var(--text-primary)' }}>
+                        Tarik Data (Pull)
+                      </span>
+                      <span className="text-[11px] block mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                        Ambil data dari Host Induk dan perbarui basis data lokal
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModSyncSettings({ ...modSyncSettings, syncDirection: 'Push' })}
+                    className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all ${
+                      modSyncSettings.syncDirection === 'Push' 
+                        ? 'border-indigo-500 bg-indigo-500/10' 
+                        : 'border-slate-500/20 hover:bg-slate-500/5'
+                    }`}
+                  >
+                    <ArrowUpRight className={`w-4 h-4 mt-0.5 ${modSyncSettings.syncDirection === 'Push' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                    <div>
+                      <span className="text-xs font-bold block" style={{ color: 'var(--text-primary)' }}>
+                        Kirim Data (Push)
+                      </span>
+                      <span className="text-[11px] block mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                        Unggah perubahan data lokal ke Server Induk
+                      </span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t mt-3 flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
+                <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                  Aman: Menggunakan pemetaan email unik pengguna
+                </span>
+                <button
+                  type="submit"
+                  disabled={modSyncLoading}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-md hover:opacity-95 transition-all disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--accent-primary)' }}
+                >
+                  <RefreshCw className={`w-4 h-4 ${modSyncLoading ? 'animate-spin' : ''}`} />
+                  {modSyncLoading ? 'Memproses Sinkronisasi...' : 'Mulai Sinkronisasi Selektif'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        {/* Hasil Eksekusi Modular Sync */}
+        {modSyncResult && (
+          <div className="p-4 rounded-xl border bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                <span className="font-bold text-sm">{modSyncResult.message}</span>
+              </div>
+              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-emerald-500/20">
+                {modSyncResult.executionDurationMs} ms
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
+              <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
+                <span className="text-[11px] block opacity-80">Notes Baru</span>
+                <span className="text-base font-bold">+{modSyncResult.notesSynced}</span>
+              </div>
+              <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
+                <span className="text-[11px] block opacity-80">Notes Update</span>
+                <span className="text-base font-bold">~{modSyncResult.notesUpdated}</span>
+              </div>
+              <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
+                <span className="text-[11px] block opacity-80">Absensi Baru</span>
+                <span className="text-base font-bold">+{modSyncResult.attendancesSynced}</span>
+              </div>
+              <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
+                <span className="text-[11px] block opacity-80">Absensi Update</span>
+                <span className="text-base font-bold">~{modSyncResult.attendancesUpdated}</span>
+              </div>
+              <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
+                <span className="text-[11px] block opacity-80">Badges Baru</span>
+                <span className="text-base font-bold">+{modSyncResult.badgesSynced}</span>
+              </div>
+              <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
+                <span className="text-[11px] block opacity-80">Badges Update</span>
+                <span className="text-base font-bold">~{modSyncResult.userBadgesSynced}</span>
+              </div>
+            </div>
+
+            {modSyncResult.details && modSyncResult.details.length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowLogDetails(!showLogDetails)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold underline opacity-90 hover:opacity-100"
+                >
+                  {showLogDetails ? 'Sembunyikan Log Rinci' : 'Tampilkan Log Rinci'}
+                  {showLogDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+                {showLogDetails && (
+                  <div className="mt-2 p-3 rounded-lg bg-black/40 text-slate-200 text-xs font-mono space-y-1 max-h-48 overflow-y-auto">
+                    {modSyncResult.details.map((line, idx) => (
+                      <div key={idx} className="leading-relaxed">{line}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Error Alert */}
+        {modSyncError && (
+          <div className="p-4 rounded-xl border bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 space-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <span className="font-bold">
+                {typeof modSyncError === 'string' ? modSyncError : modSyncError.message}
+              </span>
+            </div>
+            {modSyncError.details && modSyncError.details.length > 0 && (
+              <ul className="text-xs font-mono list-disc list-inside space-y-0.5 opacity-90 pl-1">
+                {modSyncError.details.map((d, i) => (
+                  <li key={i}>{d}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>

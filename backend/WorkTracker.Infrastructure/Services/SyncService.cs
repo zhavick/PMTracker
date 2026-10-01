@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using WorkTracker.Core.DTOs;
 using WorkTracker.Core.Entities;
+using WorkTracker.Core.Enums;
 using WorkTracker.Infrastructure.Data;
 
 namespace WorkTracker.Infrastructure.Services;
@@ -25,6 +26,7 @@ public interface ISyncService
     Task<SyncResultDto> PushToHostAsync(SyncPushRequestDto dto, string? currentUserId = null);
     Task<SyncResultDto> PullFromHostAsync(SyncPullRequestDto dto, string? currentUserId = null);
     Task<SyncResultDto> ReceivePayloadAsync(SyncReceiveRequestDto dto);
+    Task<SyncModulesResultDto> SyncModulesAsync(SyncModulesRequestDto dto, string? currentUserId = null);
 }
 
 public class SyncService : ISyncService
@@ -935,4 +937,390 @@ public class SyncService : ISyncService
     private string SqlDate(DateTime? val) => val.HasValue ? $"'{val.Value:yyyy-MM-dd HH:mm:ss}'" : "NULL";
     private string SqlNullableInt(int? val) => val.HasValue ? val.Value.ToString() : "NULL";
     private string SqlNullableDouble(double? val) => val.HasValue ? val.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "NULL";
+
+    public async Task<SyncModulesResultDto> SyncModulesAsync(SyncModulesRequestDto dto, string? currentUserId = null)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var result = new SyncModulesResultDto { Timestamp = DateTime.UtcNow };
+        var targetHost = (dto.TargetHostUrl ?? "https://tracker.saidilmuna.space").TrimEnd('/');
+        
+        result.Details.Add($"Memulai sinkronisasi modular ke Server Induk: {targetHost} (Arah: {dto.SyncDirection})");
+
+        var client = _httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(Math.Clamp(dto.TimeoutSeconds, 5, 120));
+
+        // 1. Authenticate with Remote Server
+        result.Details.Add($"[1/4] Mengautentikasi ke host induk ({dto.Email})...");
+        string? remoteJwtToken = null;
+
+        try
+        {
+            var loginPayload = new { email = dto.Email, password = dto.Password };
+            var loginResp = await client.PostAsJsonAsync($"{targetHost}/api/auth/login", loginPayload);
+            
+            if (!loginResp.IsSuccessStatusCode)
+            {
+                var errContent = await loginResp.Content.ReadAsStringAsync();
+                result.Success = false;
+                result.Message = $"Gagal login ke server induk ({targetHost}): Status HTTP {(int)loginResp.StatusCode}";
+                result.Details.Add($"-> ERROR: Server merespons HTTP {(int)loginResp.StatusCode}. Detail: {errContent}");
+                result.ExecutionDurationMs = sw.ElapsedMilliseconds;
+                return result;
+            }
+
+            var loginJson = await loginResp.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(loginJson);
+            if (doc.RootElement.TryGetProperty("data", out var dataEl) && dataEl.TryGetProperty("token", out var tokenEl))
+            {
+                remoteJwtToken = tokenEl.GetString();
+            }
+            else if (doc.RootElement.TryGetProperty("token", out var directToken))
+            {
+                remoteJwtToken = directToken.GetString();
+            }
+
+            if (string.IsNullOrWhiteSpace(remoteJwtToken))
+            {
+                result.Success = false;
+                result.Message = "Token otentikasi JWT tidak ditemukan pada respons server induk.";
+                result.Details.Add("-> ERROR: Respons login valid namun tidak menyertakan JWT token.");
+                result.ExecutionDurationMs = sw.ElapsedMilliseconds;
+                return result;
+            }
+
+            result.Details.Add("-> Otentikasi berhasil. Token JWT valid diterima.");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", remoteJwtToken);
+        }
+        catch (Exception ex)
+        {
+            result.Success = false;
+            result.Message = $"Tidak dapat terhubung ke server induk: {ex.Message}";
+            result.Details.Add($"-> ERROR KONEKSI: {ex.Message}");
+            result.ExecutionDurationMs = sw.ElapsedMilliseconds;
+            return result;
+        }
+
+        var isPull = dto.SyncDirection?.Equals("Push", StringComparison.OrdinalIgnoreCase) != true;
+
+        // Dapatkan pengguna lokal untuk mapping foreign key
+        var localUsers = await _context.Users.ToListAsync();
+        var defaultUserId = currentUserId ?? localUsers.FirstOrDefault()?.Id ?? string.Empty;
+
+        // 2. Modul Notes (Catatan Kerja)
+        if (dto.SyncNotes)
+        {
+            result.Details.Add("[2/4] Sinkronisasi Modul Catatan Kerja (Notes)...");
+            try
+            {
+                if (isPull)
+                {
+                    var notesResp = await client.GetAsync($"{targetHost}/api/notes");
+                    if (notesResp.IsSuccessStatusCode)
+                    {
+                        var notesJson = await notesResp.Content.ReadAsStringAsync();
+                        using var notesDoc = JsonDocument.Parse(notesJson);
+                        JsonElement notesArray = default;
+
+                        if (notesDoc.RootElement.ValueKind == JsonValueKind.Array)
+                        {
+                            notesArray = notesDoc.RootElement;
+                        }
+                        else if (notesDoc.RootElement.TryGetProperty("data", out var dEl) && dEl.ValueKind == JsonValueKind.Array)
+                        {
+                            notesArray = dEl;
+                        }
+
+                        if (notesArray.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var item in notesArray.EnumerateArray())
+                            {
+                                var title = item.TryGetProperty("title", out var tEl) ? tEl.GetString() ?? "" : "";
+                                if (string.IsNullOrWhiteSpace(title)) continue;
+
+                                var content = item.TryGetProperty("contentHtml", out var cEl) ? cEl.GetString() ?? "" : "";
+                                var category = item.TryGetProperty("category", out var catEl) ? catEl.GetString() ?? "General" : "General";
+                                var color = item.TryGetProperty("color", out var colEl) ? colEl.GetString() ?? "#6366F1" : "#6366F1";
+                                var isPinned = item.TryGetProperty("isPinned", out var pEl) && pEl.GetBoolean();
+                                
+                                DateTime createdAt = DateTime.UtcNow;
+                                if (item.TryGetProperty("createdAt", out var crEl) && crEl.TryGetDateTime(out var dtCr))
+                                    createdAt = dtCr;
+
+                                var authorEmail = item.TryGetProperty("authorEmail", out var aeEl) ? aeEl.GetString() : null;
+                                var matchedUser = localUsers.FirstOrDefault(u => !string.IsNullOrEmpty(authorEmail) && u.Email != null && u.Email.Equals(authorEmail, StringComparison.OrdinalIgnoreCase));
+                                var noteAuthorId = matchedUser?.Id ?? defaultUserId;
+                                var noteCompanyId = matchedUser?.CompanyId;
+
+                                var existingNote = await _context.Notes
+                                    .FirstOrDefaultAsync(n => n.Title == title && (n.AuthorUserId == noteAuthorId || Math.Abs((n.CreatedAt - createdAt).TotalHours) < 24));
+
+                                if (existingNote != null)
+                                {
+                                    existingNote.ContentHtml = content;
+                                    existingNote.Category = category;
+                                    existingNote.Color = color;
+                                    existingNote.IsPinned = isPinned;
+                                    existingNote.UpdatedAt = DateTime.UtcNow;
+                                    result.NotesUpdated++;
+                                }
+                                else
+                                {
+                                    var newNote = new WorkNote
+                                    {
+                                        Title = title,
+                                        ContentHtml = content,
+                                        Category = category,
+                                        Color = color,
+                                        IsPinned = isPinned,
+                                        AuthorUserId = noteAuthorId,
+                                        CompanyId = noteCompanyId,
+                                        CreatedAt = createdAt,
+                                        UpdatedAt = DateTime.UtcNow
+                                    };
+                                    _context.Notes.Add(newNote);
+                                    result.NotesSynced++;
+                                }
+                            }
+                            result.Details.Add($"-> Notes Pull: {result.NotesSynced} baru ditambahkan, {result.NotesUpdated} diperbarui.");
+                        }
+                    }
+                    else
+                    {
+                        result.Details.Add($"-> Notes: Server remote mengembalikan status HTTP {(int)notesResp.StatusCode}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Details.Add($"-> Notes Error: {ex.Message}");
+            }
+        }
+        else
+        {
+            result.Details.Add("[2/4] Modul Catatan Kerja (Notes) dilewati.");
+        }
+
+        // 3. Modul Attendance (Presensi Tim)
+        if (dto.SyncAttendance)
+        {
+            result.Details.Add("[3/4] Sinkronisasi Modul Presensi (Attendance)...");
+            try
+            {
+                if (isPull)
+                {
+                    var now = DateTime.UtcNow;
+                    var monthsToSync = new[] { (now.Month, now.Year), (now.Month == 1 ? 12 : now.Month - 1, now.Month == 1 ? now.Year - 1 : now.Year) };
+
+                    foreach (var (m, y) in monthsToSync)
+                    {
+                        var attResp = await client.GetAsync($"{targetHost}/api/attendance/monthly?month={m}&year={y}");
+                        if (!attResp.IsSuccessStatusCode) continue;
+
+                        var attJson = await attResp.Content.ReadAsStringAsync();
+                        using var attDoc = JsonDocument.Parse(attJson);
+                        JsonElement attArray = default;
+
+                        if (attDoc.RootElement.ValueKind == JsonValueKind.Array)
+                        {
+                            attArray = attDoc.RootElement;
+                        }
+                        else if (attDoc.RootElement.TryGetProperty("data", out var dEl) && dEl.ValueKind == JsonValueKind.Array)
+                        {
+                            attArray = dEl;
+                        }
+
+                        if (attArray.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var item in attArray.EnumerateArray())
+                            {
+                                if (!item.TryGetProperty("date", out var dProp) || !dProp.TryGetDateTime(out var attDate))
+                                    continue;
+
+                                var userEmail = item.TryGetProperty("userEmail", out var ueEl) ? ueEl.GetString() : null;
+                                var matchedUser = localUsers.FirstOrDefault(u => !string.IsNullOrEmpty(userEmail) && u.Email != null && u.Email.Equals(userEmail, StringComparison.OrdinalIgnoreCase));
+                                if (matchedUser == null) continue;
+
+                                DateTime? clockIn = item.TryGetProperty("clockIn", out var ciEl) && ciEl.TryGetDateTime(out var dtCi) ? dtCi : null;
+                                DateTime? clockOut = item.TryGetProperty("clockOut", out var coEl) && coEl.TryGetDateTime(out var dtCo) ? dtCo : null;
+                                double totalHours = item.TryGetProperty("totalHours", out var thEl) && thEl.TryGetDouble(out var thVal) ? thVal : 0.0;
+                                var notes = item.TryGetProperty("notes", out var noEl) ? noEl.GetString() : null;
+                                var location = item.TryGetProperty("location", out var locEl) ? locEl.GetString() : "Remote Sync";
+
+                                var existingAtt = await _context.Attendances
+                                    .FirstOrDefaultAsync(a => a.UserId == matchedUser.Id && a.Date.Date == attDate.Date);
+
+                                if (existingAtt != null)
+                                {
+                                    bool updated = false;
+                                    if (clockOut.HasValue && !existingAtt.ClockOut.HasValue)
+                                    {
+                                        existingAtt.ClockOut = clockOut;
+                                        existingAtt.TotalHours = totalHours;
+                                        updated = true;
+                                    }
+                                    if (!string.IsNullOrWhiteSpace(notes) && string.IsNullOrWhiteSpace(existingAtt.Notes))
+                                    {
+                                        existingAtt.Notes = notes;
+                                        updated = true;
+                                    }
+                                    if (updated)
+                                    {
+                                        existingAtt.UpdatedAt = DateTime.UtcNow;
+                                        result.AttendancesUpdated++;
+                                    }
+                                }
+                                else
+                                {
+                                    var newAtt = new AttendanceRecord
+                                    {
+                                        UserId = matchedUser.Id,
+                                        Date = attDate.Date,
+                                        Type = AttendanceType.Present,
+                                        WorkLocation = WorkLocation.WFO,
+                                        ClockIn = clockIn,
+                                        ClockOut = clockOut,
+                                        TotalHours = totalHours,
+                                        Notes = notes,
+                                        Location = location,
+                                        Status = AttendanceStatus.Approved,
+                                        CreatedAt = DateTime.UtcNow,
+                                        UpdatedAt = DateTime.UtcNow
+                                    };
+                                    _context.Attendances.Add(newAtt);
+                                    result.AttendancesSynced++;
+                                }
+                            }
+                        }
+                    }
+                    result.Details.Add($"-> Attendance Pull: {result.AttendancesSynced} baru ditambahkan, {result.AttendancesUpdated} diperbarui.");
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Details.Add($"-> Attendance Error: {ex.Message}");
+            }
+        }
+        else
+        {
+            result.Details.Add("[3/4] Modul Presensi (Attendance) dilewati.");
+        }
+
+        // 4. Modul Gamifikasi (Master Badges)
+        if (dto.SyncGamification)
+        {
+            result.Details.Add("[4/4] Sinkronisasi Modul Gamifikasi (Master Badges)...");
+            try
+            {
+                if (isPull)
+                {
+                    var badgesResp = await client.GetAsync($"{targetHost}/api/gamification/badges");
+                    if (badgesResp.IsSuccessStatusCode)
+                    {
+                        var badgesJson = await badgesResp.Content.ReadAsStringAsync();
+                        using var badgesDoc = JsonDocument.Parse(badgesJson);
+                        JsonElement badgesArray = default;
+
+                        if (badgesDoc.RootElement.ValueKind == JsonValueKind.Array)
+                        {
+                            badgesArray = badgesDoc.RootElement;
+                        }
+                        else if (badgesDoc.RootElement.TryGetProperty("data", out var dEl) && dEl.ValueKind == JsonValueKind.Array)
+                        {
+                            badgesArray = dEl;
+                        }
+
+                        if (badgesArray.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var item in badgesArray.EnumerateArray())
+                            {
+                                var code = item.TryGetProperty("code", out var cEl) ? cEl.GetString() : null;
+                                if (string.IsNullOrWhiteSpace(code)) continue;
+
+                                var name = item.TryGetProperty("name", out var nEl) ? nEl.GetString() ?? code : code;
+                                var desc = item.TryGetProperty("description", out var dscEl) ? dscEl.GetString() ?? "" : "";
+                                var category = item.TryGetProperty("category", out var catEl) ? catEl.GetString() ?? "General" : "General";
+                                var icon = item.TryGetProperty("icon", out var icEl) ? icEl.GetString() ?? "Award" : "Award";
+                                var color = item.TryGetProperty("color", out var clrEl) ? clrEl.GetString() ?? "#10B981" : "#10B981";
+                                var points = item.TryGetProperty("points", out var ptEl) && ptEl.TryGetInt32(out var pt) ? pt : 50;
+                                var threshold = item.TryGetProperty("triggerThreshold", out var ttEl) && ttEl.TryGetInt32(out var tt) ? tt : 0;
+                                var orderIndex = item.TryGetProperty("orderIndex", out var oiEl) && oiEl.TryGetInt32(out var oi) ? oi : 0;
+                                var isActive = !item.TryGetProperty("isActive", out var iaEl) || iaEl.GetBoolean();
+
+                                var existingBadge = await _context.MasterBadges.FirstOrDefaultAsync(b => b.Code == code);
+                                if (existingBadge != null)
+                                {
+                                    existingBadge.Name = name;
+                                    existingBadge.Description = desc;
+                                    existingBadge.Category = category;
+                                    existingBadge.Icon = icon;
+                                    existingBadge.Color = color;
+                                    existingBadge.Points = points;
+                                    existingBadge.TriggerThreshold = threshold;
+                                    existingBadge.OrderIndex = orderIndex;
+                                    existingBadge.IsActive = isActive;
+                                    result.UserBadgesSynced++; // repurposed as Badges Updated
+                                }
+                                else
+                                {
+                                    var newBadge = new MasterBadge
+                                    {
+                                        Code = code,
+                                        Name = name,
+                                        Description = desc,
+                                        Category = category,
+                                        Icon = icon,
+                                        Color = color,
+                                        Points = points,
+                                        Rarity = BadgeRarity.Common,
+                                        TriggerType = BadgeTriggerType.Manual,
+                                        TriggerThreshold = threshold,
+                                        IsActive = isActive,
+                                        OrderIndex = orderIndex,
+                                        CreatedAt = DateTime.UtcNow
+                                    };
+                                    _context.MasterBadges.Add(newBadge);
+                                    result.BadgesSynced++;
+                                }
+                            }
+                            result.Details.Add($"-> Badges Pull: {result.BadgesSynced} badge baru ditambahkan, {result.UserBadgesSynced} diperbarui.");
+                        }
+                    }
+                    else
+                    {
+                        result.Details.Add($"-> Gamifikasi: Server remote mengembalikan status HTTP {(int)badgesResp.StatusCode}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Details.Add($"-> Gamifikasi Error: {ex.Message}");
+            }
+        }
+        else
+        {
+            result.Details.Add("[4/4] Modul Gamifikasi dilewati.");
+        }
+
+        // Simpan perubahan ke database
+        await _context.SaveChangesAsync();
+        await SetSettingAsync("Sync_LastSyncAt", DateTime.UtcNow.ToString("o"));
+        await SetSettingAsync("Sync_LastSyncStatus", "Berhasil (Granular Modules Sync)");
+        await _context.SaveChangesAsync();
+
+        await RecordAuditLogAsync(currentUserId, "SyncModules", 
+            $"Sinkronisasi modular selesai: Notes ({result.NotesSynced} baru, {result.NotesUpdated} update), " +
+            $"Attendance ({result.AttendancesSynced} baru, {result.AttendancesUpdated} update), " +
+            $"Badges ({result.BadgesSynced} baru, {result.UserBadgesSynced} update).");
+
+        sw.Stop();
+        result.Success = true;
+        result.ExecutionDurationMs = sw.ElapsedMilliseconds;
+        result.Message = $"Sinkronisasi selektif selesai sukses dalam {sw.ElapsedMilliseconds} ms: " +
+            $"{result.NotesSynced} catatan baru ({result.NotesUpdated} update), " +
+            $"{result.AttendancesSynced} presensi baru ({result.AttendancesUpdated} update), " +
+            $"{result.BadgesSynced} badge baru ({result.UserBadgesSynced} update).";
+        result.Details.Add($"-> SELESAI: {result.Message}");
+
+        return result;
+    }
 }

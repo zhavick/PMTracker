@@ -87,3 +87,31 @@ public class SyncResultDto
     public string? BackupFileName { get; set; }
     public string? ErrorDetails { get; set; }
 }
+
+public class SyncModulesRequestDto
+{
+    public string TargetHostUrl { get; set; } = "https://tracker.saidilmuna.space";
+    public string Email { get; set; } = "admin@trackerkerja.com";
+    public string Password { get; set; } = "Password123!";
+    public string SyncDirection { get; set; } = "Pull"; // "Pull", "Push", "TwoWay"
+    public bool SyncNotes { get; set; } = true;
+    public bool SyncAttendance { get; set; } = true;
+    public bool SyncGamification { get; set; } = true;
+    public int TimeoutSeconds { get; set; } = 30;
+}
+
+public class SyncModulesResultDto
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public int NotesSynced { get; set; }
+    public int NotesUpdated { get; set; }
+    public int AttendancesSynced { get; set; }
+    public int AttendancesUpdated { get; set; }
+    public int BadgesSynced { get; set; }
+    public int UserBadgesSynced { get; set; }
+    public long ExecutionDurationMs { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public List<string> Details { get; set; } = new();
+}
+
