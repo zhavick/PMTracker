@@ -32,8 +32,6 @@ export default function TaskImportModal({ isOpen, onClose, onSuccess }) {
   const [detailSearch, setDetailSearch] = useState('');
   const fileInputRef = useRef(null);
 
-  if (!isOpen || !canImportExcel) return null;
-
   const handleFileChange = (e) => {
     const selected = e.target.files?.[0];
     if (selected) {
@@ -125,6 +123,8 @@ export default function TaskImportModal({ isOpen, onClose, onSuccess }) {
       t.status?.toLowerCase().includes(s)
     );
   }, [detailTab, detailSearch, createdTasks, updatedTasks, allTasks]);
+
+  if (!isOpen || !canImportExcel) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
