@@ -6,10 +6,12 @@ import {
   RefreshCw, 
   FolderArchive, 
   Server, 
-  FileText 
+  FileText,
+  Trash2
 } from 'lucide-react';
 import SyncPage from './SyncPage';
 import EmailSettingsPage from './EmailSettingsPage';
+import DataCleanupTab from '../components/maintenance/DataCleanupTab';
 
 export default function ConfigurationPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -19,7 +21,7 @@ export default function ConfigurationPage() {
   const activeTab = (() => {
     if (rawTab === 'email') return 'smtp';
     if (rawTab === 'sync') return 'modular';
-    if (['modular', 'host-sync', 'offline-pkg', 'smtp', 'templates'].includes(rawTab)) {
+    if (['modular', 'host-sync', 'offline-pkg', 'smtp', 'templates', 'maintenance'].includes(rawTab)) {
       return rawTab;
     }
     return 'modular'; // Default to Granular Module Sync
@@ -60,6 +62,13 @@ export default function ConfigurationPage() {
       label: 'Template Notifikasi',
       desc: 'Editor Template Email Sistem',
       icon: FileText
+    },
+    {
+      id: 'maintenance',
+      label: 'Pembersihan Data',
+      badge: 'Admin',
+      desc: 'Parsial & Full Reset Database',
+      icon: Trash2
     }
   ];
 
@@ -140,6 +149,9 @@ export default function ConfigurationPage() {
         )}
         {(activeTab === 'smtp' || activeTab === 'templates') && (
           <EmailSettingsPage activeSection={activeTab} />
+        )}
+        {activeTab === 'maintenance' && (
+          <DataCleanupTab />
         )}
       </div>
     </div>
