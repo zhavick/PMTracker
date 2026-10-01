@@ -152,9 +152,22 @@ public class TasksApiController : ControllerBase
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var companyId = await User.GetCompanyIdAsync(_context);
 
+        var trimmedTitle = dto.Title.Trim();
+        var normalizedTitle = trimmedTitle.ToLower();
+
+        var isDuplicate = await _context.Tasks.AnyAsync(t =>
+            t.ProjectId == dto.ProjectId &&
+            (t.CompanyId == companyId || (t.CompanyId == null && companyId == null)) &&
+            t.Title.Trim().ToLower() == normalizedTitle);
+
+        if (isDuplicate && !(dto.AllowDuplicate ?? false))
+        {
+            return BadRequest(ApiResponse<object>.Fail($"Tugas dengan judul '{trimmedTitle}' sudah ada pada proyek ini. Mohon gunakan judul yang berbeda untuk mencegah duplikasi/redundansi data."));
+        }
+
         var task = new WorkTask
         {
-            Title = dto.Title.Trim(),
+            Title = trimmedTitle,
             Description = dto.Description?.Trim(),
             Status = dto.Status,
             Priority = dto.Priority,

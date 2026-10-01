@@ -365,4 +365,227 @@ public class ClosedXmlService
         workbook.SaveAs(ms);
         return ms.ToArray();
     }
+
+    public byte[] GenerateElistecTimesheetExcel(
+        string memberName,
+        string memberFullName,
+        string clientName,
+        string sowNo,
+        int durationDays,
+        List<ElistecTimesheetRowDto> rows,
+        string? supervisorSigner = "xxxx")
+    {
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Sheet1");
+        ws.ShowGridLines = true;
+
+        // Row 2: Title
+        var titleCell = ws.Cell("E2");
+        titleCell.Value = "ELISTEC - Timesheet";
+        titleCell.Style.Font.Bold = true;
+        titleCell.Style.Font.FontSize = 14;
+        titleCell.Style.Font.FontName = "Calibri";
+        titleCell.Style.Font.FontColor = XLColor.FromArgb(31, 78, 120);
+
+        // Row 4: Duration & Client Name
+        ws.Cell("A4").Value = "Duration:";
+        ws.Cell("A4").Style.Font.Bold = true;
+        ws.Cell("A4").Style.Font.FontName = "Calibri";
+
+        ws.Cell("B4").Value = $"{durationDays} DAYS";
+        ws.Cell("B4").Style.Font.Bold = true;
+        ws.Cell("B4").Style.Font.FontName = "Calibri";
+
+        ws.Cell("F4").Value = "Client Name:";
+        ws.Cell("F4").Style.Font.Bold = true;
+        ws.Cell("F4").Style.Font.FontName = "Calibri";
+
+        ws.Cell("G4").Value = clientName;
+        ws.Cell("G4").Style.Font.Bold = true;
+        ws.Cell("G4").Style.Font.FontName = "Calibri";
+
+        ws.Cell("K4").Value = "Client Name:";
+        ws.Cell("K4").Style.Font.FontName = "Calibri";
+
+        // Row 5: Name & SOW No
+        ws.Cell("A5").Value = "Name:";
+        ws.Cell("A5").Style.Font.Bold = true;
+        ws.Cell("A5").Style.Font.FontName = "Calibri";
+
+        ws.Cell("B5").Value = memberFullName;
+        ws.Cell("B5").Style.Font.Bold = true;
+        ws.Cell("B5").Style.Font.FontName = "Calibri";
+
+        ws.Cell("K5").Value = "SOW No.:";
+        ws.Cell("K5").Style.Font.Bold = true;
+        ws.Cell("K5").Style.Font.FontName = "Calibri";
+
+        ws.Cell("L5").Value = string.IsNullOrWhiteSpace(sowNo) ? "-" : sowNo;
+        ws.Cell("L5").Style.Font.FontName = "Calibri";
+
+        // Row 7: Table Headers
+        int headerRow = 7;
+        string[] headers = new[]
+        {
+            "Issue Key", "Issue Summary", "Hours", "MD", "Work Date", "Clock In", "Clock Out", 
+            "Username", "Full Name", "Period", "Project Name", "Activity Type", "Working Place"
+        };
+
+        var headerBg = XLColor.FromArgb(31, 78, 120); // Dark Navy Blue #1F4E78
+        for (int i = 0; i < headers.Length; i++)
+        {
+            var cell = ws.Cell(headerRow, i + 1);
+            cell.Value = headers[i];
+            cell.Style.Font.Bold = true;
+            cell.Style.Font.FontSize = 11;
+            cell.Style.Font.FontName = "Calibri";
+            cell.Style.Font.FontColor = XLColor.White;
+            cell.Style.Fill.BackgroundColor = headerBg;
+            cell.Style.Alignment.Horizontal = (i == 0 || i == 2 || i == 3 || i == 4 || i == 5 || i == 6 || i == 9 || i == 12)
+                ? XLAlignmentHorizontalValues.Center
+                : XLAlignmentHorizontalValues.Left;
+            cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            cell.Style.Border.OutsideBorderColor = XLColor.FromArgb(200, 200, 200);
+        }
+
+        // Data Rows (Row 8 onwards)
+        int currentRow = headerRow + 1;
+        foreach (var r in rows)
+        {
+            // Col A: Issue Key
+            ws.Cell(currentRow, 1).Value = r.IssueKey;
+            ws.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // Col B: Issue Summary
+            ws.Cell(currentRow, 2).Value = r.IssueSummary;
+            ws.Cell(currentRow, 2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+
+            // Col C: Hours
+            ws.Cell(currentRow, 3).Value = r.Hours;
+            ws.Cell(currentRow, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+            ws.Cell(currentRow, 3).Style.NumberFormat.Format = "0.##";
+
+            // Col D: MD Formula =IF(C{row}="","",C{row}/8)
+            ws.Cell(currentRow, 4).FormulaA1 = $"=IF(C{currentRow}=\"\",\"\",C{currentRow}/8)";
+            ws.Cell(currentRow, 4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+            ws.Cell(currentRow, 4).Style.NumberFormat.Format = "0.###";
+
+            // Col E: Work Date
+            ws.Cell(currentRow, 5).Value = r.WorkDate.ToString("dd/MM/yyyy");
+            ws.Cell(currentRow, 5).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // Col F: Clock In
+            ws.Cell(currentRow, 6).Value = r.ClockIn;
+            ws.Cell(currentRow, 6).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // Col G: Clock Out
+            ws.Cell(currentRow, 7).Value = r.ClockOut;
+            ws.Cell(currentRow, 7).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // Col H: Username
+            ws.Cell(currentRow, 8).Value = r.Username;
+
+            // Col I: Full Name
+            ws.Cell(currentRow, 9).Value = r.FullName;
+
+            // Col J: Period
+            ws.Cell(currentRow, 10).Value = r.Period;
+            ws.Cell(currentRow, 10).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // Col K: Project Name
+            ws.Cell(currentRow, 11).Value = r.ProjectName;
+
+            // Col L: Activity Type
+            ws.Cell(currentRow, 12).Value = r.ActivityType;
+
+            // Col M: Working Place
+            ws.Cell(currentRow, 13).Value = r.WorkingPlace;
+            ws.Cell(currentRow, 13).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // Row styling
+            for (int c = 1; c <= 13; c++)
+            {
+                var cell = ws.Cell(currentRow, c);
+                cell.Style.Font.FontName = "Calibri";
+                cell.Style.Font.FontSize = 10;
+                cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.OutsideBorderColor = XLColor.FromArgb(220, 224, 230);
+                if (r.IsWeekendOrHoliday)
+                {
+                    cell.Style.Fill.BackgroundColor = XLColor.FromArgb(248, 249, 250);
+                    cell.Style.Font.FontColor = XLColor.FromArgb(100, 116, 139);
+                }
+            }
+
+            currentRow++;
+        }
+
+        // Summary Row
+        int lastDataRow = currentRow - 1;
+        if (rows.Count > 0)
+        {
+            ws.Cell(currentRow, 2).Value = "Total ";
+            ws.Cell(currentRow, 2).Style.Font.Bold = true;
+            ws.Cell(currentRow, 2).Style.Font.FontName = "Calibri";
+            ws.Cell(currentRow, 2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+
+            ws.Cell(currentRow, 3).FormulaA1 = $"=SUM(C{headerRow + 1}:C{lastDataRow})";
+            ws.Cell(currentRow, 3).Style.Font.Bold = true;
+            ws.Cell(currentRow, 3).Style.Font.FontName = "Calibri";
+            ws.Cell(currentRow, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+            ws.Cell(currentRow, 3).Style.NumberFormat.Format = "0.##";
+
+            ws.Cell(currentRow, 4).FormulaA1 = $"=SUM(D{headerRow + 1}:D{lastDataRow})";
+            ws.Cell(currentRow, 4).Style.Font.Bold = true;
+            ws.Cell(currentRow, 4).Style.Font.FontName = "Calibri";
+            ws.Cell(currentRow, 4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+            ws.Cell(currentRow, 4).Style.NumberFormat.Format = "0.###";
+
+            for (int c = 1; c <= 13; c++)
+            {
+                var cell = ws.Cell(currentRow, c);
+                cell.Style.Border.TopBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.BottomBorder = XLBorderStyleValues.Double;
+                cell.Style.Fill.BackgroundColor = XLColor.FromArgb(243, 244, 246);
+            }
+        }
+
+        // Signatures Block
+        int sigRow = currentRow + 3;
+        ws.Cell(sigRow, 2).Value = "Resource,";
+        ws.Cell(sigRow, 2).Style.Font.Bold = true;
+        ws.Cell(sigRow, 2).Style.Font.FontName = "Calibri";
+
+        ws.Cell(sigRow, 7).Value = "Mengetahui,";
+        ws.Cell(sigRow, 7).Style.Font.Bold = true;
+        ws.Cell(sigRow, 7).Style.Font.FontName = "Calibri";
+
+        int sigNameRow = sigRow + 8;
+        ws.Cell(sigNameRow, 7).Value = string.IsNullOrWhiteSpace(supervisorSigner) ? "xxxx" : supervisorSigner;
+        ws.Cell(sigNameRow, 7).Style.Font.FontName = "Calibri";
+
+        ws.Cell(sigNameRow + 2, 2).Value = memberFullName;
+        ws.Cell(sigNameRow + 2, 2).Style.Font.Bold = true;
+        ws.Cell(sigNameRow + 2, 2).Style.Font.FontName = "Calibri";
+
+        // Column Widths
+        ws.Column(1).Width = 12;   // Issue Key
+        ws.Column(2).Width = 75;   // Issue Summary
+        ws.Column(3).Width = 10;   // Hours
+        ws.Column(4).Width = 10;   // MD
+        ws.Column(5).Width = 16;   // Work Date
+        ws.Column(6).Width = 14;   // Clock In
+        ws.Column(7).Width = 14;   // Clock Out
+        ws.Column(8).Width = 18;   // Username
+        ws.Column(9).Width = 24;   // Full Name
+        ws.Column(10).Width = 12;  // Period
+        ws.Column(11).Width = 26;  // Project Name
+        ws.Column(12).Width = 32;  // Activity Type
+        ws.Column(13).Width = 14;  // Working Place
+
+        using var ms = new MemoryStream();
+        workbook.SaveAs(ms);
+        return ms.ToArray();
+    }
 }
+

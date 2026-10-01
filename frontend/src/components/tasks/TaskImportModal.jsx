@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   UploadCloud, 
   FileSpreadsheet, 
@@ -9,7 +9,11 @@ import {
   UserPlus, 
   Loader2, 
   ArrowRight,
-  Database
+  Database,
+  Search,
+  Sparkles,
+  RefreshCw,
+  PlusCircle
 } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
 
@@ -20,6 +24,8 @@ export default function TaskImportModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [importResult, setImportResult] = useState(null);
+  const [detailTab, setDetailTab] = useState('all'); // 'all' | 'created' | 'updated'
+  const [detailSearch, setDetailSearch] = useState('');
   const fileInputRef = useRef(null);
 
   if (!isOpen) return null;
@@ -94,17 +100,38 @@ export default function TaskImportModal({ isOpen, onClose, onSuccess }) {
     setFile(null);
     setError('');
     setImportResult(null);
+    setDetailTab('all');
+    setDetailSearch('');
     onClose();
   };
+
+  // Process details for result grid
+  const createdTasks = importResult?.tasksCreated || [];
+  const updatedTasks = importResult?.tasksUpdated || [];
+  const allTasks = useMemo(() => [...createdTasks, ...updatedTasks], [createdTasks, updatedTasks]);
+
+  const filteredTasks = useMemo(() => {
+    const list = detailTab === 'created' ? createdTasks : detailTab === 'updated' ? updatedTasks : allTasks;
+    if (!detailSearch.trim()) return list;
+    const s = detailSearch.toLowerCase();
+    return list.filter(t => 
+      t.title?.toLowerCase().includes(s) ||
+      t.projectName?.toLowerCase().includes(s) ||
+      t.assignedTo?.toLowerCase().includes(s) ||
+      t.status?.toLowerCase().includes(s)
+    );
+  }, [detailTab, detailSearch, createdTasks, updatedTasks, allTasks]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div 
-        className="w-full max-w-xl rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-6 relative overflow-hidden"
+        className={`w-full rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-6 relative overflow-hidden transition-all flex flex-col ${
+          importResult ? 'max-w-4xl max-h-[92vh]' : 'max-w-xl'
+        }`}
         style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div 
               className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-md"
@@ -117,7 +144,7 @@ export default function TaskImportModal({ isOpen, onClose, onSuccess }) {
                 Impor Tugas dari Excel
               </h2>
               <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                Dukungan multi-sheet tim (Syafix, Haviz, Danang, Atha, Iqbal, Glenn, Heni)
+                Validasi duplikasi otomatis & update detail per anggota tim
               </p>
             </div>
           </div>
@@ -130,55 +157,59 @@ export default function TaskImportModal({ isOpen, onClose, onSuccess }) {
           </button>
         </div>
 
-        {/* Mode Toggle */}
-        <div className="flex rounded-xl p-1 border text-xs font-semibold" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-          <button
-            type="button"
-            onClick={() => setIsPathMode(false)}
-            className={`flex-1 py-1.5 rounded-lg transition-all ${
-              !isPathMode 
-                ? 'shadow-sm text-white font-bold' 
-                : 'opacity-70 hover:opacity-100'
-            }`}
-            style={{ backgroundColor: !isPathMode ? 'var(--accent-primary)' : 'transparent', color: !isPathMode ? '#fff' : 'var(--text-primary)' }}
-          >
-            Unggah Berkas (.xlsx)
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsPathMode(true)}
-            className={`flex-1 py-1.5 rounded-lg transition-all ${
-              isPathMode 
-                ? 'shadow-sm text-white font-bold' 
-                : 'opacity-70 hover:opacity-100'
-            }`}
-            style={{ backgroundColor: isPathMode ? 'var(--accent-primary)' : 'transparent', color: isPathMode ? '#fff' : 'var(--text-primary)' }}
-          >
-            Path Lokal di Komputer
-          </button>
-        </div>
+        {/* Mode Toggle (only when no result yet) */}
+        {!importResult && (
+          <div className="flex rounded-xl p-1 border text-xs font-semibold shrink-0" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+            <button
+              type="button"
+              onClick={() => setIsPathMode(false)}
+              className={`flex-1 py-1.5 rounded-lg transition-all ${
+                !isPathMode 
+                  ? 'shadow-sm text-white font-bold' 
+                  : 'opacity-70 hover:opacity-100'
+              }`}
+              style={{ backgroundColor: !isPathMode ? 'var(--accent-primary)' : 'transparent', color: !isPathMode ? '#fff' : 'var(--text-primary)' }}
+            >
+              Unggah Berkas (.xlsx)
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPathMode(true)}
+              className={`flex-1 py-1.5 rounded-lg transition-all ${
+                isPathMode 
+                  ? 'shadow-sm text-white font-bold' 
+                  : 'opacity-70 hover:opacity-100'
+              }`}
+              style={{ backgroundColor: isPathMode ? 'var(--accent-primary)' : 'transparent', color: isPathMode ? '#fff' : 'var(--text-primary)' }}
+            >
+              Path Lokal di Komputer
+            </button>
+          </div>
+        )}
 
         {/* Error Alert */}
         {error && (
-          <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-xs text-rose-500">
+          <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-xs text-rose-500 shrink-0">
             <AlertCircle size={16} className="shrink-0 mt-0.5" />
             <div>{error}</div>
           </div>
         )}
 
-        {/* Import Success Result */}
+        {/* Import Success Result with Detailed Data Grid */}
         {importResult ? (
-          <div className="space-y-4 animate-fade-in">
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
+          <div className="space-y-4 animate-fade-in overflow-y-auto flex-1 pr-1">
+            {/* Success Summary Banner */}
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-1">
               <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
                 <CheckCircle2 size={18} />
                 <span>Impor Berhasil Diselesaikan!</span>
               </div>
               <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                Sebanyak <strong>{importResult.successRows}</strong> tugas berhasil disimpan dan diasosiasikan ke PIC masing-masing.
+                Sebanyak <strong>{importResult.createdCount || createdTasks.length}</strong> tugas baru ditambahkan, dan <strong>{importResult.updatedCount || updatedTasks.length}</strong> tugas disinkronkan tanpa redundansi data.
               </p>
             </div>
 
+            {/* Metric Chips */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
               <div className="p-3 rounded-xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
                 <div className="text-xl font-black" style={{ color: 'var(--text-primary)' }}>{importResult.totalRows}</div>
@@ -186,24 +217,144 @@ export default function TaskImportModal({ isOpen, onClose, onSuccess }) {
               </div>
               <div className="p-3 rounded-xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
                 <div className="text-xl font-black text-emerald-500">{importResult.successRows}</div>
-                <div className="text-[10px] font-semibold opacity-70" style={{ color: 'var(--text-secondary)' }}>Berhasil</div>
+                <div className="text-[10px] font-semibold opacity-70" style={{ color: 'var(--text-secondary)' }}>Total Sukses</div>
               </div>
               <div className="p-3 rounded-xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-                <div className="text-xl font-black text-indigo-500">{importResult.projectsCreated}</div>
-                <div className="text-[10px] font-semibold opacity-70" style={{ color: 'var(--text-secondary)' }}>Proyek Baru</div>
+                <div className="text-xl font-black text-emerald-400">{importResult.createdCount || createdTasks.length}</div>
+                <div className="text-[10px] font-semibold opacity-70" style={{ color: 'var(--text-secondary)' }}>Tugas Baru Ditambah</div>
               </div>
               <div className="p-3 rounded-xl border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-                <div className="text-xl font-black text-purple-500">{importResult.usersCreated}</div>
-                <div className="text-[10px] font-semibold opacity-70" style={{ color: 'var(--text-secondary)' }}>Anggota Baru</div>
+                <div className="text-xl font-black text-sky-400">{importResult.updatedCount || updatedTasks.length}</div>
+                <div className="text-[10px] font-semibold opacity-70" style={{ color: 'var(--text-secondary)' }}>Tugas Diperbarui</div>
               </div>
             </div>
 
+            {/* Filter Tabs & Search Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+              <div className="flex items-center gap-1.5 p-1 rounded-xl border text-xs font-semibold" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+                <button
+                  type="button"
+                  onClick={() => setDetailTab('all')}
+                  className={`px-3 py-1.5 rounded-lg transition-all text-xs ${
+                    detailTab === 'all' ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'opacity-70 hover:opacity-100'
+                  }`}
+                  style={{ color: detailTab === 'all' ? '#fff' : 'var(--text-primary)' }}
+                >
+                  Semua ({allTasks.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailTab('created')}
+                  className={`px-3 py-1.5 rounded-lg transition-all text-xs flex items-center gap-1.5 ${
+                    detailTab === 'created' ? 'bg-emerald-600 text-white font-bold shadow-sm' : 'opacity-70 hover:opacity-100'
+                  }`}
+                  style={{ color: detailTab === 'created' ? '#fff' : 'var(--text-primary)' }}
+                >
+                  <PlusCircle size={13} />
+                  <span>Baru ({createdTasks.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailTab('updated')}
+                  className={`px-3 py-1.5 rounded-lg transition-all text-xs flex items-center gap-1.5 ${
+                    detailTab === 'updated' ? 'bg-sky-600 text-white font-bold shadow-sm' : 'opacity-70 hover:opacity-100'
+                  }`}
+                  style={{ color: detailTab === 'updated' ? '#fff' : 'var(--text-primary)' }}
+                >
+                  <RefreshCw size={13} />
+                  <span>Diperbarui ({updatedTasks.length})</span>
+                </button>
+              </div>
+
+              {/* Search Box */}
+              <div className="relative flex-1 max-w-xs">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50" style={{ color: 'var(--text-secondary)' }} />
+                <input
+                  type="text"
+                  value={detailSearch}
+                  onChange={(e) => setDetailSearch(e.target.value)}
+                  placeholder="Cari tugas / proyek / PIC..."
+                  className="w-full pl-9 pr-3 py-1.5 rounded-xl border text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                />
+              </div>
+            </div>
+
+            {/* Interactive Data Grid of Imported Tasks */}
+            <div className="border rounded-2xl overflow-hidden max-h-72 overflow-y-auto" style={{ borderColor: 'var(--border-color)' }}>
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b text-[11px] font-bold uppercase tracking-wider" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}>
+                    <th className="py-2.5 px-3 w-10 text-center">#</th>
+                    <th className="py-2.5 px-3 w-32">Aksi / Status</th>
+                    <th className="py-2.5 px-3">Judul Tugas</th>
+                    <th className="py-2.5 px-3">Proyek</th>
+                    <th className="py-2.5 px-3">PIC</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3">Prioritas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                  {filteredTasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-6 text-center opacity-60 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        Tidak ada baris tugas yang cocok dengan filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredTasks.map((t, idx) => (
+                      <tr 
+                        key={idx} 
+                        className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        <td className="py-2 px-3 text-center opacity-60 text-[11px]">{idx + 1}</td>
+                        <td className="py-2 px-3">
+                          {t.action === 'Created' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              Ditambahkan
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                              Diperbarui
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 font-semibold max-w-xs truncate" title={t.title}>
+                          {t.title}
+                        </td>
+                        <td className="py-2 px-3 opacity-90 max-w-[150px] truncate" title={t.projectName || '-'}>
+                          {t.projectName || '-'}
+                        </td>
+                        <td className="py-2 px-3 opacity-80 whitespace-nowrap">
+                          {t.assignedTo || '-'}
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-black/5 dark:bg-white/5">
+                            {t.status || 'Todo'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-black/5 dark:bg-white/5">
+                            {t.priority || 'Medium'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Created Projects List */}
             {importResult.createdProjectNames?.length > 0 && (
               <div className="p-3 rounded-xl border space-y-1.5" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
                 <div className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
-                  <FolderPlus size={14} className="text-indigo-500" /> Proyek yang Dibuat ({importResult.createdProjectNames.length}):
+                  <FolderPlus size={14} className="text-indigo-500" /> Proyek Baru yang Terbentuk ({importResult.createdProjectNames.length}):
                 </div>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
                   {importResult.createdProjectNames.map((p, i) => (
                     <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 text-indigo-500">
                       {p}
@@ -213,7 +364,11 @@ export default function TaskImportModal({ isOpen, onClose, onSuccess }) {
               </div>
             )}
 
-            <div className="pt-2 flex justify-end">
+            {/* Footer Buttons */}
+            <div className="pt-2 flex items-center justify-between border-t shrink-0" style={{ borderColor: 'var(--border-color)' }}>
+              <span className="text-[11px] opacity-60" style={{ color: 'var(--text-secondary)' }}>
+                Menampilkan {filteredTasks.length} dari {allTasks.length} tugas yang diproses
+              </span>
               <button
                 type="button"
                 onClick={handleClose}

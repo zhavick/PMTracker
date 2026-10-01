@@ -12,7 +12,10 @@ import {
   X, 
   Save, 
   Layers,
-  Users
+  Users,
+  Sparkles,
+  Building2,
+  UserCheck
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useTimer } from '../context/TimerContext';
@@ -62,6 +65,17 @@ export default function TimesheetPage() {
   });
   const [manualLoading, setManualLoading] = useState(false);
   const [manualError, setManualError] = useState(null);
+
+  // Elistec Timesheet Export Modal State
+  const [isElistecModalOpen, setIsElistecModalOpen] = useState(false);
+  const [elistecForm, setElistecForm] = useState({
+    userId: '',
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+    clientName: 'Tugu Insurance',
+    sowNo: ''
+  });
+  const [elistecLoading, setElistecLoading] = useState(false);
 
   // Set date ranges according to presets
   useEffect(() => {
@@ -156,6 +170,44 @@ export default function TimesheetPage() {
     }
   };
 
+  const handleExportElistec = async (e) => {
+    if (e) e.preventDefault();
+    setElistecLoading(true);
+    try {
+      const targetId = elistecForm.userId || (selectedUserId && selectedUserId !== 'all' ? selectedUserId : user?.id);
+      const params = {
+        userId: targetId,
+        year: parseInt(elistecForm.year, 10),
+        month: parseInt(elistecForm.month, 10),
+        clientName: elistecForm.clientName?.trim() || 'Tugu Insurance',
+        sowNo: elistecForm.sowNo?.trim() || '-'
+      };
+      const res = await axiosClient.get('/api/timesheets/export-elistec', {
+        params,
+        responseType: 'blob'
+      });
+      const selectedMember = members.find(m => m.id === targetId);
+      const memberName = selectedMember?.fullName || selectedMember?.userName || user?.fullName || 'Member';
+      const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      const monthStr = monthNames[parseInt(elistecForm.month, 10) - 1] || elistecForm.month;
+      const fileName = `Timesheet Elistec - ${monthStr} ${elistecForm.year} - ${memberName}.xlsx`;
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setIsElistecModalOpen(false);
+    } catch (err) {
+      console.error('Failed to export Elistec timesheet:', err);
+      alert('Gagal mengunduh laporan Timesheet Elistec.');
+    } finally {
+      setElistecLoading(false);
+    }
+  };
+
   const handleDeleteSession = async (sessionId) => {
     if (!window.confirm('Yakin ingin menghapus sesi kerja ini?')) return;
     try {
@@ -241,21 +293,38 @@ export default function TimesheetPage() {
           {/* Manual Entry Button */}
           <button
             onClick={() => setIsManualModalOpen(true)}
-            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all hover:bg-black/5 dark:hover:bg-white/5"
+            className="flex items-center space-x-2 px-3.5 py-2.5 rounded-xl border text-sm font-semibold transition-all hover:bg-black/5 dark:hover:bg-white/5"
             style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
           >
             <Plus className="w-4 h-4" />
             <span>Catat Jam Manual</span>
           </button>
 
-          {/* Export Excel Button */}
+          {/* Export Personal Excel Button */}
           <button
             onClick={handleExportExcel}
-            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all transform active:scale-95"
+            className="flex items-center space-x-2 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all transform active:scale-95"
             style={{ backgroundColor: '#10B981', boxShadow: '0 10px 20px -5px rgba(16, 185, 129, 0.4)' }}
+            title="Ekspor laporan timesheet personal ringkas"
           >
             <FileSpreadsheet className="w-4 h-4" />
-            <span>Ekspor Excel (.xlsx)</span>
+            <span>Excel Personal</span>
+          </button>
+
+          {/* Export Format Elistec Button */}
+          <button
+            onClick={() => {
+              if (!elistecForm.userId && user?.id) {
+                setElistecForm(f => ({ ...f, userId: selectedUserId && selectedUserId !== 'all' ? selectedUserId : user.id }));
+              }
+              setIsElistecModalOpen(true);
+            }}
+            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all transform active:scale-95"
+            style={{ backgroundColor: '#1F4E78', boxShadow: '0 10px 20px -5px rgba(31, 78, 120, 0.4)' }}
+            title="Ekspor laporan timesheet bulanan per member sesuai format resmi Elistec"
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span>Format Elistec (.xlsx)</span>
           </button>
         </div>
       </div>
@@ -624,6 +693,168 @@ export default function TimesheetPage() {
                 >
                   <Save className="w-4 h-4" />
                   <span>{manualLoading ? 'Menyimpan...' : 'Simpan Sesi'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Ekspor Laporan Timesheet Format Elistec */}
+      {isElistecModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div 
+            className="w-full max-w-lg rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-6 relative overflow-hidden"
+            style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-md"
+                  style={{ backgroundColor: '#1F4E78' }}
+                >
+                  <FileSpreadsheet size={22} className="text-sky-300" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                    Ekspor Timesheet Format Elistec
+                  </h2>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    Laporan 13 kolom resmi: MD, Formula, Weekend Libur, & Tanda Tangan
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsElistecModalOpen(false)}
+                className="p-2 rounded-xl border hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleExportElistec} className="space-y-4">
+              {/* Member Selector */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  Anggota Tim (Member) *
+                </label>
+                {isAdmin && members.length > 0 ? (
+                  <select
+                    value={elistecForm.userId || (user?.id || '')}
+                    onChange={(e) => setElistecForm(f => ({ ...f, userId: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm"
+                    style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  >
+                    {members.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.fullName || m.userName} ({m.jobTitle || m.role || 'Member'})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="px-4 py-2.5 rounded-xl border text-sm font-semibold" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}>
+                    {user?.fullName || user?.userName} (Anda)
+                  </div>
+                )}
+              </div>
+
+              {/* Bulan & Tahun */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    Bulan *
+                  </label>
+                  <select
+                    value={elistecForm.month}
+                    onChange={(e) => setElistecForm(f => ({ ...f, month: parseInt(e.target.value, 10) }))}
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm"
+                    style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  >
+                    {[
+                      { v: 1, n: 'Januari' }, { v: 2, n: 'Februari' }, { v: 3, n: 'Maret' },
+                      { v: 4, n: 'April' }, { v: 5, n: 'Mei' }, { v: 6, n: 'Juni' },
+                      { v: 7, n: 'Juli' }, { v: 8, n: 'Agustus' }, { v: 9, n: 'September' },
+                      { v: 10, n: 'Oktober' }, { v: 11, n: 'November' }, { v: 12, n: 'Desember' }
+                    ].map(m => (
+                      <option key={m.v} value={m.v}>{m.n}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    Tahun *
+                  </label>
+                  <input
+                    type="number"
+                    min="2020"
+                    max="2035"
+                    value={elistecForm.year}
+                    onChange={(e) => setElistecForm(f => ({ ...f, year: parseInt(e.target.value, 10) }))}
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm"
+                    style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+              </div>
+
+              {/* Client Name */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  Nama Klien / Perusahaan
+                </label>
+                <input
+                  type="text"
+                  value={elistecForm.clientName}
+                  onChange={(e) => setElistecForm(f => ({ ...f, clientName: e.target.value }))}
+                  placeholder="Contoh: Tugu Insurance"
+                  className="w-full px-4 py-2.5 rounded-xl border text-sm"
+                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              {/* SOW Number */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  Nomor SOW (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={elistecForm.sowNo}
+                  onChange={(e) => setElistecForm(f => ({ ...f, sowNo: e.target.value }))}
+                  placeholder="Contoh: SOW-2026/09/01 atau kosongkan (-)"
+                  className="w-full px-4 py-2.5 rounded-xl border text-sm"
+                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              {/* Informational Tip */}
+              <div className="p-3 rounded-2xl bg-sky-500/10 border border-sky-500/25 text-xs text-sky-600 dark:text-sky-400 space-y-1">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-sky-500" /> Format Resmi Elistec
+                </p>
+                <p className="text-[11px] opacity-90">
+                  Laporan akan menghasilkan file spreadsheet (.xlsx) lengkap dengan formula man-days <code>=C/8</code>, jam kerja riil/tugas, otomatisasi baris akhir pekan, dan kolom tanda tangan siap cetak.
+                </p>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsElistecModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border text-sm font-medium"
+                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={elistecLoading}
+                  className="flex items-center space-x-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-md disabled:opacity-50 transition-all hover:opacity-95"
+                  style={{ backgroundColor: '#1F4E78', boxShadow: '0 8px 16px -4px rgba(31, 78, 120, 0.4)' }}
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-sky-300" />
+                  <span>{elistecLoading ? 'Membuat Berkas Excel...' : 'Unduh Berkas Excel (.xlsx)'}</span>
                 </button>
               </div>
             </form>

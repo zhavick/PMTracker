@@ -272,58 +272,124 @@ public class TaskExcelImportService
                     if (completedDate.HasValue) descParts.Add($"Selesai: {completedDate.Value:dd/MM/yyyy}");
                     
                     var description = descParts.Count > 0 ? string.Join(" | ", descParts) : null;
+                    var normalizedTitle = title.Trim().ToLower();
 
-                    // Check if task already exists for this user and project (or unassigned)
-                    var existingTask = await _context.Tasks.FirstOrDefaultAsync(t =>
-                        t.Title == title &&
+                    // Check if task was already queued in this current import batch
+                    var inBatchTask = newTasks.FirstOrDefault(t =>
                         t.ProjectId == projectId &&
                         t.AssignedToUserId == taskUser.Id &&
-                        (t.CompanyId == companyId || t.CompanyId == null));
+                        t.Title.Trim().ToLower() == normalizedTitle);
 
-                    if (existingTask == null)
+                    if (inBatchTask != null)
                     {
-                        existingTask = await _context.Tasks.FirstOrDefaultAsync(t =>
-                            t.Title == title &&
-                            t.ProjectId == projectId &&
-                            t.AssignedToUserId == null &&
-                            (t.CompanyId == companyId || t.CompanyId == null));
-                    }
+                        inBatchTask.Status = status;
+                        inBatchTask.Priority = priority;
+                        inBatchTask.Progress = progress;
+                        inBatchTask.Milestone = milestone;
+                        if (startDate.HasValue) inBatchTask.StartDate = startDate;
+                        if (dueDate.HasValue) inBatchTask.DueDate = dueDate;
+                        if (!string.IsNullOrWhiteSpace(obstacle)) inBatchTask.Obstacle = obstacle;
+                        if (!string.IsNullOrWhiteSpace(solution)) inBatchTask.Solution = solution;
+                        if (!string.IsNullOrEmpty(description)) inBatchTask.Description = description;
+                        inBatchTask.UpdatedAt = DateTime.UtcNow;
 
-                    if (existingTask != null)
-                    {
-                        existingTask.Status = status;
-                        existingTask.Priority = priority;
-                        existingTask.Progress = progress;
-                        existingTask.Milestone = milestone;
-                        existingTask.StartDate = startDate;
-                        existingTask.DueDate = dueDate;
-                        if (!string.IsNullOrWhiteSpace(obstacle)) existingTask.Obstacle = obstacle;
-                        if (!string.IsNullOrWhiteSpace(solution)) existingTask.Solution = solution;
-                        existingTask.AssignedToUserId = taskUser.Id;
-                        if (!string.IsNullOrEmpty(description)) existingTask.Description = description;
-                        existingTask.UpdatedAt = DateTime.UtcNow;
+                        result.UpdatedCount++;
+                        result.TasksUpdated.Add(new ImportedTaskItemDto
+                        {
+                            Title = title,
+                            ProjectName = projectName,
+                            AssignedTo = taskUser.FullName ?? taskUser.UserName,
+                            Status = status.ToString(),
+                            Priority = priority.ToString(),
+                            Action = "Updated",
+                            Milestone = milestone,
+                            RowNumber = r,
+                            SheetName = sheetName
+                        });
                     }
                     else
                     {
-                        var task = new WorkTask
+                        // Check if task already exists in database for this user and project (or unassigned)
+                        var existingTask = await _context.Tasks.FirstOrDefaultAsync(t =>
+                            t.ProjectId == projectId &&
+                            t.AssignedToUserId == taskUser.Id &&
+                            (t.CompanyId == companyId || t.CompanyId == null) &&
+                            t.Title.Trim().ToLower() == normalizedTitle);
+
+                        if (existingTask == null)
                         {
-                            Title = title,
-                            Description = description,
-                            Status = status,
-                            Priority = priority,
-                            Progress = progress,
-                            Milestone = milestone,
-                            Obstacle = obstacle,
-                            Solution = solution,
-                            ProjectId = projectId,
-                            CompanyId = companyId,
-                            AssignedToUserId = taskUser.Id,
-                            StartDate = startDate,
-                            DueDate = dueDate,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-                        newTasks.Add(task);
+                            existingTask = await _context.Tasks.FirstOrDefaultAsync(t =>
+                                t.ProjectId == projectId &&
+                                t.AssignedToUserId == null &&
+                                (t.CompanyId == companyId || t.CompanyId == null) &&
+                                t.Title.Trim().ToLower() == normalizedTitle);
+                        }
+
+                        if (existingTask != null)
+                        {
+                            existingTask.Status = status;
+                            existingTask.Priority = priority;
+                            existingTask.Progress = progress;
+                            existingTask.Milestone = milestone;
+                            if (startDate.HasValue) existingTask.StartDate = startDate;
+                            if (dueDate.HasValue) existingTask.DueDate = dueDate;
+                            if (!string.IsNullOrWhiteSpace(obstacle)) existingTask.Obstacle = obstacle;
+                            if (!string.IsNullOrWhiteSpace(solution)) existingTask.Solution = solution;
+                            existingTask.AssignedToUserId = taskUser.Id;
+                            if (!string.IsNullOrEmpty(description)) existingTask.Description = description;
+                            existingTask.UpdatedAt = DateTime.UtcNow;
+
+                            result.UpdatedCount++;
+                            result.TasksUpdated.Add(new ImportedTaskItemDto
+                            {
+                                Id = existingTask.Id,
+                                Title = title,
+                                ProjectName = projectName,
+                                AssignedTo = taskUser.FullName ?? taskUser.UserName,
+                                Status = status.ToString(),
+                                Priority = priority.ToString(),
+                                Action = "Updated",
+                                Milestone = milestone,
+                                RowNumber = r,
+                                SheetName = sheetName
+                            });
+                        }
+                        else
+                        {
+                            var task = new WorkTask
+                            {
+                                Title = title,
+                                Description = description,
+                                Status = status,
+                                Priority = priority,
+                                Progress = progress,
+                                Milestone = milestone,
+                                Obstacle = obstacle,
+                                Solution = solution,
+                                ProjectId = projectId,
+                                CompanyId = companyId,
+                                AssignedToUserId = taskUser.Id,
+                                StartDate = startDate,
+                                DueDate = dueDate,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+                            newTasks.Add(task);
+
+                            result.CreatedCount++;
+                            result.TasksCreated.Add(new ImportedTaskItemDto
+                            {
+                                Title = title,
+                                ProjectName = projectName,
+                                AssignedTo = taskUser.FullName ?? taskUser.UserName,
+                                Status = status.ToString(),
+                                Priority = priority.ToString(),
+                                Action = "Created",
+                                Milestone = milestone,
+                                RowNumber = r,
+                                SheetName = sheetName
+                            });
+                        }
                     }
 
                     result.SuccessRows++;

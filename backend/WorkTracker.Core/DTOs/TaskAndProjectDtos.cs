@@ -147,6 +147,7 @@ public class CreateTaskDto
     public DateTime? StartDate { get; set; }
     public DateTime? DueDate { get; set; }
     public string? Tags { get; set; }
+    public bool? AllowDuplicate { get; set; } = false;
 }
 
 public class UpdateTaskDto
@@ -185,7 +186,6 @@ public class UnifiedSaveTaskDto
     [Required]
     [MaxLength(300)]
     public string Title { get; set; } = string.Empty;
-
     public string? Description { get; set; }
     public WorkTaskStatus Status { get; set; }
     public TaskPriority Priority { get; set; }
@@ -201,6 +201,7 @@ public class UnifiedSaveTaskDto
     public DateTime? StartDate { get; set; }
     public DateTime? DueDate { get; set; }
     public string? Tags { get; set; }
+    public bool? AllowDuplicate { get; set; } = false;
 
     // Unified session logging
     public bool LogSession { get; set; } = false;
@@ -210,16 +211,51 @@ public class UnifiedSaveTaskDto
     public string? SessionNotes { get; set; }
 }
 
+public class ImportedTaskItemDto
+{
+    public int? Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? ProjectName { get; set; }
+    public string? AssignedTo { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string Priority { get; set; } = string.Empty;
+    public string Action { get; set; } = "Created"; // "Created" or "Updated"
+    public string? Milestone { get; set; }
+    public int? RowNumber { get; set; }
+    public string? SheetName { get; set; }
+}
+
 public class TaskImportResultDto
 {
     public int TotalRows { get; set; }
     public int SuccessRows { get; set; }
     public int FailedRows { get; set; }
+    public int CreatedCount { get; set; }
+    public int UpdatedCount { get; set; }
     public int ProjectsCreated { get; set; }
     public int UsersCreated { get; set; }
     public List<string> CreatedProjectNames { get; set; } = new();
     public List<string> CreatedUserEmails { get; set; } = new();
+    public List<ImportedTaskItemDto> TasksCreated { get; set; } = new();
+    public List<ImportedTaskItemDto> TasksUpdated { get; set; } = new();
     public List<string> Errors { get; set; } = new();
+}
+
+public class ElistecTimesheetRowDto
+{
+    public string IssueKey { get; set; } = string.Empty;
+    public string IssueSummary { get; set; } = string.Empty;
+    public double Hours { get; set; }
+    public DateTime WorkDate { get; set; }
+    public string ClockIn { get; set; } = "-";
+    public string ClockOut { get; set; } = "-";
+    public string Username { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string Period { get; set; } = string.Empty;
+    public string ProjectName { get; set; } = string.Empty;
+    public string ActivityType { get; set; } = string.Empty;
+    public string WorkingPlace { get; set; } = "WFO";
+    public bool IsWeekendOrHoliday { get; set; }
 }
 
 public class BulkUpdateTasksRequestDto
@@ -237,4 +273,5 @@ public class BulkDeleteTasksRequestDto
     [Required]
     public List<int> TaskIds { get; set; } = new();
 }
+
 
