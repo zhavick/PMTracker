@@ -16,8 +16,12 @@ import {
   PlusCircle
 } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
+import { useAuth } from '../../context/AuthContext';
 
 export default function TaskImportModal({ isOpen, onClose, onSuccess }) {
+  const { user } = useAuth();
+  const canImportExcel = ['Admin', 'PM', 'Project Manager', 'ProjectManager', 'System Analyst'].includes(user?.role);
+
   const [file, setFile] = useState(null);
   const [filePath, setFilePath] = useState('C:\\Users\\WAHANA 24\\Downloads\\Task Tracker v2.xlsx');
   const [isPathMode, setIsPathMode] = useState(false);
@@ -28,7 +32,7 @@ export default function TaskImportModal({ isOpen, onClose, onSuccess }) {
   const [detailSearch, setDetailSearch] = useState('');
   const fileInputRef = useRef(null);
 
-  if (!isOpen) return null;
+  if (!isOpen || !canImportExcel) return null;
 
   const handleFileChange = (e) => {
     const selected = e.target.files?.[0];

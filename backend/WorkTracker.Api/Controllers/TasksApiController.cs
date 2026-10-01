@@ -393,6 +393,7 @@ public class TasksApiController : ControllerBase
     }
 
     [HttpPost("import-excel")]
+    [Authorize(Roles = "Admin,PM,Project Manager,ProjectManager,System Analyst")]
     public async Task<IActionResult> ImportTasksExcel([FromForm] TaskImportUploadDto dto)
     {
         var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);

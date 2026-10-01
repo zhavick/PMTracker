@@ -19,6 +19,7 @@ import {
   CheckSquare
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
+import { useAuth } from '../context/AuthContext';
 import TaskTableGrid from '../components/tasks/TaskTableGrid';
 import TaskKanbanBoard from '../components/tasks/TaskKanbanBoard';
 import TaskFormModal from '../components/tasks/TaskFormModal';
@@ -26,6 +27,9 @@ import TaskImportModal from '../components/tasks/TaskImportModal';
 import TaskDetailDrawer from '../components/tasks/TaskDetailDrawer';
 
 export default function TasksPage() {
+  const { user } = useAuth();
+  const canImportExcel = ['Admin', 'PM', 'Project Manager', 'ProjectManager', 'System Analyst'].includes(user?.role);
+
   // USER SPECIFICATION: Grid view is the default view
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'kanban'
   const [tasks, setTasks] = useState([]);
@@ -374,16 +378,18 @@ export default function TasksPage() {
             <span className="hidden sm:inline">{isExporting ? 'Mengekspor...' : 'Ekspor Excel'}</span>
           </button>
 
-          {/* Import Excel Button */}
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border shadow-sm transition-all hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-card)' }}
-            title="Impor Tugas dari Berkas Excel (.xlsx)"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
-            <span className="hidden sm:inline">Impor Excel</span>
-          </button>
+          {/* Import Excel Button (Admin / PM only) */}
+          {canImportExcel && (
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border shadow-sm transition-all hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-card)' }}
+              title="Impor Tugas dari Berkas Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+              <span className="hidden sm:inline">Impor Excel</span>
+            </button>
+          )}
 
           {/* Add New Task Button */}
           <button
@@ -707,12 +713,14 @@ export default function TasksPage() {
         taskToEdit={taskToEdit}
       />
 
-      {/* Excel Import Modal */}
-      <TaskImportModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onSuccess={() => fetchTasks(true)}
-      />
+      {/* Excel Import Modal (Admin / PM only) */}
+      {canImportExcel && (
+        <TaskImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onSuccess={() => fetchTasks(true)}
+        />
+      )}
     </div>
   );
 }
