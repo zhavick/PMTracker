@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using WorkTracker.Api.Extensions;
 using WorkTracker.Core.DTOs;
 using WorkTracker.Core.Entities;
 using WorkTracker.Infrastructure.Data;
@@ -24,17 +25,40 @@ public class TicketsApiController : ControllerBase
     }
 
     [HttpGet("summary")]
-    public async Task<IActionResult> GetSummary()
+    public async Task<IActionResult> GetSummary([FromQuery] int? companyId = null)
     {
         var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var isAdmin = User.IsInRole("Admin");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
 
-        var total = await _context.Tickets.CountAsync();
-        var open = await _context.Tickets.CountAsync(t => t.Status == TicketStatus.Open);
-        var inProgress = await _context.Tickets.CountAsync(t => t.Status == TicketStatus.InProgress);
-        var resolved = await _context.Tickets.CountAsync(t => t.Status == TicketStatus.Resolved || t.Status == TicketStatus.Closed);
-        var critical = await _context.Tickets.CountAsync(t => t.Priority == TicketPriority.Critical && t.Status != TicketStatus.Closed && t.Status != TicketStatus.Rejected);
-        var myAssigned = await _context.Tickets.CountAsync(t => t.AssignedToUserId == currentUserId && t.Status != TicketStatus.Closed);
-        var myReported = await _context.Tickets.CountAsync(t => t.CreatedByUserId == currentUserId);
+        var query = _context.Tickets.AsQueryable();
+
+        if (isAdmin)
+        {
+            if (companyId.HasValue)
+            {
+                query = query.Where(t => t.CreatedByUser.CompanyId == companyId.Value || (t.Project != null && t.Project.CompanyId == companyId.Value));
+            }
+        }
+        else
+        {
+            if (userCompanyId.HasValue)
+            {
+                query = query.Where(t => t.CreatedByUser.CompanyId == userCompanyId.Value || (t.Project != null && t.Project.CompanyId == userCompanyId.Value));
+            }
+            else
+            {
+                query = query.Where(t => t.CreatedByUserId == currentUserId || t.AssignedToUserId == currentUserId);
+            }
+        }
+
+        var total = await query.CountAsync();
+        var open = await query.CountAsync(t => t.Status == TicketStatus.Open);
+        var inProgress = await query.CountAsync(t => t.Status == TicketStatus.InProgress);
+        var resolved = await query.CountAsync(t => t.Status == TicketStatus.Resolved || t.Status == TicketStatus.Closed);
+        var critical = await query.CountAsync(t => t.Priority == TicketPriority.Critical && t.Status != TicketStatus.Closed && t.Status != TicketStatus.Rejected);
+        var myAssigned = await query.CountAsync(t => t.AssignedToUserId == currentUserId && t.Status != TicketStatus.Closed);
+        var myReported = await query.CountAsync(t => t.CreatedByUserId == currentUserId);
 
         return Ok(ApiResponse<object>.Success(new
         {
@@ -54,16 +78,41 @@ public class TicketsApiController : ControllerBase
         [FromQuery] TicketPriority? priority,
         [FromQuery] TicketCategory? category,
         [FromQuery] int? projectId,
+        [FromQuery] int? companyId,
         [FromQuery] string? assignedToUserId,
         [FromQuery] string? createdByUserId,
         [FromQuery] string? search)
     {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var isAdmin = User.IsInRole("Admin");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
+
         var query = _context.Tickets
             .Include(t => t.CreatedByUser)
             .Include(t => t.AssignedToUser)
             .Include(t => t.Project)
             .Include(t => t.Comments)
             .AsQueryable();
+
+        // Multi-tenancy Scoping
+        if (isAdmin)
+        {
+            if (companyId.HasValue)
+            {
+                query = query.Where(t => t.CreatedByUser.CompanyId == companyId.Value || (t.Project != null && t.Project.CompanyId == companyId.Value));
+            }
+        }
+        else
+        {
+            if (userCompanyId.HasValue)
+            {
+                query = query.Where(t => t.CreatedByUser.CompanyId == userCompanyId.Value || (t.Project != null && t.Project.CompanyId == userCompanyId.Value));
+            }
+            else
+            {
+                query = query.Where(t => t.CreatedByUserId == currentUserId || t.AssignedToUserId == currentUserId);
+            }
+        }
 
         if (status.HasValue)
             query = query.Where(t => t.Status == status.Value);
@@ -126,6 +175,10 @@ public class TicketsApiController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetTicketById(int id)
     {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var isAdmin = User.IsInRole("Admin");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
+
         var ticket = await _context.Tickets
             .Include(t => t.CreatedByUser)
             .Include(t => t.AssignedToUser)
@@ -136,6 +189,19 @@ public class TicketsApiController : ControllerBase
 
         if (ticket == null)
             return NotFound(ApiResponse<object>.Fail("Tiket tidak ditemukan."));
+
+        if (!isAdmin && userCompanyId.HasValue)
+        {
+            var canAccess = ticket.CreatedByUserId == currentUserId 
+                || ticket.AssignedToUserId == currentUserId 
+                || (ticket.CreatedByUser != null && ticket.CreatedByUser.CompanyId == userCompanyId.Value)
+                || (ticket.Project != null && ticket.Project.CompanyId == userCompanyId.Value);
+
+            if (!canAccess)
+            {
+                return Forbid();
+            }
+        }
 
         var result = new
         {
@@ -185,6 +251,17 @@ public class TicketsApiController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail("Judul dan deskripsi tiket wajib diisi."));
 
         var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var isAdmin = User.IsInRole("Admin");
+        var userCompanyId = await User.GetCompanyIdAsync(_context);
+
+        if (req.ProjectId.HasValue)
+        {
+            var project = await _context.Projects.FindAsync(req.ProjectId.Value);
+            if (project == null || (!isAdmin && userCompanyId.HasValue && project.CompanyId != userCompanyId.Value))
+            {
+                return BadRequest(ApiResponse<object>.Fail("Proyek yang dipilih tidak valid atau tidak dapat diakses."));
+            }
+        }
 
         // Generate Ticket Number: TCK-YYYYMM-XXXX
         var datePrefix = DateTime.UtcNow.ToString("yyyyMM");

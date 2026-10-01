@@ -23,6 +23,7 @@ import ProfilePage from './pages/ProfilePage';
 import UserGuidePage from './pages/UserGuidePage';
 import GamificationPage from './pages/GamificationPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import TicketingPage from './pages/TicketingPage';
 import { TimerProvider } from './context/TimerContext';
 
 // Protected Route Guard
@@ -55,7 +56,8 @@ export default function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="tasks" element={<TasksPage />} />
           <Route path="projects" element={<ProjectsPage />} />
-          <Route path="ticketing" element={<Navigate to="/dashboard" replace />} />
+          <Route path="tickets" element={<TicketingPage />} />
+          <Route path="ticketing" element={<Navigate to="/tickets" replace />} />
           <Route path="timesheet" element={<TimesheetPage />} />
 
           <Route path="attendance" element={<AttendancePage />} />

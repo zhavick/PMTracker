@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   X, LayoutDashboard, CheckSquare, Briefcase, Clock, Calendar, 
   FileText, Database, Code, Users, Settings, ShieldAlert, 
-  SlidersHorizontal, HelpCircle, ExternalLink, Building2
+  SlidersHorizontal, HelpCircle, ExternalLink, Building2, LifeBuoy, Trophy
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -17,10 +17,12 @@ export default function MobileDrawer({ isOpen, onClose }) {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/tasks', label: 'Daftar Tugas (Grid/Kanban)', icon: CheckSquare },
     { path: '/projects', label: 'Proyek Kerja', icon: Briefcase },
+    { path: '/tickets', label: 'Tiket Dukungan (Helpdesk)', icon: LifeBuoy },
     { path: '/timesheet', label: 'Timesheet & Multi-Timer', icon: Clock },
     { path: '/attendance', label: 'Presensi & Kehadiran', icon: Calendar },
     { path: '/calendar', label: 'Kalender Tugas', icon: Calendar },
     { path: '/notes', label: 'Catatan & Dokumen', icon: FileText },
+    { path: '/gamification', label: 'Gamifikasi & Badge', icon: Trophy },
     { path: '/sql-tools', label: 'SQL Beautifier', icon: Database },
     { path: '/json-tools', label: 'JSON Payload Tools', icon: Code },
     ...(isAdmin ? [
