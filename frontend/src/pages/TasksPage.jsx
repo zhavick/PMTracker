@@ -302,8 +302,10 @@ export default function TasksPage() {
 
   // Metrics
   const totalTasks = totalItems || tasks.length;
-  const completedTasks = tasks.filter(t => t.status === 2).length;
-  const inProgressTasks = tasks.filter(t => t.status === 1).length;
+  const isCompleted = (s) => s === 2 || String(s).toLowerCase() === 'done' || String(s).toLowerCase() === 'completed';
+  const isInProgress = (s) => s === 1 || String(s).toLowerCase() === 'inprogress' || String(s).toLowerCase() === 'in_progress';
+  const completedTasks = tasks.filter(t => isCompleted(t.status)).length;
+  const inProgressTasks = tasks.filter(t => isInProgress(t.status)).length;
   const totalSeconds = tasks.reduce((sum, t) => sum + (t.totalSecondsSpent || 0), 0);
   const totalHours = (totalSeconds / 3600).toFixed(1);
 

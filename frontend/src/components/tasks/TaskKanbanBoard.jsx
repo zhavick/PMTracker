@@ -35,6 +35,37 @@ function formatSeconds(totalSeconds) {
   return `${hours}j ${minutes}m`;
 }
 
+const normalizeStatus = (val) => {
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (!val && val !== 0) return 0;
+  switch (String(val).toLowerCase()) {
+    case '0': case 'todo': return 0;
+    case '1': case 'inprogress': case 'in_progress': case 'in progress': return 1;
+    case '2': case 'done': case 'completed': return 2;
+    case '3': case 'overdue': return 3;
+    case '4': case 'review': case 'inreview': case 'in_review': case 'in review': return 4;
+    default: {
+      const parsed = parseInt(val, 10);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+  }
+};
+
+const normalizePriority = (val) => {
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (!val && val !== 0) return 1;
+  switch (String(val).toLowerCase()) {
+    case '0': case 'low': return 0;
+    case '1': case 'medium': return 1;
+    case '2': case 'high': return 2;
+    case '3': case 'critical': return 3;
+    default: {
+      const parsed = parseInt(val, 10);
+      return isNaN(parsed) ? 1 : parsed;
+    }
+  }
+};
+
 export default function TaskKanbanBoard({ 
   tasks = [], 
   loading = false, 
@@ -61,10 +92,10 @@ export default function TaskKanbanBoard({
 
   // Group tasks by column
   const groupedTasks = {
-    0: tasks.filter(t => t.status === 0),
-    1: tasks.filter(t => t.status === 1),
-    4: tasks.filter(t => t.status === 4),
-    2: tasks.filter(t => t.status === 2 || t.status === 3) // treat overdue/done accordingly
+    0: tasks.filter(t => normalizeStatus(t.status) === 0),
+    1: tasks.filter(t => normalizeStatus(t.status) === 1),
+    4: tasks.filter(t => normalizeStatus(t.status) === 4),
+    2: tasks.filter(t => normalizeStatus(t.status) === 2 || normalizeStatus(t.status) === 3) // treat overdue/done accordingly
   };
 
   const handleDragStart = (e, taskId) => {
@@ -85,7 +116,7 @@ export default function TaskKanbanBoard({
     setDraggedTaskId(null);
 
     const task = tasks.find(t => t.id === taskId);
-    if (!task || task.status === targetStatus) return;
+    if (!task || normalizeStatus(task.status) === targetStatus) return;
 
     try {
       setMovingTaskId(taskId);
@@ -102,7 +133,7 @@ export default function TaskKanbanBoard({
 
   const handleStepStatus = async (task, direction) => {
     const statusOrder = [0, 1, 4, 2];
-    const currentIndex = statusOrder.indexOf(task.status);
+    const currentIndex = statusOrder.indexOf(normalizeStatus(task.status));
     if (currentIndex === -1) return;
 
     const newIndex = currentIndex + direction;

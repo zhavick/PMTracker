@@ -17,6 +17,37 @@ import {
 } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
 
+const normalizeStatus = (val) => {
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (!val && val !== 0) return 0;
+  switch (String(val).toLowerCase()) {
+    case '0': case 'todo': return 0;
+    case '1': case 'inprogress': case 'in_progress': case 'in progress': return 1;
+    case '2': case 'done': case 'completed': return 2;
+    case '3': case 'overdue': return 3;
+    case '4': case 'review': case 'inreview': case 'in_review': case 'in review': return 4;
+    default: {
+      const parsed = parseInt(val, 10);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+  }
+};
+
+const normalizePriority = (val) => {
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (!val && val !== 0) return 1;
+  switch (String(val).toLowerCase()) {
+    case '0': case 'low': return 0;
+    case '1': case 'medium': return 1;
+    case '2': case 'high': return 2;
+    case '3': case 'critical': return 3;
+    default: {
+      const parsed = parseInt(val, 10);
+      return isNaN(parsed) ? 1 : parsed;
+    }
+  }
+};
+
 const STATUS_CONFIG = {
   0: { label: 'To Do', color: 'bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20' },
   1: { label: 'In Progress', color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
@@ -195,10 +226,12 @@ export default function TaskTableGrid({
             </thead>
             <tbody className="divide-y text-sm" style={{ borderColor: 'var(--border-color)' }}>
               {tasks.map((task) => {
-                const statusInfo = STATUS_CONFIG[task.status] || STATUS_CONFIG[0];
-                const priorityInfo = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG[1];
+                const normStatus = normalizeStatus(task.status);
+                const normPriority = normalizePriority(task.priority);
+                const statusInfo = STATUS_CONFIG[normStatus] || STATUS_CONFIG[0];
+                const priorityInfo = PRIORITY_CONFIG[normPriority] || PRIORITY_CONFIG[1];
                 const hasObstacle = Boolean(task.obstacle);
-                const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 2;
+                const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && normStatus !== 2;
                 const isSelected = selectedTaskIds.includes(task.id);
 
                 return (
@@ -294,7 +327,7 @@ export default function TaskTableGrid({
                     {/* Status Dropdown */}
                     <td className="py-4 px-3 align-top">
                       <select
-                        value={task.status}
+                        value={normStatus}
                         disabled={updatingTaskId === task.id}
                         onChange={(e) => handleQuickStatusChange(task, e.target.value)}
                         className={`text-xs font-bold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 ${statusInfo.color}`}

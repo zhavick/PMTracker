@@ -147,7 +147,10 @@ public class TasksApiController : ControllerBase
     public async Task<IActionResult> CreateTask([FromBody] CreateTaskDto dto)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Fail("Data input tidak valid."));
+        {
+            var errors = string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+            return BadRequest(ApiResponse<object>.Fail($"Data input tidak valid: {errors}"));
+        }
 
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var companyId = await User.GetCompanyIdAsync(_context);
@@ -172,10 +175,10 @@ public class TasksApiController : ControllerBase
             Status = dto.Status,
             Priority = dto.Priority,
             Progress = dto.Status == WorkTaskStatus.Completed ? 100 : Math.Clamp(dto.Progress, 0, 100),
-            ProjectId = dto.ProjectId,
+            ProjectId = (dto.ProjectId.HasValue && dto.ProjectId.Value > 0) ? dto.ProjectId.Value : null,
             CategoryId = dto.CategoryId,
             CompanyId = companyId,
-            AssignedToUserId = string.IsNullOrWhiteSpace(dto.AssignedToUserId) ? userId : dto.AssignedToUserId,
+            AssignedToUserId = string.IsNullOrWhiteSpace(dto.AssignedToUserId) ? userId : dto.AssignedToUserId.Trim(),
             ParentTaskId = dto.ParentTaskId,
             Milestone = string.IsNullOrWhiteSpace(dto.Milestone) ? "Implementation" : dto.Milestone.Trim(),
             Obstacle = dto.Obstacle?.Trim(),
@@ -197,7 +200,10 @@ public class TasksApiController : ControllerBase
     public async Task<IActionResult> UpdateTask(int id, [FromBody] UpdateTaskDto dto)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Fail("Data input tidak valid."));
+        {
+            var errors = string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+            return BadRequest(ApiResponse<object>.Fail($"Data input tidak valid: {errors}"));
+        }
 
         var companyId = await User.GetCompanyIdAsync(_context);
         var task = await _context.Tasks.Include(t => t.Project).FirstOrDefaultAsync(t => t.Id == id);
@@ -209,9 +215,9 @@ public class TasksApiController : ControllerBase
         task.Status = dto.Status;
         task.Priority = dto.Priority;
         task.Progress = dto.Status == WorkTaskStatus.Completed ? 100 : Math.Clamp(dto.Progress, 0, 100);
-        task.ProjectId = dto.ProjectId;
+        task.ProjectId = (dto.ProjectId.HasValue && dto.ProjectId.Value > 0) ? dto.ProjectId.Value : null;
         task.CategoryId = dto.CategoryId;
-        task.AssignedToUserId = dto.AssignedToUserId;
+        task.AssignedToUserId = string.IsNullOrWhiteSpace(dto.AssignedToUserId) ? null : dto.AssignedToUserId.Trim();
         task.ParentTaskId = dto.ParentTaskId;
         task.Milestone = string.IsNullOrWhiteSpace(dto.Milestone) ? "Implementation" : dto.Milestone.Trim();
         task.Obstacle = dto.Obstacle?.Trim();
@@ -258,7 +264,10 @@ public class TasksApiController : ControllerBase
     public async Task<IActionResult> UnifiedSave(int id, [FromBody] UnifiedSaveTaskDto dto)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Fail("Data input tidak valid."));
+        {
+            var errors = string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+            return BadRequest(ApiResponse<object>.Fail($"Data input tidak valid: {errors}"));
+        }
 
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var companyId = await User.GetCompanyIdAsync(_context);
@@ -280,9 +289,9 @@ public class TasksApiController : ControllerBase
                 task.Status = dto.Status;
                 task.Priority = dto.Priority;
                 task.Progress = dto.Status == WorkTaskStatus.Completed ? 100 : Math.Clamp(dto.Progress, 0, 100);
-                task.ProjectId = dto.ProjectId;
+                task.ProjectId = (dto.ProjectId.HasValue && dto.ProjectId.Value > 0) ? dto.ProjectId.Value : null;
                 task.CategoryId = dto.CategoryId;
-                task.AssignedToUserId = dto.AssignedToUserId;
+                task.AssignedToUserId = string.IsNullOrWhiteSpace(dto.AssignedToUserId) ? null : dto.AssignedToUserId.Trim();
                 task.ParentTaskId = dto.ParentTaskId;
                 task.Milestone = string.IsNullOrWhiteSpace(dto.Milestone) ? "Implementation" : dto.Milestone.Trim();
                 task.Obstacle = dto.Obstacle?.Trim();

@@ -23,6 +23,44 @@ const MILESTONES = [
   'Maintenance'
 ];
 
+// Helper to normalize status enum to integer (0: Todo, 1: InProgress, 2: Done, 3: Overdue, 4: InReview)
+const parseStatusValue = (val) => {
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (!val && val !== 0) return 0;
+  switch (String(val).toLowerCase()) {
+    case '0': case 'todo': return 0;
+    case '1': case 'inprogress': case 'in_progress': case 'in progress': return 1;
+    case '2': case 'done': case 'completed': return 2;
+    case '3': case 'overdue': return 3;
+    case '4': case 'review': case 'inreview': case 'in_review': case 'in review': return 4;
+    default: {
+      const parsed = parseInt(val, 10);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+  }
+};
+
+// Helper to normalize priority enum to integer (0: Low, 1: Medium, 2: High, 3: Critical)
+const parsePriorityValue = (val) => {
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (!val && val !== 0) return 1;
+  switch (String(val).toLowerCase()) {
+    case '0': case 'low': return 0;
+    case '1': case 'medium': return 1;
+    case '2': case 'high': return 2;
+    case '3': case 'critical': return 3;
+    default: {
+      const parsed = parseInt(val, 10);
+      return isNaN(parsed) ? 1 : parsed;
+    }
+  }
+};
+
+const safeTrim = (str) => {
+  if (str === null || str === undefined) return '';
+  return String(str).trim();
+};
+
 export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = null, defaultProjectId = null }) {
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'unified'
   const [loading, setLoading] = useState(false);
@@ -57,18 +95,18 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
       fetchMembers();
       if (taskToEdit) {
         setFormData({
-          title: taskToEdit.title || '',
-          description: taskToEdit.description || '',
-          status: taskToEdit.status ?? 0,
-          priority: taskToEdit.priority ?? 1,
-          progress: taskToEdit.progress ?? 0,
+          title: safeTrim(taskToEdit.title),
+          description: safeTrim(taskToEdit.description),
+          status: parseStatusValue(taskToEdit.status),
+          priority: parsePriorityValue(taskToEdit.priority),
+          progress: typeof taskToEdit.progress === 'number' ? taskToEdit.progress : (parseInt(taskToEdit.progress, 10) || 0),
           projectId: taskToEdit.projectId || '',
           assignedToUserId: taskToEdit.assignedToUserId || '',
-          milestone: taskToEdit.milestone || 'Implementation',
-          obstacle: taskToEdit.obstacle || '',
-          solution: taskToEdit.solution || '',
-          dueDate: taskToEdit.dueDate ? taskToEdit.dueDate.split('T')[0] : '',
-          startDate: taskToEdit.startDate ? taskToEdit.startDate.split('T')[0] : '',
+          milestone: safeTrim(taskToEdit.milestone) || 'Implementation',
+          obstacle: safeTrim(taskToEdit.obstacle),
+          solution: safeTrim(taskToEdit.solution),
+          dueDate: taskToEdit.dueDate ? String(taskToEdit.dueDate).split('T')[0] : '',
+          startDate: taskToEdit.startDate ? String(taskToEdit.startDate).split('T')[0] : '',
           logSession: false,
           durationMinutes: 30,
           sessionDate: new Date().toISOString().split('T')[0],
@@ -126,7 +164,9 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' 
+        ? checked 
+        : (name === 'priority' ? parsePriorityValue(value) : value)
     }));
   };
 
@@ -140,7 +180,7 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
   };
 
   const handleStatusChange = (newStatus) => {
-    const statusNum = parseInt(newStatus, 10);
+    const statusNum = parseStatusValue(newStatus);
     setFormData(prev => ({
       ...prev,
       status: statusNum,
@@ -150,7 +190,8 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title.trim()) {
+    const trimmedTitle = safeTrim(formData.title);
+    if (!trimmedTitle) {
       setError('Judul tugas wajib diisi.');
       return;
     }
@@ -160,16 +201,16 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
 
     try {
       const payload = {
-        title: formData.title.trim(),
-        description: formData.description.trim() || null,
-        status: parseInt(formData.status, 10),
-        priority: parseInt(formData.priority, 10),
-        progress: parseInt(formData.progress, 10),
+        title: trimmedTitle,
+        description: safeTrim(formData.description) || null,
+        status: parseStatusValue(formData.status),
+        priority: parsePriorityValue(formData.priority),
+        progress: Math.max(0, Math.min(100, parseInt(formData.progress, 10) || 0)),
         projectId: formData.projectId ? parseInt(formData.projectId, 10) : null,
-        assignedToUserId: formData.assignedToUserId ? formData.assignedToUserId : null,
-        milestone: formData.milestone,
-        obstacle: formData.obstacle.trim() || null,
-        solution: formData.solution.trim() || null,
+        assignedToUserId: formData.assignedToUserId ? safeTrim(formData.assignedToUserId) || null : null,
+        milestone: safeTrim(formData.milestone) || 'Implementation',
+        obstacle: safeTrim(formData.obstacle) || null,
+        solution: safeTrim(formData.solution) || null,
         startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
         dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null
       };
@@ -181,9 +222,9 @@ export default function TaskFormModal({ isOpen, onClose, onSaved, taskToEdit = n
           const unifiedPayload = {
             ...payload,
             logSession: true,
-            durationMinutes: parseInt(formData.durationMinutes, 10),
+            durationMinutes: parseInt(formData.durationMinutes, 10) || 30,
             sessionDate: formData.sessionDate ? new Date(formData.sessionDate).toISOString() : new Date().toISOString(),
-            sessionNotes: formData.sessionNotes.trim() || 'Manual session via Unified Save'
+            sessionNotes: safeTrim(formData.sessionNotes) || 'Manual session via Unified Save'
           };
           await axiosClient.put(`/api/tasks/${taskToEdit.id}/unified-save`, unifiedPayload);
         } else {
