@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 
-export default function SyncPage() {
+export default function SyncPage({ activeSection = 'all' }) {
   const [localStatus, setLocalStatus] = useState(null);
   const [settings, setSettings] = useState({
     targetHostUrl: 'https://tracker.saidilmuna.space',
@@ -308,138 +308,151 @@ export default function SyncPage() {
     }
   };
 
+  const isAll = activeSection === 'all';
+  const isModular = activeSection === 'modular';
+  const isHostSync = activeSection === 'host-sync';
+  const isOfflinePkg = activeSection === 'offline-pkg';
+
+  const renderLocalNodeStats = () => (
+    <div 
+      className="rounded-2xl border p-6 shadow-sm space-y-5"
+      style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
+    >
+      <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: 'var(--border-color)' }}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-indigo-500/15 text-indigo-500">
+            <Server className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              Node Lokal (Child Node)
+            </h2>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Mesin: {localStatus?.hostName || localStatus?.instanceId || 'Local Machine'} • {localStatus?.databaseType || localStatus?.databaseEngine || 'MySQL 8.4 LTS'}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+          </span>
+          <span className="text-xs font-semibold text-emerald-500">Online</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
+          <span className="text-xl font-bold font-mono text-indigo-500">{localStatus?.totalTasks || 0}</span>
+          <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Tugas</p>
+        </div>
+        <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
+          <span className="text-xl font-bold font-mono text-sky-500">{localStatus?.totalProjects || 0}</span>
+          <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Proyek</p>
+        </div>
+        <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
+          <span className="text-xl font-bold font-mono text-emerald-500">{localStatus?.totalUsers || 0}</span>
+          <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Pengguna</p>
+        </div>
+        <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
+          <span className="text-xl font-bold font-mono text-amber-500">{localStatus?.totalSessions || 0}</span>
+          <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Sesi Jam</p>
+        </div>
+        <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
+          <span className="text-xl font-bold font-mono text-purple-500">{localStatus?.totalUploadFiles || 0}</span>
+          <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Berkas File</p>
+        </div>
+        <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
+          <span className="text-xl font-bold font-mono text-rose-500">{localStatus?.totalUploadsFormatted || '0 B'}</span>
+          <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Ukuran Upload</p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6 pb-16 animate-fade-in">
       {/* Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2.5" style={{ color: 'var(--text-primary)' }}>
-            <RefreshCw className="w-7 h-7 text-indigo-500" />
-            Sinkronisasi Server Induk & Multi-Node
-          </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Replikasi dua arah (Push/Pull) dengan Server Induk <span className="font-semibold text-indigo-500">https://tracker.saidilmuna.space/</span> dan Swagger API terotorisasi.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <a
-            href="http://localhost:5000/swagger"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border hover:bg-slate-500/10 text-sm font-semibold transition-colors"
-            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-          >
-            <ExternalLink className="w-4 h-4 text-emerald-500" />
-            Buka Swagger API
-          </a>
-          <button
-            onClick={fetchInitialData}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border hover:bg-slate-500/10 text-sm font-semibold transition-colors"
-            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Segarkan Status
-          </button>
-        </div>
-      </div>
-
-      {/* Swagger & Otorisasi Banner */}
-      <div 
-        className="rounded-2xl border p-5 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4"
-        style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
-      >
-        <div className="flex items-start gap-3.5">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/15 text-emerald-500 flex-shrink-0 mt-0.5">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              Akses Swagger API & Petunjuk Otorisasi
-              <span className="px-2 py-0.5 text-[11px] font-mono rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                Bearer JWT + X-Sync-ApiKey
-              </span>
-            </h3>
-            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              1. Buka Swagger lokal di <a href="http://localhost:5000/swagger" target="_blank" rel="noreferrer" className="underline font-mono text-indigo-500 font-semibold">http://localhost:5000/swagger</a>.<br/>
-              2. Klik tombol hijau <strong>Authorize</strong> di kanan atas halaman Swagger.<br/>
-              3. Masukkan <strong>Bearer &lt;token_jwt&gt;</strong> (setelah login via <code>/api/auth/login</code>) atau isi <strong>X-Sync-ApiKey</strong> untuk endpoint sinkronisasi.<br/>
-              4. Otorisasi kini tersimpan otomatis (<em>Persistent Authorization</em>) sehingga tidak hilang saat refresh.
+      {isAll && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2.5" style={{ color: 'var(--text-primary)' }}>
+              <RefreshCw className="w-7 h-7 text-indigo-500" />
+              Sinkronisasi Server Induk & Multi-Node
+            </h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+              Replikasi dua arah (Push/Pull) dengan Server Induk <span className="font-semibold text-indigo-500">https://tracker.saidilmuna.space/</span> dan Swagger API terotorisasi.
             </p>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <a
-            href="https://tracker.saidilmuna.space/swagger/"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border hover:bg-slate-500/10 transition-colors"
-            style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
-          >
-            Swagger Server Induk
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </a>
+          <div className="flex items-center gap-2.5">
+            <a
+              href="http://localhost:5000/swagger"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border hover:bg-slate-500/10 text-sm font-semibold transition-colors"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+            >
+              <ExternalLink className="w-4 h-4 text-emerald-500" />
+              Buka Swagger API
+            </a>
+            <button
+              onClick={fetchInitialData}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border hover:bg-slate-500/10 text-sm font-semibold transition-colors"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Segarkan Status
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Grid: Status Lokal & Status Server Induk */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Node Lokal Stats */}
+      {/* Swagger & Otorisasi Banner */}
+      {(isAll || isHostSync) && (
         <div 
-          className="rounded-2xl border p-6 shadow-sm space-y-5"
+          className="rounded-2xl border p-5 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4"
           style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
         >
-          <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: 'var(--border-color)' }}>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-indigo-500/15 text-indigo-500">
-                <Server className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                  Node Lokal (Child Node)
-                </h2>
-                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  Mesin: {localStatus?.hostName || localStatus?.instanceId || 'Local Machine'} • {localStatus?.databaseType || localStatus?.databaseEngine || 'MySQL 8.4 LTS'}
-                </span>
-              </div>
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/15 text-emerald-500 flex-shrink-0 mt-0.5">
+              <ShieldCheck className="w-5 h-5" />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-semibold text-emerald-500">Online</span>
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                Akses Swagger API & Petunjuk Otorisasi
+                <span className="px-2 py-0.5 text-[11px] font-mono rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  Bearer JWT + X-Sync-ApiKey
+                </span>
+              </h3>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                1. Buka Swagger lokal di <a href="http://localhost:5000/swagger" target="_blank" rel="noreferrer" className="underline font-mono text-indigo-500 font-semibold">http://localhost:5000/swagger</a>.<br/>
+                2. Klik tombol hijau <strong>Authorize</strong> di kanan atas halaman Swagger.<br/>
+                3. Masukkan <strong>Bearer &lt;token_jwt&gt;</strong> (setelah login via <code>/api/auth/login</code>) atau isi <strong>X-Sync-ApiKey</strong> untuk endpoint sinkronisasi.<br/>
+                4. Otorisasi kini tersimpan otomatis (<em>Persistent Authorization</em>) sehingga tidak hilang saat refresh.
+              </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
-              <span className="text-xl font-bold font-mono text-indigo-500">{localStatus?.totalTasks || 0}</span>
-              <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Tugas</p>
-            </div>
-            <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
-              <span className="text-xl font-bold font-mono text-sky-500">{localStatus?.totalProjects || 0}</span>
-              <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Proyek</p>
-            </div>
-            <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
-              <span className="text-xl font-bold font-mono text-emerald-500">{localStatus?.totalUsers || 0}</span>
-              <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Pengguna</p>
-            </div>
-            <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
-              <span className="text-xl font-bold font-mono text-amber-500">{localStatus?.totalSessions || 0}</span>
-              <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Sesi Jam</p>
-            </div>
-            <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
-              <span className="text-xl font-bold font-mono text-purple-500">{localStatus?.totalUploadFiles || 0}</span>
-              <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Berkas File</p>
-            </div>
-            <div className="p-3 rounded-xl border text-center" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}>
-              <span className="text-xl font-bold font-mono text-rose-500">{localStatus?.totalUploadsFormatted || '0 B'}</span>
-              <p className="text-[11px] font-medium mt-0.5" style={{ color: 'var(--text-secondary)' }}>Ukuran Upload</p>
-            </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <a
+              href="https://tracker.saidilmuna.space/swagger/"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border hover:bg-slate-500/10 transition-colors"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+            >
+              Swagger Server Induk
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </a>
           </div>
         </div>
+      )}
+
+      {/* Grid: Status Lokal & Status Server Induk */}
+      {(isAll || isHostSync) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {renderLocalNodeStats()}
 
         {/* Server Induk Remote Stats */}
         <div 
@@ -522,8 +535,10 @@ export default function SyncPage() {
           )}
         </div>
       </div>
+      )}
 
       {/* Operasi Replikasi Sinkronisasi (Push / Pull) */}
+      {(isAll || isHostSync) && (
       <div 
         className="rounded-2xl border p-6 shadow-sm space-y-6"
         style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
@@ -623,8 +638,10 @@ export default function SyncPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* SINKRONISASI GRANULAR PER MODUL (SELECTIVE SYNC - FSD v3.7) */}
+      {(isAll || isModular) && (
       <div 
         className="rounded-2xl border p-6 shadow-sm space-y-6"
         style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
@@ -921,8 +938,13 @@ export default function SyncPage() {
           </div>
         )}
       </div>
+      )}
+
+      {/* Node stats for modular tab */}
+      {isModular && renderLocalNodeStats()}
 
       {/* Ekspor & Impor Paket / SQL Backup Manual */}
+      {(isAll || isOfflinePkg) && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Ekspor Manual */}
         <div 
@@ -1051,8 +1073,13 @@ export default function SyncPage() {
           </form>
         </div>
       </div>
+      )}
+
+      {/* Node stats for offline package tab */}
+      {isOfflinePkg && renderLocalNodeStats()}
 
       {/* Pengaturan Konfigurasi Sinkronisasi */}
+      {(isAll || isHostSync) && (
       <div 
         className="rounded-2xl border p-6 shadow-sm space-y-5"
         style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
@@ -1177,6 +1204,7 @@ export default function SyncPage() {
           </div>
         </form>
       </div>
+      )}
     </div>
   );
 }

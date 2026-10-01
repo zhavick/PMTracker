@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   User, 
   Mail, 
@@ -18,7 +19,15 @@ import {
   Sparkles,
   Trash2,
   RefreshCw,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Trophy,
+  Award,
+  Flame,
+  Coins,
+  Coffee,
+  Quote,
+  Smile,
+  ExternalLink
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
@@ -72,6 +81,39 @@ export default function ProfilePage() {
   const [passLoading, setPassLoading] = useState(false);
   const [passMsg, setPassMsg] = useState(null);
 
+  // Gamification Profile State
+  const [gamificationProfile, setGamificationProfile] = useState(null);
+  const [gamificationLoading, setGamificationLoading] = useState(true);
+
+  // Random Joke State
+  const [joke, setJoke] = useState(null);
+  const [jokeLoading, setJokeLoading] = useState(false);
+  const [revealPunchline, setRevealPunchline] = useState(true);
+
+  const FALLBACK_JOKES = [
+    { setup: "Why do programmers prefer dark mode?", punchline: "Because light attracts bugs!", type: "programming" },
+    { setup: "How many programmers does it take to change a light bulb?", punchline: "None, it's a hardware problem.", type: "programming" },
+    { setup: "There are 10 types of people in the world:", punchline: "Those who understand binary, and those who don't.", type: "programming" },
+    { setup: "Why was the JavaScript developer sad?", punchline: "Because they didn't Node how to Express themselves.", type: "programming" },
+    { setup: "Why do Java developers wear glasses?", punchline: "Because they don't C#!", type: "programming" },
+    { setup: "What is a programmer's favorite hangout place?", punchline: "Foo Bar.", type: "programming" }
+  ];
+
+  const fetchRandomJoke = async () => {
+    setJokeLoading(true);
+    try {
+      const res = await fetch('https://official-joke-api.appspot.com/random_joke');
+      if (!res.ok) throw new Error('Network error');
+      const data = await res.json();
+      setJoke({ setup: data.setup, punchline: data.punchline, type: data.type });
+    } catch (err) {
+      const fallback = FALLBACK_JOKES[Math.floor(Math.random() * FALLBACK_JOKES.length)];
+      setJoke(fallback);
+    } finally {
+      setJokeLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       setProfileData({
@@ -85,6 +127,22 @@ export default function ProfilePage() {
         coverPictureUrl: user.coverPictureUrl || ''
       });
     }
+
+    const fetchGamification = async () => {
+      try {
+        const res = await axiosClient.get('/api/gamification/profile');
+        if (res.data?.data) {
+          setGamificationProfile(res.data.data);
+        }
+      } catch (err) {
+        console.error('Failed to load gamification profile', err);
+      } finally {
+        setGamificationLoading(false);
+      }
+    };
+
+    fetchGamification();
+    fetchRandomJoke();
   }, [user]);
 
   const handleProfileSubmit = async (e) => {
@@ -327,6 +385,128 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {/* ── Gamification Points & Achievement Banner ── */}
+      <div 
+        className="rounded-3xl border p-6 shadow-sm relative overflow-hidden transition-all"
+        style={{ 
+          backgroundColor: 'var(--bg-secondary)', 
+          borderColor: 'var(--border-color)' 
+        }}
+      >
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4" style={{ borderColor: 'var(--border-color)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center shadow-lg text-white">
+              <Trophy className="w-6 h-6 text-amber-200" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                  Poin Prestasi & Gamifikasi
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                  Level Progress
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Kumpulkan poin dari penyelesaian tugas, catatan kerja, dan absensi aktif harian
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to="/gamification"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all shadow-md hover:opacity-90 self-start md:self-auto"
+            style={{ backgroundColor: 'var(--accent-primary)' }}
+          >
+            <span>Buka Pusat Hadiah & Badge</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {/* 4 Metric Highlights */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+          {/* Card 1: Available Points */}
+          <div 
+            className="p-4 rounded-2xl border transition-all hover:translate-y-[-2px] hover:shadow-md"
+            style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Poin Tersedia</span>
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                <Coins className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-amber-500">
+              {gamificationLoading ? '...' : (gamificationProfile?.availablePoints ?? 0).toLocaleString('id-ID')}
+              <span className="text-xs font-semibold text-slate-400 ml-1">Pts</span>
+            </div>
+            <p className="text-[11px] font-medium text-slate-400 mt-1">
+              ≈ Rp {(((gamificationProfile?.availablePoints ?? 0) * 100)).toLocaleString('id-ID')}
+            </p>
+          </div>
+
+          {/* Card 2: Total Accumulated Points */}
+          <div 
+            className="p-4 rounded-2xl border transition-all hover:translate-y-[-2px] hover:shadow-md"
+            style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Poin</span>
+              <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                <Trophy className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-xl sm:text-2xl font-black" style={{ color: 'var(--text-primary)' }}>
+              {gamificationLoading ? '...' : (gamificationProfile?.totalPointsEarned ?? 0).toLocaleString('id-ID')}
+              <span className="text-xs font-semibold text-slate-400 ml-1">Pts</span>
+            </div>
+            <p className="text-[11px] font-medium text-slate-400 mt-1">
+              Akumulasi seumur hidup
+            </p>
+          </div>
+
+          {/* Card 3: Daily Streak */}
+          <div 
+            className="p-4 rounded-2xl border transition-all hover:translate-y-[-2px] hover:shadow-md"
+            style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Daily Streak</span>
+              <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                <Flame className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-rose-500 flex items-center gap-1.5">
+              <span>{gamificationLoading ? '...' : (gamificationProfile?.currentStreak ?? 0)}</span>
+              <span className="text-xs font-semibold text-slate-400">Hari</span>
+            </div>
+            <p className="text-[11px] font-medium text-slate-400 mt-1">
+              Rekor: {gamificationProfile?.longestStreak ?? 0} Hari
+            </p>
+          </div>
+
+          {/* Card 4: Badges Unlocked */}
+          <div 
+            className="p-4 rounded-2xl border transition-all hover:translate-y-[-2px] hover:shadow-md"
+            style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Badge Terbuka</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                <Award className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-emerald-500 flex items-center gap-1.5">
+              <span>{gamificationLoading ? '...' : (gamificationProfile?.badges?.length ?? 0)}</span>
+              <span className="text-xs font-semibold text-slate-400">/ 42 Badge</span>
+            </div>
+            <p className="text-[11px] font-medium text-slate-400 mt-1">
+              {gamificationProfile?.hasCheckedInToday ? '✓ Sudah check-in hari ini' : 'Belum check-in hari ini'}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* ── Forms Grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Profile & Customization Form */}
@@ -460,99 +640,209 @@ export default function ProfilePage() {
           </form>
         </div>
 
-        {/* Change Password & Security Form */}
-        <div 
-          className="rounded-3xl border p-6 shadow-sm space-y-5"
-          style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
-        >
-          <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-color)' }}>
-            <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <Lock className="w-4 h-4 text-indigo-500" />
-              Keamanan & Ganti Kata Sandi
-            </h2>
-            <Shield className="w-4 h-4 text-indigo-400" />
-          </div>
-
-          {passMsg && (
-            <div className={`p-4 rounded-xl flex items-center gap-3 border text-sm font-medium ${
-              passMsg.type === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                : 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400'
-            }`}>
-              {passMsg.type === 'success' ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 flex-shrink-0" />}
-              <span>{passMsg.text}</span>
+        {/* Column 2: Security & Coffee Break / Humor Widget */}
+        <div className="space-y-6">
+          {/* Change Password & Security Form */}
+          <div 
+            className="rounded-3xl border p-6 shadow-sm space-y-5"
+            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
+          >
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-color)' }}>
+              <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <Lock className="w-4 h-4 text-indigo-500" />
+                Keamanan & Ganti Kata Sandi
+              </h2>
+              <Shield className="w-4 h-4 text-indigo-400" />
             </div>
-          )}
 
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
-                Kata Sandi Saat Ini *
-              </label>
-              <div className="relative">
+            {passMsg && (
+              <div className={`p-4 rounded-xl flex items-center gap-3 border text-sm font-medium ${
+                passMsg.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400'
+              }`}>
+                {passMsg.type === 'success' ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 flex-shrink-0" />}
+                <span>{passMsg.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
+                  Kata Sandi Saat Ini *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    required
+                    value={passwords.currentPassword}
+                    onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
+                    placeholder="Masukkan kata sandi lama Anda"
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  >
+                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
+                  Kata Sandi Baru *
+                </label>
                 <input
                   type={showPass ? 'text' : 'password'}
                   required
-                  value={passwords.currentPassword}
-                  onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
-                  placeholder="Masukkan kata sandi lama Anda"
-                  className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  minLength={6}
+                  value={passwords.newPassword}
+                  onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
+                  placeholder="Minimal 6 karakter"
+                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
+                  Konfirmasi Kata Sandi Baru *
+                </label>
+                <input
+                  type={showPass ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={passwords.confirmNewPassword}
+                  onChange={(e) => setPasswords({ ...passwords, confirmNewPassword: e.target.value })}
+                  placeholder="Ulangi kata sandi baru"
+                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              <div className="pt-2">
                 <button
-                  type="button"
-                  onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  type="submit"
+                  disabled={passLoading}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:opacity-95 transition-all disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--accent-primary)' }}
                 >
-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <Lock className="w-4 h-4" />
+                  {passLoading ? 'Menyimpan...' : 'Perbarui Kata Sandi'}
                 </button>
               </div>
-            </div>
+            </form>
+          </div>
 
-            <div>
-              <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
-                Kata Sandi Baru *
-              </label>
-              <input
-                type={showPass ? 'text' : 'password'}
-                required
-                minLength={6}
-                value={passwords.newPassword}
-                onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
-                placeholder="Minimal 6 karakter"
-                className="w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-              />
-            </div>
+          {/* Coffee Break & Developer Humor Card */}
+          <div 
+            className="rounded-3xl border p-6 shadow-sm space-y-4 relative overflow-hidden"
+            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
+          >
+            {/* Subtle background glow */}
+            <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-amber-500/10 blur-2xl pointer-events-none" />
 
-            <div>
-              <label className="block text-xs font-semibold uppercase mb-1.5 text-slate-400">
-                Konfirmasi Kata Sandi Baru *
-              </label>
-              <input
-                type={showPass ? 'text' : 'password'}
-                required
-                minLength={6}
-                value={passwords.confirmNewPassword}
-                onChange={(e) => setPasswords({ ...passwords, confirmNewPassword: e.target.value })}
-                placeholder="Ulangi kata sandi baru"
-                className="w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-              />
-            </div>
-
-            <div className="pt-2">
+            <div className="flex items-center justify-between border-b pb-3 relative z-10" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center">
+                  <Coffee className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
+                    Coffee Break & Humor Harian
+                  </h2>
+                  <p className="text-[11px] text-slate-400">Penyegar pikiran di sela waktu kerja</p>
+                </div>
+              </div>
+              
               <button
-                type="submit"
-                disabled={passLoading}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:opacity-95 transition-all disabled:opacity-50"
-                style={{ backgroundColor: 'var(--accent-primary)' }}
+                type="button"
+                onClick={() => {
+                  setRevealPunchline(false);
+                  fetchRandomJoke();
+                }}
+                disabled={jokeLoading}
+                title="Ambil lelucon acak baru"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all hover:bg-slate-500/10 disabled:opacity-50"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
               >
-                <Lock className="w-4 h-4" />
-                {passLoading ? 'Menyimpan...' : 'Perbarui Kata Sandi'}
+                <RefreshCw className={`w-3.5 h-3.5 text-amber-500 ${jokeLoading ? 'animate-spin' : ''}`} />
+                <span>Jokes Baru</span>
               </button>
             </div>
-          </form>
+
+            {/* Joke Box */}
+            <div 
+              className="p-5 rounded-2xl border relative transition-all"
+              style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
+            >
+              <Quote className="w-8 h-8 text-amber-500/20 absolute top-3 right-3 pointer-events-none" />
+              
+              {jokeLoading ? (
+                <div className="py-6 flex flex-col items-center justify-center gap-2 text-slate-400">
+                  <RefreshCw className="w-6 h-6 animate-spin text-amber-500" />
+                  <span className="text-xs font-medium">Sedang meracik lelucon segar...</span>
+                </div>
+              ) : joke ? (
+                <div className="space-y-3 relative z-10">
+                  {joke.type && (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+                      {joke.type}
+                    </span>
+                  )}
+                  
+                  {/* Setup */}
+                  <p className="text-sm sm:text-base font-semibold leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                    "{joke.setup}"
+                  </p>
+
+                  {/* Punchline */}
+                  {revealPunchline ? (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 animate-fade-in flex items-start gap-2.5">
+                      <span className="text-lg">😄</span>
+                      <div className="flex-1">
+                        <p className="text-xs font-bold uppercase tracking-wide text-amber-500 mb-0.5">Punchline:</p>
+                        <p className="text-sm font-bold text-amber-400 leading-snug">
+                          {joke.punchline}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setRevealPunchline(true)}
+                      className="w-full py-2.5 px-4 rounded-xl border border-dashed border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-xs font-bold flex items-center justify-center gap-2 transition-all"
+                    >
+                      <Smile className="w-4 h-4" />
+                      <span>Klik untuk melihat punchline 😂</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="py-4 text-center text-xs text-slate-400">
+                  Gagal memuat lelucon. Silakan klik tombol 'Jokes Baru'.
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+              <span className="flex items-center gap-1">
+                <span>Sumber:</span>
+                <a 
+                  href="https://official-joke-api.appspot.com/random_joke" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="text-indigo-400 hover:underline inline-flex items-center gap-0.5"
+                >
+                  official-joke-api <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </span>
+              <span className="text-[10px] text-slate-400 italic">Have a great productive day! ✨</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -17,8 +17,14 @@ import {
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 
-export default function EmailSettingsPage() {
-  const [activeTab, setActiveTab] = useState('smtp'); // 'smtp' | 'templates'
+export default function EmailSettingsPage({ activeSection }) {
+  const [activeTab, setActiveTab] = useState(activeSection || 'smtp'); // 'smtp' | 'templates'
+
+  useEffect(() => {
+    if (activeSection) {
+      setActiveTab(activeSection === 'templates' ? 'templates' : 'smtp');
+    }
+  }, [activeSection]);
   const [loading, setLoading] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
@@ -152,53 +158,56 @@ export default function EmailSettingsPage() {
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2.5" style={{ color: 'var(--text-primary)' }}>
-            <Mail className="w-7 h-7 text-indigo-500" />
-            Integrasi Server Email (SMTP)
-          </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Konfigurasi koneksi email keluar (outgoing SMTP) dan personalisasi 7 template email notifikasi
-          </p>
-        </div>
-      </div>
+      {/* Header and Inner Tabs (shown only when rendered standalone) */}
+      {!activeSection && (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2.5" style={{ color: 'var(--text-primary)' }}>
+                <Mail className="w-7 h-7 text-indigo-500" />
+                Integrasi Server Email (SMTP)
+              </h1>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                Konfigurasi koneksi email keluar (outgoing SMTP) dan personalisasi 7 template email notifikasi
+              </p>
+            </div>
+          </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
-        <button
-          onClick={() => setActiveTab('smtp')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-            activeTab === 'smtp'
-              ? 'text-white shadow-sm'
-              : 'hover:bg-slate-500/10'
-          }`}
-          style={{
-            backgroundColor: activeTab === 'smtp' ? 'var(--accent-primary)' : 'transparent',
-            color: activeTab === 'smtp' ? '#ffffff' : 'var(--text-secondary)'
-          }}
-        >
-          <Server className="w-4 h-4" />
-          Konfigurasi SMTP
-        </button>
+          <div className="flex items-center gap-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
+            <button
+              onClick={() => setActiveTab('smtp')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === 'smtp'
+                  ? 'text-white shadow-sm'
+                  : 'hover:bg-slate-500/10'
+              }`}
+              style={{
+                backgroundColor: activeTab === 'smtp' ? 'var(--accent-primary)' : 'transparent',
+                color: activeTab === 'smtp' ? '#ffffff' : 'var(--text-secondary)'
+              }}
+            >
+              <Server className="w-4 h-4" />
+              Konfigurasi SMTP
+            </button>
 
-        <button
-          onClick={() => setActiveTab('templates')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-            activeTab === 'templates'
-              ? 'text-white shadow-sm'
-              : 'hover:bg-slate-500/10'
-          }`}
-          style={{
-            backgroundColor: activeTab === 'templates' ? 'var(--accent-primary)' : 'transparent',
-            color: activeTab === 'templates' ? '#ffffff' : 'var(--text-secondary)'
-          }}
-        >
-          <FileText className="w-4 h-4" />
-          7 Template Notifikasi
-        </button>
-      </div>
+            <button
+              onClick={() => setActiveTab('templates')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === 'templates'
+                  ? 'text-white shadow-sm'
+                  : 'hover:bg-slate-500/10'
+              }`}
+              style={{
+                backgroundColor: activeTab === 'templates' ? 'var(--accent-primary)' : 'transparent',
+                color: activeTab === 'templates' ? '#ffffff' : 'var(--text-secondary)'
+              }}
+            >
+              <FileText className="w-4 h-4" />
+              7 Template Notifikasi
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Alerts */}
       {message && (
