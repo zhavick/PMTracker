@@ -16,22 +16,60 @@ import {
   Download,
   Users,
   Trash2,
-  CheckSquare
+  CheckSquare,
+  UserCheck
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
+import { useGridTableState } from '../hooks/useGridTableState';
 import TaskTableGrid from '../components/tasks/TaskTableGrid';
 import TaskKanbanBoard from '../components/tasks/TaskKanbanBoard';
 import TaskFormModal from '../components/tasks/TaskFormModal';
 import TaskImportModal from '../components/tasks/TaskImportModal';
 import TaskDetailDrawer from '../components/tasks/TaskDetailDrawer';
 
+const DEFAULT_TASKS_STATE = {
+  search: '',
+  selectedProject: '',
+  selectedAssignee: '',
+  onlyMyTasks: false,
+  selectedStatus: '',
+  selectedPriority: '',
+  selectedMilestone: '',
+  sortBy: 'createdAt',
+  sortDesc: true,
+  page: 1,
+  pageSize: 25,
+  viewMode: 'grid'
+};
+
 export default function TasksPage() {
   const { user } = useAuth();
   const canImportExcel = ['Admin', 'PM', 'Project Manager', 'ProjectManager', 'System Analyst'].includes(user?.role);
 
-  // USER SPECIFICATION: Grid view is the default view
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'kanban'
+  // Persistent Table State (Cookies via useGridTableState)
+  const {
+    state: tableState,
+    updateState: updateTableState,
+    handleSort,
+    resetState: resetFilters
+  } = useGridTableState('wt_grid_tasks_v1', DEFAULT_TASKS_STATE);
+
+  const {
+    search,
+    selectedProject,
+    selectedAssignee,
+    onlyMyTasks,
+    selectedStatus,
+    selectedPriority,
+    selectedMilestone,
+    sortBy,
+    sortDesc,
+    page,
+    pageSize,
+    viewMode
+  } = tableState;
+
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [members, setMembers] = useState([]);
@@ -42,18 +80,6 @@ export default function TasksPage() {
   // Bulk Selection State
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
   const [isBulkActionLoading, setIsBulkActionLoading] = useState(false);
-
-  // Filters
-  const [search, setSearch] = useState('');
-  const [selectedProject, setSelectedProject] = useState('');
-  const [selectedAssignee, setSelectedAssignee] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
-  const [selectedPriority, setSelectedPriority] = useState('');
-  const [selectedMilestone, setSelectedMilestone] = useState('');
-
-  // Pagination (Grid view)
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(25);
   const [totalItems, setTotalItems] = useState(0);
 
   // Modals & Drawer
@@ -63,6 +89,31 @@ export default function TasksPage() {
   const [taskForDetail, setTaskForDetail] = useState(null);
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
 
+  const handleToggleMyTasks = (e) => {
+    const checked = e.target.checked;
+    if (checked) {
+      updateTableState({
+        onlyMyTasks: true,
+        selectedAssignee: user?.id || '',
+        page: 1
+      });
+    } else {
+      updateTableState({
+        onlyMyTasks: false,
+        selectedAssignee: '',
+        page: 1
+      });
+    }
+  };
+
+  const handleAssigneeChange = (val) => {
+    updateTableState({
+      selectedAssignee: val,
+      onlyMyTasks: Boolean(user?.id && val === user.id),
+      page: 1
+    });
+  };
+
   const fetchTasks = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     else setRefreshing(true);
@@ -71,11 +122,17 @@ export default function TasksPage() {
       const params = {
         page,
         pageSize,
-        parentOnly: false // Load tasks for grid/kanban
+        parentOnly: false,
+        sortBy,
+        sortDesc
       };
       if (search.trim()) params.search = search.trim();
       if (selectedProject) params.projectId = selectedProject;
-      if (selectedAssignee) params.assignedToUserId = selectedAssignee;
+      if (onlyMyTasks && user?.id) {
+        params.assignedToUserId = user.id;
+      } else if (selectedAssignee) {
+        params.assignedToUserId = selectedAssignee;
+      }
       if (selectedStatus !== '') params.status = selectedStatus;
       if (selectedPriority !== '') params.priority = selectedPriority;
       if (selectedMilestone) params.milestone = selectedMilestone;
@@ -92,7 +149,20 @@ export default function TasksPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [page, pageSize, search, selectedProject, selectedAssignee, selectedStatus, selectedPriority, selectedMilestone]);
+  }, [
+    page, 
+    pageSize, 
+    search, 
+    selectedProject, 
+    selectedAssignee, 
+    onlyMyTasks, 
+    selectedStatus, 
+    selectedPriority, 
+    selectedMilestone, 
+    sortBy, 
+    sortDesc, 
+    user?.id
+  ]);
 
   const fetchMetadata = async () => {
     try {
@@ -337,12 +407,13 @@ export default function TasksPage() {
         {/* Action Controls */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* View Toggle: Grid (Default) vs Kanban */}
+          {/* View Toggle: Grid (Default) vs Kanban */}
           <div 
             className="flex p-1 rounded-xl border shadow-sm"
             style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
           >
             <button
-              onClick={() => setViewMode('grid')}
+              onClick={() => updateTableState({ viewMode: 'grid' })}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 viewMode === 'grid'
                   ? 'bg-indigo-600 text-white shadow-sm'
@@ -355,7 +426,7 @@ export default function TasksPage() {
             </button>
 
             <button
-              onClick={() => setViewMode('kanban')}
+              onClick={() => updateTableState({ viewMode: 'kanban' })}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 viewMode === 'kanban'
                   ? 'bg-indigo-600 text-white shadow-sm'
@@ -460,30 +531,55 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
+      {/* Filter and Search Bar with Cookie Persistence & Hanya Tugas Saya */}
       <div 
         className="p-4 rounded-2xl border shadow-sm space-y-3"
         style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
           {/* Search Input */}
-          <div className="relative sm:col-span-2 lg:col-span-2">
+          <div className="relative sm:col-span-2 lg:col-span-3">
             <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
             <input
               type="text"
               placeholder="Cari judul, kendala, atau solusi..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => updateTableState({ search: e.target.value, page: 1 })}
               className="w-full pl-9 pr-4 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
             />
           </div>
 
+          {/* Quick Checkbox: Hanya Tugas Saya */}
+          <div className="sm:col-span-1 lg:col-span-2 flex items-center">
+            <label 
+              className={`flex items-center gap-2 w-full px-3 py-2 rounded-xl border cursor-pointer select-none transition-all ${
+                onlyMyTasks 
+                  ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold shadow-xs' 
+                  : 'hover:bg-black/5 dark:hover:bg-white/5 border-dashed'
+              }`}
+              style={{ 
+                borderColor: onlyMyTasks ? undefined : 'var(--border-color)', 
+                backgroundColor: onlyMyTasks ? undefined : 'var(--bg-secondary)' 
+              }}
+              title="Centang untuk menampilkan langsung tugas yang ditugaskan kepada saya"
+            >
+              <input 
+                type="checkbox" 
+                checked={onlyMyTasks}
+                onChange={handleToggleMyTasks}
+                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
+              />
+              <UserCheck className="w-4 h-4 shrink-0 text-indigo-500" />
+              <span className="text-xs whitespace-nowrap">Hanya Tugas Saya</span>
+            </label>
+          </div>
+
           {/* Project Filter */}
-          <div>
+          <div className="sm:col-span-1 lg:col-span-2">
             <select
               value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
+              onChange={(e) => updateTableState({ selectedProject: e.target.value, page: 1 })}
               className="w-full px-3 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
             >
@@ -495,10 +591,10 @@ export default function TasksPage() {
           </div>
 
           {/* Assignee / PIC Filter */}
-          <div>
+          <div className="sm:col-span-1 lg:col-span-2">
             <select
               value={selectedAssignee}
-              onChange={(e) => setSelectedAssignee(e.target.value)}
+              onChange={(e) => handleAssigneeChange(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
             >
@@ -510,10 +606,10 @@ export default function TasksPage() {
           </div>
 
           {/* Status Filter */}
-          <div>
+          <div className="sm:col-span-1 lg:col-span-2">
             <select
               value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
+              onChange={(e) => updateTableState({ selectedStatus: e.target.value, page: 1 })}
               className="w-full px-3 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
             >
@@ -526,35 +622,39 @@ export default function TasksPage() {
           </div>
 
           {/* Priority Filter */}
-          <div>
+          <div className="sm:col-span-1 lg:col-span-1">
             <select
               value={selectedPriority}
-              onChange={(e) => setSelectedPriority(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              onChange={(e) => updateTableState({ selectedPriority: e.target.value, page: 1 })}
+              className="w-full px-2.5 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
             >
-              <option value="">Semua Prioritas</option>
+              <option value="">Prioritas</option>
               <option value="0">🟢 Low</option>
-              <option value="1">🔵 Medium</option>
+              <option value="1">🔵 Med</option>
               <option value="2">🟠 High</option>
-              <option value="3">🔴 Critical</option>
+              <option value="3">🔴 Crit</option>
             </select>
           </div>
         </div>
 
-        {/* Clear Filters Button if any filter active */}
-        {(search || selectedProject || selectedAssignee || selectedStatus !== '' || selectedPriority !== '' || selectedMilestone) && (
-          <div className="flex items-center justify-between pt-2 border-t text-xs" style={{ borderColor: 'var(--border-color)' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Menyaring hasil pencarian</span>
+        {/* Clear Filters Button & Cookies Indicator */}
+        <div className="flex items-center justify-between pt-2 border-t text-xs" style={{ borderColor: 'var(--border-color)' }}>
+          <span className="opacity-70 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Filter & preferensi tersimpan di cookies (tetap aktif setelah refresh).
+          </span>
+          {(search || selectedProject || selectedAssignee || onlyMyTasks || selectedStatus !== '' || selectedPriority !== '' || selectedMilestone) && (
             <button
-              onClick={clearFilters}
+              onClick={resetFilters}
               className="flex items-center space-x-1 text-rose-500 hover:text-rose-600 font-semibold"
+              title="Kembalikan semua filter ke pengaturan awal"
             >
               <X className="w-3.5 h-3.5" />
               <span>Reset Semua Filter</span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Main View: Grid View (Default) or Kanban View */}
@@ -569,10 +669,13 @@ export default function TasksPage() {
           page={page}
           pageSize={pageSize}
           totalItems={totalItems}
-          onPageChange={setPage}
+          onPageChange={(p) => updateTableState({ page: p })}
           selectedTaskIds={selectedTaskIds}
           onToggleSelectTask={handleToggleSelectTask}
           onToggleSelectAll={handleToggleSelectAll}
+          sortBy={sortBy}
+          sortDesc={sortDesc}
+          onSort={handleSort}
         />
       ) : (
         <TaskKanbanBoard

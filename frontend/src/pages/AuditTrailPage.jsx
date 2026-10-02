@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   ShieldAlert, Search, Download, RefreshCw, ChevronLeft,
   ChevronRight, Filter, User, Clock, Activity, AlertCircle,
-  TrendingUp, BarChart2, Globe, X, Calendar
+  TrendingUp, BarChart2, Globe, X, Calendar, RotateCcw
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
+import SortableHeader from '../components/common/SortableHeader';
+import { useGridTableState } from '../hooks/useGridTableState';
 
 // ── HTTP Method Color Maps ────────────────────────────────────────────────────
 function getMethodBadge(method) {
@@ -169,22 +171,47 @@ export default function AuditTrailPage() {
   const [chartLoading, setChartLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Filters
-  const [search, setSearch] = useState('');
-  const [statusCode, setStatusCode] = useState('');
-  const [methodFilter, setMethodFilter] = useState('ALL');
-  const [userNameFilter, setUserNameFilter] = useState('');
-  const [moduleFilter, setModuleFilter] = useState('');
-  const [activityFilter, setActivityFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState(() => {
+  // Grid state with cookie persistence
+  const defaultAuditState = useMemo(() => {
     const d = new Date(); d.setDate(d.getDate() - 30);
-    return d.toISOString().slice(0, 10);
-  });
-  const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+    return {
+      search: '',
+      statusCode: '',
+      methodFilter: 'ALL',
+      userNameFilter: '',
+      moduleFilter: '',
+      activityFilter: '',
+      dateFrom: d.toISOString().slice(0, 10),
+      dateTo: new Date().toISOString().slice(0, 10),
+      page: 1,
+      pageSize: 25,
+      sortBy: 'timestamp',
+      sortDesc: true
+    };
+  }, []);
 
-  // Pagination
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(25);
+  const {
+    state: gridState,
+    updateState: updateGridState,
+    handleSort,
+    resetState: resetGridState
+  } = useGridTableState('wt_grid_audittrail_v1', defaultAuditState);
+
+  const {
+    search,
+    statusCode,
+    methodFilter,
+    userNameFilter,
+    moduleFilter,
+    activityFilter,
+    dateFrom,
+    dateTo,
+    page,
+    pageSize,
+    sortBy,
+    sortDesc
+  } = gridState;
+
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
@@ -202,7 +229,7 @@ export default function AuditTrailPage() {
     try {
       const res = await axiosClient.get('/api/audit-trail', {
         params: {
-          search: search.trim() || undefined,
+          search: search?.trim() || undefined,
           statusCode: statusCode ? parseInt(statusCode) : undefined,
           method: methodFilter !== 'ALL' ? methodFilter : undefined,
           userName: userNameFilter || undefined,
@@ -210,6 +237,8 @@ export default function AuditTrailPage() {
           activity: activityFilter || undefined,
           dateFrom: dateFrom || undefined,
           dateTo: dateTo || undefined,
+          sortBy: sortBy || 'timestamp',
+          sortDesc: sortDesc,
           page, pageSize
         }
       });
@@ -222,7 +251,7 @@ export default function AuditTrailPage() {
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal memuat riwayat audit trail.');
     } finally { setLoading(false); }
-  }, [search, statusCode, methodFilter, userNameFilter, moduleFilter, activityFilter, dateFrom, dateTo, page, pageSize]);
+  }, [search, statusCode, methodFilter, userNameFilter, moduleFilter, activityFilter, dateFrom, dateTo, page, pageSize, sortBy, sortDesc]);
 
   const fetchChart = useCallback(async () => {
     setChartLoading(true);
@@ -246,11 +275,11 @@ export default function AuditTrailPage() {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { fetchLogs(); }, [page, statusCode, methodFilter]);
+  useEffect(() => { fetchLogs(); }, [page, pageSize, statusCode, methodFilter, sortBy, sortDesc]);
   useEffect(() => { fetchDropdowns(); }, []);
   useEffect(() => { if (showChart) fetchChart(); }, [dateFrom, dateTo, userNameFilter, moduleFilter, showChart]);
 
-  const handleSearchSubmit = (e) => { e.preventDefault(); setPage(1); fetchLogs(); fetchChart(); };
+  const handleSearchSubmit = (e) => { e?.preventDefault(); updateGridState({ page: 1 }); fetchLogs(); fetchChart(); };
 
   const handleExportCsv = async () => {
     try {
@@ -269,9 +298,7 @@ export default function AuditTrailPage() {
   };
 
   const resetFilters = () => {
-    setSearch(''); setStatusCode(''); setMethodFilter('ALL');
-    setUserNameFilter(''); setModuleFilter(''); setActivityFilter('');
-    setPage(1);
+    resetGridState();
   };
 
   const inputStyle = { backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' };
@@ -360,7 +387,7 @@ export default function AuditTrailPage() {
             <div style={{ position: 'relative', gridColumn: '1/-1' }}>
               <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
               <input
-                type="text" value={search} onChange={e => setSearch(e.target.value)}
+                type="text" value={search || ''} onChange={e => updateGridState({ search: e.target.value })}
                 placeholder="Cari URL, email pengguna, aksi..."
                 className={inputCls}
                 style={{ ...inputStyle, width: '100%', paddingLeft: 36, boxSizing: 'border-box' }}
@@ -370,7 +397,7 @@ export default function AuditTrailPage() {
             {/* HTTP Method */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>HTTP Method</label>
-              <select value={methodFilter} onChange={e => { setMethodFilter(e.target.value); setPage(1); }} className={inputCls} style={{ ...inputStyle, width: '100%' }}>
+              <select value={methodFilter} onChange={e => updateGridState({ methodFilter: e.target.value, page: 1 })} className={inputCls} style={{ ...inputStyle, width: '100%' }}>
                 {['ALL', 'GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
@@ -378,7 +405,7 @@ export default function AuditTrailPage() {
             {/* Status Code */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Status HTTP</label>
-              <select value={statusCode} onChange={e => { setStatusCode(e.target.value); setPage(1); }} className={inputCls} style={{ ...inputStyle, width: '100%' }}>
+              <select value={statusCode} onChange={e => updateGridState({ statusCode: e.target.value, page: 1 })} className={inputCls} style={{ ...inputStyle, width: '100%' }}>
                 <option value="">Semua Status</option>
                 <option value="200">200 OK</option>
                 <option value="201">201 Created</option>
@@ -393,7 +420,7 @@ export default function AuditTrailPage() {
             {/* User Filter */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Pengguna</label>
-              <input list="users-list" value={userNameFilter} onChange={e => setUserNameFilter(e.target.value)} placeholder="Ketik nama/email..."
+              <input list="users-list" value={userNameFilter} onChange={e => updateGridState({ userNameFilter: e.target.value })} placeholder="Ketik nama/email..."
                 className={inputCls} style={{ ...inputStyle, width: '100%' }} />
               <datalist id="users-list">
                 {distinctUsers.map((u, i) => <option key={i} value={u.userName || u.userEmail} />)}
@@ -403,7 +430,7 @@ export default function AuditTrailPage() {
             {/* Module Filter */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Modul</label>
-              <select value={moduleFilter} onChange={e => setModuleFilter(e.target.value)} className={inputCls} style={{ ...inputStyle, width: '100%' }}>
+              <select value={moduleFilter} onChange={e => updateGridState({ moduleFilter: e.target.value })} className={inputCls} style={{ ...inputStyle, width: '100%' }}>
                 <option value="">Semua Modul</option>
                 {distinctModules.map((m, i) => <option key={i} value={m}>{m.replace('ApiController', '')}</option>)}
               </select>
@@ -412,27 +439,28 @@ export default function AuditTrailPage() {
             {/* Activity Filter */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Aktivitas</label>
-              <input value={activityFilter} onChange={e => setActivityFilter(e.target.value)} placeholder="Nama action..."
+              <input value={activityFilter} onChange={e => updateGridState({ activityFilter: e.target.value })} placeholder="Nama action..."
                 className={inputCls} style={{ ...inputStyle, width: '100%' }} />
             </div>
 
             {/* Date From */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Dari Tanggal</label>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={inputCls} style={{ ...inputStyle, width: '100%' }} />
+              <input type="date" value={dateFrom} onChange={e => updateGridState({ dateFrom: e.target.value })} className={inputCls} style={{ ...inputStyle, width: '100%' }} />
             </div>
 
             {/* Date To */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Hingga Tanggal</label>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={inputCls} style={{ ...inputStyle, width: '100%' }} />
+              <input type="date" value={dateTo} onChange={e => updateGridState({ dateTo: e.target.value })} className={inputCls} style={{ ...inputStyle, width: '100%' }} />
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
             <button type="button" onClick={resetFilters}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>
-              <X size={13} /> Reset
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}
+              title="Reset semua filter dan pengurutan ke kondisi bawaan">
+              <RotateCcw size={13} /> Reset Filter
             </button>
             <button type="submit"
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 20px', borderRadius: 10, background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
@@ -466,9 +494,71 @@ export default function AuditTrailPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.02)' }}>
-                  {['Waktu', 'Method', 'Status', 'Endpoint / Path', 'Modul & Aksi', 'Pengguna', 'IP', 'Durasi'].map(h => (
-                    <th key={h} style={{ padding: '10px 14px', textAlign: h === 'Durasi' ? 'right' : 'left', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
+                  <SortableHeader 
+                    label="Waktu" 
+                    sortKey="timestamp" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    style={{ padding: '10px 14px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }} 
+                  />
+                  <SortableHeader 
+                    label="Method" 
+                    sortKey="method" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    style={{ padding: '10px 14px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }} 
+                  />
+                  <SortableHeader 
+                    label="Status" 
+                    sortKey="status" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    style={{ padding: '10px 14px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }} 
+                  />
+                  <SortableHeader 
+                    label="Endpoint / Path" 
+                    sortKey="path" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    style={{ padding: '10px 14px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }} 
+                  />
+                  <SortableHeader 
+                    label="Modul & Aksi" 
+                    sortKey="module" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    style={{ padding: '10px 14px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }} 
+                  />
+                  <SortableHeader 
+                    label="Pengguna" 
+                    sortKey="user" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    style={{ padding: '10px 14px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }} 
+                  />
+                  <SortableHeader 
+                    label="IP" 
+                    sortKey="ip" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    style={{ padding: '10px 14px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }} 
+                  />
+                  <SortableHeader 
+                    label="Durasi" 
+                    sortKey="duration" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    align="right" 
+                    style={{ padding: '10px 14px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }} 
+                  />
                 </tr>
               </thead>
               <tbody>
@@ -531,12 +621,12 @@ export default function AuditTrailPage() {
             Total <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{totalItems.toLocaleString()}</span> entri
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+            <button onClick={() => updateGridState({ page: Math.max(1, page - 1) })} disabled={page <= 1}
               style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'none', cursor: page <= 1 ? 'not-allowed' : 'pointer', opacity: page <= 1 ? 0.35 : 1, color: 'var(--text-secondary)' }}>
               <ChevronLeft size={15} />
             </button>
             <span style={{ padding: '0 8px', fontWeight: 600 }}>Hal. {page} / {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+            <button onClick={() => updateGridState({ page: Math.min(totalPages, page + 1) })} disabled={page >= totalPages}
               style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'none', cursor: page >= totalPages ? 'not-allowed' : 'pointer', opacity: page >= totalPages ? 0.35 : 1, color: 'var(--text-secondary)' }}>
               <ChevronRight size={15} />
             </button>

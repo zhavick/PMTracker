@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -11,9 +11,11 @@ import {
   Users, 
   Edit3, 
   X, 
-  Save,
-  Check,
-  Globe
+  Save, 
+  Check, 
+  Globe, 
+  RotateCcw, 
+  Search 
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +25,8 @@ import {
   getAppTimezone, 
   getTimezoneInfo 
 } from '../utils/timezoneHelper';
+import SortableHeader from '../components/common/SortableHeader';
+import { useGridTableState } from '../hooks/useGridTableState';
 
 const ATTENDANCE_TYPES = [
   { id: 1, label: 'Hadir (Normal)', color: 'text-emerald-600 bg-emerald-500/10' },
@@ -54,7 +58,25 @@ export default function AttendancePage() {
   const isAdmin = user?.role === 'Admin';
   const tzInfo = getTimezoneInfo();
 
-  const [activeTab, setActiveTab] = useState('self'); // 'self' | 'reconciliation'
+  const defaultAttendanceState = useMemo(() => ({
+    sortBy: 'date',
+    sortDesc: true,
+    typeFilter: 'all',
+    locationFilter: 'all',
+    searchTerm: '',
+    activeTab: 'self'
+  }), []);
+
+  const {
+    state: gridState,
+    updateState: updateGridState,
+    handleSort,
+    resetState: resetGridState
+  } = useGridTableState('wt_grid_attendance_v1', defaultAttendanceState);
+
+  const { sortBy, sortDesc, typeFilter, locationFilter, searchTerm, activeTab } = gridState;
+  const setActiveTab = (tab) => updateGridState({ activeTab: tab });
+
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Today state
@@ -72,6 +94,50 @@ export default function AttendancePage() {
   // Monthly history
   const [monthlyRecords, setMonthlyRecords] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+
+  // Filtered and Sorted monthly records
+  const sortedRecords = useMemo(() => {
+    if (!monthlyRecords || monthlyRecords.length === 0) return [];
+    let list = [...monthlyRecords];
+
+    if (typeFilter && typeFilter !== 'all') {
+      const typeNum = parseInt(typeFilter, 10);
+      list = list.filter(r => r.type === typeNum);
+    }
+    if (locationFilter && locationFilter !== 'all') {
+      const locNum = parseInt(locationFilter, 10);
+      list = list.filter(r => r.workLocation === locNum);
+    }
+    if (searchTerm?.trim()) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter(r => (r.notes && r.notes.toLowerCase().includes(term)));
+    }
+
+    if (!sortBy) return list;
+
+    list.sort((a, b) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
+
+      if (sortBy === 'date' || sortBy === 'clockIn' || sortBy === 'clockOut') {
+        const timeA = valA ? new Date(valA).getTime() : 0;
+        const timeB = valB ? new Date(valB).getTime() : 0;
+        return sortDesc ? timeB - timeA : timeA - timeB;
+      }
+
+      if (sortBy === 'totalHours' || sortBy === 'type' || sortBy === 'workLocation') {
+        const numA = Number(valA) || 0;
+        const numB = Number(valB) || 0;
+        return sortDesc ? numB - numA : numA - numB;
+      }
+
+      const strA = (valA ?? '').toString().toLowerCase();
+      const strB = (valB ?? '').toString().toLowerCase();
+      return sortDesc ? strB.localeCompare(strA) : strA.localeCompare(strB);
+    });
+
+    return list;
+  }, [monthlyRecords, sortBy, sortDesc, typeFilter, locationFilter, searchTerm]);
 
   // Manual Attendance Modal State
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -437,14 +503,70 @@ export default function AttendancePage() {
             className="lg:col-span-2 rounded-3xl border shadow-sm overflow-hidden flex flex-col"
             style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
           >
-            <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
+            <div className="p-4 border-b flex flex-wrap items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
               <div>
                 <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
-                  Riwayat Presensi Bulan Ini
+                  Riwayat Presensi Bulan Ini ({sortedRecords.length})
                 </h3>
                 <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                   Rekapitulasi jam masuk, jam pulang, dan durasi kerja per hari.
                 </p>
+              </div>
+
+              {/* Table Toolbar / Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-[130px] max-w-[170px]">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Cari catatan..."
+                    value={searchTerm || ''}
+                    onChange={(e) => updateGridState({ searchTerm: e.target.value })}
+                    className="w-full pl-7 pr-6 py-1 rounded-xl border text-xs"
+                    style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => updateGridState({ searchTerm: '' })}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                <select
+                  value={typeFilter}
+                  onChange={(e) => updateGridState({ typeFilter: e.target.value })}
+                  className="px-2.5 py-1 rounded-xl border text-xs font-semibold"
+                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                >
+                  <option value="all">Semua Tipe</option>
+                  {ATTENDANCE_TYPES.map(t => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={locationFilter}
+                  onChange={(e) => updateGridState({ locationFilter: e.target.value })}
+                  className="px-2.5 py-1 rounded-xl border text-xs font-semibold"
+                  style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                >
+                  <option value="all">Semua Lokasi</option>
+                  {LOCATIONS.map(l => (
+                    <option key={l.id} value={l.id}>{l.label}</option>
+                  ))}
+                </select>
+
+                <button
+                  onClick={resetGridState}
+                  className="p-1.5 rounded-xl border text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  style={{ borderColor: 'var(--border-color)' }}
+                  title="Reset filter & pengurutan tabel ke kondisi awal"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
@@ -453,9 +575,11 @@ export default function AttendancePage() {
                 <div className="py-16 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
                   Memuat riwayat kehadiran...
                 </div>
-              ) : monthlyRecords.length === 0 ? (
+              ) : sortedRecords.length === 0 ? (
                 <div className="py-16 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  Belum ada rekaman presensi pada bulan ini.
+                  {searchTerm || typeFilter !== 'all' || locationFilter !== 'all'
+                    ? 'Tidak ada rekaman yang sesuai dengan filter pencarian.'
+                    : 'Belum ada rekaman presensi pada bulan ini.'}
                 </div>
               ) : (
                 <table className="w-full text-left border-collapse text-xs">
@@ -464,17 +588,66 @@ export default function AttendancePage() {
                       className="font-bold uppercase tracking-wider border-b"
                       style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
                     >
-                      <th className="py-3 px-4">Tanggal</th>
-                      <th className="py-3 px-3">Tipe</th>
-                      <th className="py-3 px-3">Lokasi</th>
-                      <th className="py-3 px-3">Jam Masuk</th>
-                      <th className="py-3 px-3">Jam Pulang</th>
-                      <th className="py-3 px-3">Durasi</th>
-                      <th className="py-3 px-4">Catatan</th>
+                      <SortableHeader 
+                        label="Tanggal" 
+                        sortKey="date" 
+                        currentSortBy={sortBy} 
+                        currentSortDesc={sortDesc} 
+                        onSort={handleSort} 
+                        className="py-3 px-4" 
+                      />
+                      <SortableHeader 
+                        label="Tipe" 
+                        sortKey="type" 
+                        currentSortBy={sortBy} 
+                        currentSortDesc={sortDesc} 
+                        onSort={handleSort} 
+                        className="py-3 px-3" 
+                      />
+                      <SortableHeader 
+                        label="Lokasi" 
+                        sortKey="workLocation" 
+                        currentSortBy={sortBy} 
+                        currentSortDesc={sortDesc} 
+                        onSort={handleSort} 
+                        className="py-3 px-3" 
+                      />
+                      <SortableHeader 
+                        label="Jam Masuk" 
+                        sortKey="clockIn" 
+                        currentSortBy={sortBy} 
+                        currentSortDesc={sortDesc} 
+                        onSort={handleSort} 
+                        className="py-3 px-3" 
+                      />
+                      <SortableHeader 
+                        label="Jam Pulang" 
+                        sortKey="clockOut" 
+                        currentSortBy={sortBy} 
+                        currentSortDesc={sortDesc} 
+                        onSort={handleSort} 
+                        className="py-3 px-3" 
+                      />
+                      <SortableHeader 
+                        label="Durasi" 
+                        sortKey="totalHours" 
+                        currentSortBy={sortBy} 
+                        currentSortDesc={sortDesc} 
+                        onSort={handleSort} 
+                        className="py-3 px-3" 
+                      />
+                      <SortableHeader 
+                        label="Catatan" 
+                        sortKey="notes" 
+                        currentSortBy={sortBy} 
+                        currentSortDesc={sortDesc} 
+                        onSort={handleSort} 
+                        className="py-3 px-4" 
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-                    {monthlyRecords.map((r) => {
+                    {sortedRecords.map((r) => {
                       const typeInfo = ATTENDANCE_TYPES.find(t => t.id === r.type) || ATTENDANCE_TYPES[0];
                       const locInfo = LOCATIONS.find(l => l.id === r.workLocation) || LOCATIONS[0];
 

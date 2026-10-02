@@ -29,6 +29,8 @@ public class AuditTrailApiController : ControllerBase
         [FromQuery] string? activity,
         [FromQuery] string? dateFrom,
         [FromQuery] string? dateTo,
+        [FromQuery] string? sortBy = "timestamp",
+        [FromQuery] bool sortDesc = true,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
@@ -77,8 +79,22 @@ public class AuditTrailApiController : ControllerBase
             query = query.Where(a => a.Timestamp <= dtTo.AddDays(1));
 
         var total = await query.CountAsync();
+
+        query = sortBy?.ToLower() switch
+        {
+            "timestamp" or "waktu" => sortDesc ? query.OrderByDescending(a => a.Timestamp) : query.OrderBy(a => a.Timestamp),
+            "method" => sortDesc ? query.OrderByDescending(a => a.HttpMethod) : query.OrderBy(a => a.HttpMethod),
+            "status" or "statuscode" => sortDesc ? query.OrderByDescending(a => a.StatusCode) : query.OrderBy(a => a.StatusCode),
+            "path" or "endpoint" => sortDesc ? query.OrderByDescending(a => a.Path) : query.OrderBy(a => a.Path),
+            "module" or "controller" => sortDesc ? query.OrderByDescending(a => a.ControllerName) : query.OrderBy(a => a.ControllerName),
+            "action" => sortDesc ? query.OrderByDescending(a => a.ActionName) : query.OrderBy(a => a.ActionName),
+            "user" or "username" => sortDesc ? query.OrderByDescending(a => a.UserName ?? a.UserEmail) : query.OrderBy(a => a.UserName ?? a.UserEmail),
+            "ip" or "ipaddress" => sortDesc ? query.OrderByDescending(a => a.IpAddress) : query.OrderBy(a => a.IpAddress),
+            "duration" or "durationms" => sortDesc ? query.OrderByDescending(a => a.DurationMs) : query.OrderBy(a => a.DurationMs),
+            _ => sortDesc ? query.OrderByDescending(a => a.Timestamp) : query.OrderBy(a => a.Timestamp)
+        };
+
         var items = await query
-            .OrderByDescending(a => a.Timestamp)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();

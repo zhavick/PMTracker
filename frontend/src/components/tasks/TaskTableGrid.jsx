@@ -16,6 +16,7 @@ import {
   Eye
 } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
+import SortableHeader from '../common/SortableHeader';
 
 const normalizeStatus = (val) => {
   if (typeof val === 'number' && !isNaN(val)) return val;
@@ -88,7 +89,10 @@ export default function TaskTableGrid({
   onPageChange,
   selectedTaskIds = [],
   onToggleSelectTask,
-  onToggleSelectAll
+  onToggleSelectAll,
+  sortBy = 'createdAt',
+  sortDesc = true,
+  onSort
 }) {
   const [activeObstacleTask, setActiveObstacleTask] = useState(null);
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
@@ -212,15 +216,65 @@ export default function TaskTableGrid({
                     title="Pilih Semua di Halaman Ini"
                   />
                 </th>
-                <th className="py-3.5 px-4 min-w-[280px]">Tugas</th>
-                <th className="py-3.5 px-4">Proyek / Milestone</th>
-                <th className="py-3.5 px-3">PIC / Anggota</th>
-                <th className="py-3.5 px-3">Prioritas</th>
-                <th className="py-3.5 px-3">Status</th>
-                <th className="py-3.5 px-3 w-36">Progress</th>
+                <SortableHeader 
+                  label="Tugas" 
+                  sortKey="title" 
+                  currentSortBy={sortBy} 
+                  currentSortDesc={sortDesc} 
+                  onSort={onSort} 
+                  className="min-w-[280px]" 
+                />
+                <SortableHeader 
+                  label="Proyek / Milestone" 
+                  sortKey="project" 
+                  currentSortBy={sortBy} 
+                  currentSortDesc={sortDesc} 
+                  onSort={onSort} 
+                />
+                <SortableHeader 
+                  label="PIC / Anggota" 
+                  sortKey="assignee" 
+                  currentSortBy={sortBy} 
+                  currentSortDesc={sortDesc} 
+                  onSort={onSort} 
+                />
+                <SortableHeader 
+                  label="Prioritas" 
+                  sortKey="priority" 
+                  currentSortBy={sortBy} 
+                  currentSortDesc={sortDesc} 
+                  onSort={onSort} 
+                />
+                <SortableHeader 
+                  label="Status" 
+                  sortKey="status" 
+                  currentSortBy={sortBy} 
+                  currentSortDesc={sortDesc} 
+                  onSort={onSort} 
+                />
+                <SortableHeader 
+                  label="Progress" 
+                  sortKey="progress" 
+                  currentSortBy={sortBy} 
+                  currentSortDesc={sortDesc} 
+                  onSort={onSort} 
+                  className="w-36" 
+                />
                 <th className="py-3.5 px-3">Kendala</th>
-                <th className="py-3.5 px-3">Durasi</th>
-                <th className="py-3.5 px-3">Batas Waktu</th>
+                <SortableHeader 
+                  label="Durasi" 
+                  sortKey="duration" 
+                  currentSortBy={sortBy} 
+                  currentSortDesc={sortDesc} 
+                  onSort={onSort} 
+                />
+                <SortableHeader 
+                  label="Batas Waktu" 
+                  sortKey="duedate" 
+                  currentSortBy={sortBy} 
+                  currentSortDesc={sortDesc} 
+                  onSort={onSort} 
+                />
                 <th className="py-3.5 px-4 text-right">Aksi</th>
               </tr>
             </thead>

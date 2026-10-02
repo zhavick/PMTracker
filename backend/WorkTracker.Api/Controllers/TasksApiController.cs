@@ -92,10 +92,16 @@ public class TasksApiController : ControllerBase
         query = (sortBy?.ToLower()) switch
         {
             "title" => sortDesc ? query.OrderByDescending(t => t.Title) : query.OrderBy(t => t.Title),
+            "project" or "projectname" => sortDesc ? query.OrderByDescending(t => t.Project != null ? t.Project.Name : "") : query.OrderBy(t => t.Project != null ? t.Project.Name : ""),
+            "assignee" or "pic" => sortDesc ? query.OrderByDescending(t => t.AssignedToUser != null ? t.AssignedToUser.FullName : "") : query.OrderBy(t => t.AssignedToUser != null ? t.AssignedToUser.FullName : ""),
             "status" => sortDesc ? query.OrderByDescending(t => t.Status) : query.OrderBy(t => t.Status),
             "priority" => sortDesc ? query.OrderByDescending(t => t.Priority) : query.OrderBy(t => t.Priority),
             "progress" => sortDesc ? query.OrderByDescending(t => t.Progress) : query.OrderBy(t => t.Progress),
+            "milestone" => sortDesc ? query.OrderByDescending(t => t.Milestone) : query.OrderBy(t => t.Milestone),
+            "startdate" => sortDesc ? query.OrderByDescending(t => t.StartDate) : query.OrderBy(t => t.StartDate),
             "duedate" => sortDesc ? query.OrderByDescending(t => t.DueDate) : query.OrderBy(t => t.DueDate),
+            "duration" => sortDesc ? query.OrderByDescending(t => t.Sessions.Sum(s => s.Duration)) : query.OrderBy(t => t.Sessions.Sum(s => s.Duration)),
+            "createdat" => sortDesc ? query.OrderByDescending(t => t.CreatedAt) : query.OrderBy(t => t.CreatedAt),
             _ => sortDesc ? query.OrderByDescending(t => t.CreatedAt) : query.OrderBy(t => t.CreatedAt)
         };
 

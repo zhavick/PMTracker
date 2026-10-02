@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Clock, 
   Calendar, 
@@ -15,12 +15,16 @@ import {
   Users,
   Sparkles,
   Building2,
-  UserCheck
+  UserCheck,
+  RotateCcw,
+  Search
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { useTimer } from '../context/TimerContext';
 import { useAuth } from '../context/AuthContext';
 import { formatTimeInTz, formatDateInTz, getTimezoneInfo } from '../utils/timezoneHelper';
+import SortableHeader from '../components/common/SortableHeader';
+import { useGridTableState } from '../hooks/useGridTableState';
 
 function formatSeconds(totalSeconds) {
   if (!totalSeconds || totalSeconds <= 0) return '0j 0m';
@@ -47,13 +51,26 @@ export default function TimesheetPage() {
   const [sessions, setSessions] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
-  const [selectedUserId, setSelectedUserId] = useState(isAdmin ? 'all' : '');
-  const [loading, setLoading] = useState(true);
-  const [periodPreset, setPeriodPreset] = useState('month'); // 'today' | 'week' | 'month' | 'custom'
+  const defaultTimesheetState = useMemo(() => ({
+    periodPreset: 'month',
+    startDate: '',
+    endDate: '',
+    selectedUserId: isAdmin ? 'all' : (user?.id || ''),
+    sortBy: 'startTime',
+    sortDesc: true,
+    searchTerm: ''
+  }), [isAdmin, user?.id]);
 
-  // Dates
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const {
+    state: gridState,
+    updateState: updateGridState,
+    handleSort,
+    resetState: resetGridState
+  } = useGridTableState('wt_grid_timesheet_v1', defaultTimesheetState);
+
+  const { periodPreset, startDate, endDate, selectedUserId, sortBy, sortDesc, searchTerm } = gridState;
+
+  const [loading, setLoading] = useState(true);
 
   // Manual Session Modal
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -77,23 +94,22 @@ export default function TimesheetPage() {
   });
   const [elistecLoading, setElistecLoading] = useState(false);
 
-  // Set date ranges according to presets
+  // Set date ranges according to presets if not custom or if dates are empty
   useEffect(() => {
+    if (periodPreset === 'custom' && startDate && endDate) return;
+
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
     if (periodPreset === 'today') {
-      setStartDate(todayStr);
-      setEndDate(todayStr);
+      updateGridState({ startDate: todayStr, endDate: todayStr });
     } else if (periodPreset === 'week') {
       const pastWeek = new Date();
       pastWeek.setDate(today.getDate() - 7);
-      setStartDate(pastWeek.toISOString().split('T')[0]);
-      setEndDate(todayStr);
+      updateGridState({ startDate: pastWeek.toISOString().split('T')[0], endDate: todayStr });
     } else if (periodPreset === 'month') {
       const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      setStartDate(firstDay.toISOString().split('T')[0]);
-      setEndDate(todayStr);
+      updateGridState({ startDate: firstDay.toISOString().split('T')[0], endDate: todayStr });
     }
   }, [periodPreset]);
 
@@ -271,6 +287,47 @@ export default function TimesheetPage() {
 
   const projectList = Object.values(projectGroups).sort((a, b) => b.seconds - a.seconds);
 
+  // Filtered and Sorted sessions
+  const sortedSessions = useMemo(() => {
+    if (!sessions || sessions.length === 0) return [];
+    let list = [...sessions];
+
+    if (searchTerm?.trim()) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter(s =>
+        (s.taskTitle && s.taskTitle.toLowerCase().includes(term)) ||
+        (s.projectName && s.projectName.toLowerCase().includes(term)) ||
+        (s.userName && s.userName.toLowerCase().includes(term)) ||
+        (s.notes && s.notes.toLowerCase().includes(term))
+      );
+    }
+
+    if (!sortBy) return list;
+
+    list.sort((a, b) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
+
+      if (sortBy === 'startTime' || sortBy === 'endTime') {
+        const timeA = valA ? new Date(valA).getTime() : 0;
+        const timeB = valB ? new Date(valB).getTime() : 0;
+        return sortDesc ? timeB - timeA : timeA - timeB;
+      }
+
+      if (sortBy === 'duration') {
+        const durA = Number(valA) || 0;
+        const durB = Number(valB) || 0;
+        return sortDesc ? durB - durA : durA - durB;
+      }
+
+      const strA = (valA ?? '').toString().toLowerCase();
+      const strB = (valB ?? '').toString().toLowerCase();
+      return sortDesc ? strB.localeCompare(strA) : strA.localeCompare(strB);
+    });
+
+    return list;
+  }, [sessions, sortBy, sortDesc, searchTerm]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -345,7 +402,7 @@ export default function TimesheetPage() {
             ].map(p => (
               <button
                 key={p.id}
-                onClick={() => setPeriodPreset(p.id)}
+                onClick={() => updateGridState({ periodPreset: p.id })}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
                   periodPreset === p.id 
                     ? 'bg-indigo-600 text-white shadow-sm' 
@@ -357,15 +414,33 @@ export default function TimesheetPage() {
             ))}
           </div>
 
+          {/* Search Box */}
+          <div className="relative min-w-[200px] flex-1 max-w-xs">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Cari tugas, proyek, catatan..."
+              value={searchTerm || ''}
+              onChange={(e) => updateGridState({ searchTerm: e.target.value })}
+              className="w-full pl-8 pr-7 py-1.5 rounded-xl border text-xs"
+              style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+            />
+            {searchTerm && (
+              <button
+                onClick={() => updateGridState({ searchTerm: '' })}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
           {/* Date Range Inputs */}
           <div className="flex items-center gap-2">
             <input
               type="date"
               value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setPeriodPreset('custom');
-              }}
+              onChange={(e) => updateGridState({ startDate: e.target.value, periodPreset: 'custom' })}
               className="px-3 py-1.5 rounded-xl border text-xs"
               style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
             />
@@ -373,10 +448,7 @@ export default function TimesheetPage() {
             <input
               type="date"
               value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setPeriodPreset('custom');
-              }}
+              onChange={(e) => updateGridState({ endDate: e.target.value, periodPreset: 'custom' })}
               className="px-3 py-1.5 rounded-xl border text-xs"
               style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
             />
@@ -388,7 +460,7 @@ export default function TimesheetPage() {
               <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Anggota:</span>
               <select
                 value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
+                onChange={(e) => updateGridState({ selectedUserId: e.target.value })}
                 className="px-3 py-1.5 rounded-xl border text-xs font-semibold"
                 style={{ backgroundColor: 'var(--input-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
               >
@@ -400,6 +472,17 @@ export default function TimesheetPage() {
               </select>
             </div>
           )}
+
+          {/* Reset Filter Button */}
+          <button
+            onClick={resetGridState}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5 transition-all text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400"
+            style={{ borderColor: 'var(--border-color)' }}
+            title="Reset semua filter dan pengurutan ke setelan awal"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset Filter</span>
+          </button>
         </div>
       </div>
 
@@ -487,7 +570,7 @@ export default function TimesheetPage() {
       >
         <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
           <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
-            Rincian Sesi Timesheet ({sessions.length})
+            Rincian Sesi Timesheet ({sortedSessions.length})
           </h3>
         </div>
 
@@ -495,9 +578,9 @@ export default function TimesheetPage() {
           <div className="py-16 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
             Memuat data sesi...
           </div>
-        ) : sessions.length === 0 ? (
+        ) : sortedSessions.length === 0 ? (
           <div className="py-16 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Tidak ada rekaman sesi kerja pada periode ini.
+            {searchTerm ? 'Tidak ada sesi yang cocok dengan pencarian.' : 'Tidak ada rekaman sesi kerja pada periode ini.'}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -507,18 +590,69 @@ export default function TimesheetPage() {
                   className="text-xs font-bold uppercase tracking-wider border-b"
                   style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
                 >
-                  <th className="py-3 px-4">Tanggal</th>
-                  {isAdmin && <th className="py-3 px-3">PIC / Anggota</th>}
-                  <th className="py-3 px-4">Tugas & Proyek</th>
-                  <th className="py-3 px-3">Mulai</th>
-                  <th className="py-3 px-3">Selesai</th>
-                  <th className="py-3 px-3">Durasi</th>
-                  <th className="py-3 px-4">Catatan</th>
+                  <SortableHeader 
+                    label="Tanggal" 
+                    sortKey="startTime" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    className="py-3 px-4" 
+                  />
+                  {isAdmin && (
+                    <SortableHeader 
+                      label="PIC / Anggota" 
+                      sortKey="userName" 
+                      currentSortBy={sortBy} 
+                      currentSortDesc={sortDesc} 
+                      onSort={handleSort} 
+                      className="py-3 px-3" 
+                    />
+                  )}
+                  <SortableHeader 
+                    label="Tugas & Proyek" 
+                    sortKey="taskTitle" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    className="py-3 px-4" 
+                  />
+                  <SortableHeader 
+                    label="Mulai" 
+                    sortKey="startTime" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    className="py-3 px-3" 
+                  />
+                  <SortableHeader 
+                    label="Selesai" 
+                    sortKey="endTime" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    className="py-3 px-3" 
+                  />
+                  <SortableHeader 
+                    label="Durasi" 
+                    sortKey="duration" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    className="py-3 px-3" 
+                  />
+                  <SortableHeader 
+                    label="Catatan" 
+                    sortKey="notes" 
+                    currentSortBy={sortBy} 
+                    currentSortDesc={sortDesc} 
+                    onSort={handleSort} 
+                    className="py-3 px-4" 
+                  />
                   <th className="py-3 px-3 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y text-xs" style={{ borderColor: 'var(--border-color)' }}>
-                {sessions.map((s) => (
+                {sortedSessions.map((s) => (
                   <tr key={s.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
                     <td className="py-3 px-4 font-semibold" style={{ color: 'var(--text-primary)' }}>
                       {formatDate(s.startTime)}
