@@ -82,6 +82,8 @@ public class SyncResultDto
     public int SyncedFilesCount { get; set; }
     public long SyncedFilesSizeBytes { get; set; }
     public string SyncedFilesSizeFormatted { get; set; } = "0 B";
+    public int NoteAttachmentsSynced { get; set; }
+    public int NoteFilesDownloaded { get; set; }
     public long ExecutionDurationMs { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public string? BackupFileName { get; set; }
@@ -106,6 +108,9 @@ public class SyncModulesResultDto
     public string Message { get; set; } = string.Empty;
     public int NotesSynced { get; set; }
     public int NotesUpdated { get; set; }
+    public int NoteAttachmentsSynced { get; set; }
+    public int NoteFilesDownloaded { get; set; }
+    public long NoteFilesDownloadedSizeBytes { get; set; }
     public int AttendancesSynced { get; set; }
     public int AttendancesUpdated { get; set; }
     public int BadgesSynced { get; set; }

@@ -630,7 +630,7 @@ export default function SyncPage({ activeSection = 'all' }) {
               <p className="font-semibold">{syncResult.message}</p>
               {syncResult.data && (
                 <p className="text-xs font-mono opacity-90">
-                  Statement dieksekusi: {syncResult.data.executedStatementsCount || 0} • File: {syncResult.data.syncedFilesCount || 0} ({syncResult.data.syncedFilesSizeFormatted || '0 B'}) • Durasi: {syncResult.data.executionDurationMs || 0}ms
+                  Statement dieksekusi: {syncResult.data.executedStatementsCount || 0} • File: {syncResult.data.syncedFilesCount || 0} ({syncResult.data.syncedFilesSizeFormatted || '0 B'}){syncResult.data.noteFilesDownloaded > 0 ? ` • Berkas Lampiran Catatan: +${syncResult.data.noteFilesDownloaded}` : ''} • Durasi: {syncResult.data.executionDurationMs || 0}ms
                   {syncResult.data.backupFileName && ` • Backup: ${syncResult.data.backupFileName}`}
                 </p>
               )}
@@ -870,30 +870,38 @@ export default function SyncPage({ activeSection = 'all' }) {
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 text-xs">
               <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
                 <span className="text-[11px] block opacity-80">Notes Baru</span>
-                <span className="text-base font-bold">+{modSyncResult.notesSynced}</span>
+                <span className="text-base font-bold">+{modSyncResult.notesSynced || 0}</span>
               </div>
               <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
                 <span className="text-[11px] block opacity-80">Notes Update</span>
-                <span className="text-base font-bold">~{modSyncResult.notesUpdated}</span>
+                <span className="text-base font-bold">~{modSyncResult.notesUpdated || 0}</span>
+              </div>
+              <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
+                <span className="text-[11px] block opacity-80">Lampiran Notes</span>
+                <span className="text-base font-bold">+{modSyncResult.noteAttachmentsSynced || 0}</span>
+              </div>
+              <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
+                <span className="text-[11px] block opacity-80">Berkas Diunduh</span>
+                <span className="text-base font-bold text-indigo-500">+{modSyncResult.noteFilesDownloaded || 0}</span>
               </div>
               <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
                 <span className="text-[11px] block opacity-80">Absensi Baru</span>
-                <span className="text-base font-bold">+{modSyncResult.attendancesSynced}</span>
+                <span className="text-base font-bold">+{modSyncResult.attendancesSynced || 0}</span>
               </div>
               <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
                 <span className="text-[11px] block opacity-80">Absensi Update</span>
-                <span className="text-base font-bold">~{modSyncResult.attendancesUpdated}</span>
+                <span className="text-base font-bold">~{modSyncResult.attendancesUpdated || 0}</span>
               </div>
               <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
                 <span className="text-[11px] block opacity-80">Badges Baru</span>
-                <span className="text-base font-bold">+{modSyncResult.badgesSynced}</span>
+                <span className="text-base font-bold">+{modSyncResult.badgesSynced || 0}</span>
               </div>
               <div className="p-2.5 rounded-lg border bg-white/40 dark:bg-black/20" style={{ borderColor: 'var(--border-color)' }}>
                 <span className="text-[11px] block opacity-80">Badges Update</span>
-                <span className="text-base font-bold">~{modSyncResult.userBadgesSynced}</span>
+                <span className="text-base font-bold">~{modSyncResult.userBadgesSynced || 0}</span>
               </div>
             </div>
 

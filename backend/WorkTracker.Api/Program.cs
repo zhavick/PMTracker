@@ -234,7 +234,33 @@ if (app.Environment.IsDevelopment() || true) // Enable Swagger in all environmen
     });
 }
 
+// 10. Static Files & Uploads Directory Configuration
+var webRoot = app.Environment.WebRootPath;
+if (string.IsNullOrEmpty(webRoot))
+{
+    webRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+    app.Environment.WebRootPath = webRoot;
+}
+
+var uploadsDir = Directory.Exists("/app/uploads") 
+    ? "/app/uploads" 
+    : Path.Combine(webRoot, "uploads");
+
+Directory.CreateDirectory(uploadsDir);
+Directory.CreateDirectory(Path.Combine(uploadsDir, "notes"));
+Directory.CreateDirectory(Path.Combine(uploadsDir, "avatars"));
+Directory.CreateDirectory(Path.Combine(uploadsDir, "covers"));
+
 app.UseStaticFiles();
+
+if (Directory.Exists(uploadsDir))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsDir),
+        RequestPath = "/uploads"
+    });
+}
 
 app.UseCors("AllowFrontend");
 

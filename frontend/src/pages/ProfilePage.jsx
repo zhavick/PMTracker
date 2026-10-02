@@ -236,7 +236,7 @@ export default function ProfilePage() {
   const isCoverGradient = profileData.coverPictureUrl?.startsWith('linear-gradient');
 
   return (
-    <div className="space-y-6 pb-16 animate-fade-in max-w-5xl mx-auto">
+    <div className="space-y-6 pb-16 animate-fade-in w-full">
       {/* ── Cover Banner Card ── */}
       <div 
         className="relative rounded-3xl border overflow-hidden shadow-md"

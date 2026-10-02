@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -34,15 +35,18 @@ public class SyncService : ISyncService
     private readonly AppDbContext _context;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<SyncService> _logger;
+    private readonly IWebHostEnvironment _env;
 
     public SyncService(
         AppDbContext context,
         IHttpClientFactory httpClientFactory,
-        ILogger<SyncService> logger)
+        ILogger<SyncService> logger,
+        IWebHostEnvironment env)
     {
         _context = context;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _env = env;
     }
 
     public async Task<SyncPingResponseDto> PingHostAsync(string hostUrl, string? apiKey = null, string? bearerToken = null)
@@ -752,11 +756,22 @@ public class SyncService : ISyncService
 
             if (importResult.Success)
             {
+                // Ensure note attachments physical files are all downloaded and available locally
+                var (downloadedFiles, downloadedBytes) = await EnsureNoteAttachmentFilesDownloadedAsync(client, targetHost, dto.BearerToken);
+                if (downloadedFiles > 0)
+                {
+                    importResult.SyncedFilesCount += downloadedFiles;
+                    importResult.SyncedFilesSizeBytes += downloadedBytes;
+                    importResult.SyncedFilesSizeFormatted = FormatBytes(importResult.SyncedFilesSizeBytes);
+                    importResult.NoteFilesDownloaded = downloadedFiles;
+                    importResult.Message += $" Termasuk {downloadedFiles} berkas lampiran catatan yang diunduh.";
+                }
+
                 await SetSettingAsync("Sync_LastSyncAt", DateTime.UtcNow.ToString("o"));
                 await SetSettingAsync("Sync_LastSyncStatus", "Berhasil (Pull dari Host Induk)");
                 await _context.SaveChangesAsync();
 
-                await RecordAuditLogAsync(currentUserId, "SyncPull", $"Pull data dari Host Induk {targetHost} sukses. Durasi: {sw.ElapsedMilliseconds}ms");
+                await RecordAuditLogAsync(currentUserId, "SyncPull", $"Pull data dari Host Induk {targetHost} sukses. Durasi: {sw.ElapsedMilliseconds}ms, Berkas unduh: {downloadedFiles}");
             }
 
             return importResult;
@@ -815,7 +830,125 @@ public class SyncService : ISyncService
 
     private string GetUploadsPhysicalPath()
     {
-        return Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+        if (Directory.Exists("/app/uploads"))
+        {
+            return "/app/uploads";
+        }
+
+        var webRoot = _env?.WebRootPath;
+        if (!string.IsNullOrEmpty(webRoot))
+        {
+            var p = Path.Combine(webRoot, "uploads");
+            if (Directory.Exists(p)) return p;
+        }
+
+        var contentRoot = _env?.ContentRootPath;
+        if (!string.IsNullOrEmpty(contentRoot))
+        {
+            var p1 = Path.Combine(contentRoot, "wwwroot", "uploads");
+            if (Directory.Exists(p1)) return p1;
+        }
+
+        var curDir = Directory.GetCurrentDirectory();
+        var p2 = Path.Combine(curDir, "backend", "WorkTracker.Api", "wwwroot", "uploads");
+        if (Directory.Exists(p2)) return p2;
+
+        var p3 = Path.Combine(curDir, "wwwroot", "uploads");
+        if (Directory.Exists(p3)) return p3;
+
+        var p4 = Path.Combine(curDir, "uploads");
+        if (Directory.Exists(p4)) return p4;
+
+        var fallback = !string.IsNullOrEmpty(webRoot)
+            ? Path.Combine(webRoot, "uploads")
+            : (!string.IsNullOrEmpty(contentRoot) ? Path.Combine(contentRoot, "wwwroot", "uploads") : Path.Combine(curDir, "wwwroot", "uploads"));
+
+        Directory.CreateDirectory(fallback);
+        Directory.CreateDirectory(Path.Combine(fallback, "notes"));
+        Directory.CreateDirectory(Path.Combine(fallback, "avatars"));
+        Directory.CreateDirectory(Path.Combine(fallback, "covers"));
+        return fallback;
+    }
+
+    private async Task<(int downloadedCount, long downloadedBytes)> EnsureNoteAttachmentFilesDownloadedAsync(
+        HttpClient client, 
+        string targetHost, 
+        string? bearerToken = null, 
+        List<string>? details = null)
+    {
+        int count = 0;
+        long totalBytes = 0;
+        var uploadsDir = GetUploadsPhysicalPath();
+
+        try
+        {
+            var attachments = await _context.NoteAttachments.AsNoTracking().ToListAsync();
+            if (attachments.Count == 0) return (0, 0);
+
+            if (!string.IsNullOrWhiteSpace(bearerToken) && client.DefaultRequestHeaders.Authorization == null)
+            {
+                var cleanToken = bearerToken.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                    ? bearerToken.Substring(7).Trim()
+                    : bearerToken.Trim();
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cleanToken);
+            }
+
+            foreach (var att in attachments)
+            {
+                if (string.IsNullOrWhiteSpace(att.FilePath)) continue;
+
+                var relative = att.FilePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+                if (relative.StartsWith($"uploads{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                {
+                    relative = relative.Substring($"uploads{Path.DirectorySeparatorChar}".Length);
+                }
+
+                var localDest = Path.Combine(uploadsDir, relative);
+                if (File.Exists(localDest) && new FileInfo(localDest).Length > 0)
+                {
+                    continue; // Already downloaded and exists
+                }
+
+                var cleanHost = targetHost.TrimEnd('/');
+                var cleanPath = att.FilePath.StartsWith("/") ? att.FilePath : $"/{att.FilePath}";
+                var remoteUrl = att.FilePath.StartsWith("http", StringComparison.OrdinalIgnoreCase) 
+                    ? att.FilePath 
+                    : $"{cleanHost}{cleanPath}";
+
+                try
+                {
+                    var fileResp = await client.GetAsync(remoteUrl);
+                    if (fileResp.IsSuccessStatusCode)
+                    {
+                        var dir = Path.GetDirectoryName(localDest);
+                        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                        {
+                            Directory.CreateDirectory(dir);
+                        }
+
+                        var fileBytes = await fileResp.Content.ReadAsByteArrayAsync();
+                        await File.WriteAllBytesAsync(localDest, fileBytes);
+                        count++;
+                        totalBytes += fileBytes.Length;
+                        details?.Add($"-> Berhasil mengunduh lampiran '{att.FileName}' ({FormatBytes(fileBytes.Length)}) ke lokal.");
+                    }
+                    else
+                    {
+                        details?.Add($"-> Peringatan: Tidak dapat mengunduh berkas '{att.FileName}' dari host (HTTP {(int)fileResp.StatusCode}).");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    details?.Add($"-> Peringatan: Gagal mengunduh berkas '{att.FileName}': {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error while ensuring note attachment files downloaded");
+        }
+
+        return (count, totalBytes);
     }
 
     private string FormatBytes(long bytes)
@@ -1006,12 +1139,14 @@ public class SyncService : ISyncService
         var localUsers = await _context.Users.ToListAsync();
         var defaultUserId = currentUserId ?? localUsers.FirstOrDefault()?.Id ?? string.Empty;
 
-        // 2. Modul Notes (Catatan Kerja)
+        // 2. Modul Notes (Catatan Kerja & Lampiran File)
         if (dto.SyncNotes)
         {
-            result.Details.Add("[2/4] Sinkronisasi Modul Catatan Kerja (Notes)...");
+            result.Details.Add("[2/4] Sinkronisasi Modul Catatan Kerja (Notes & Lampiran Berkas)...");
             try
             {
+                var uploadsDir = GetUploadsPhysicalPath();
+
                 if (isPull)
                 {
                     var notesResp = await client.GetAsync($"{targetHost}/api/notes");
@@ -1052,8 +1187,10 @@ public class SyncService : ISyncService
                                 var noteCompanyId = matchedUser?.CompanyId;
 
                                 var existingNote = await _context.Notes
+                                    .Include(n => n.Attachments)
                                     .FirstOrDefaultAsync(n => n.Title == title && (n.AuthorUserId == noteAuthorId || Math.Abs((n.CreatedAt - createdAt).TotalHours) < 24));
 
+                                WorkNote activeNote;
                                 if (existingNote != null)
                                 {
                                     existingNote.ContentHtml = content;
@@ -1061,11 +1198,12 @@ public class SyncService : ISyncService
                                     existingNote.Color = color;
                                     existingNote.IsPinned = isPinned;
                                     existingNote.UpdatedAt = DateTime.UtcNow;
+                                    activeNote = existingNote;
                                     result.NotesUpdated++;
                                 }
                                 else
                                 {
-                                    var newNote = new WorkNote
+                                    activeNote = new WorkNote
                                     {
                                         Title = title,
                                         ContentHtml = content,
@@ -1077,17 +1215,159 @@ public class SyncService : ISyncService
                                         CreatedAt = createdAt,
                                         UpdatedAt = DateTime.UtcNow
                                     };
-                                    _context.Notes.Add(newNote);
+                                    _context.Notes.Add(activeNote);
                                     result.NotesSynced++;
                                 }
+
+                                await _context.SaveChangesAsync();
+
+                                // Process note attachments
+                                if (item.TryGetProperty("attachments", out var attArrayEl) && attArrayEl.ValueKind == JsonValueKind.Array)
+                                {
+                                    foreach (var attEl in attArrayEl.EnumerateArray())
+                                    {
+                                        var fileName = attEl.TryGetProperty("fileName", out var fnEl) ? fnEl.GetString() ?? "" : "";
+                                        var fileUrl = attEl.TryGetProperty("fileUrl", out var fuEl) 
+                                            ? fuEl.GetString() ?? "" 
+                                            : (attEl.TryGetProperty("filePath", out var fpEl) ? fpEl.GetString() ?? "" : "");
+
+                                        if (string.IsNullOrWhiteSpace(fileName) || string.IsNullOrWhiteSpace(fileUrl)) continue;
+
+                                        long fileSize = attEl.TryGetProperty("fileSize", out var fsEl) && fsEl.TryGetInt64(out var fsVal) ? fsVal : 0;
+                                        var contentType = attEl.TryGetProperty("contentType", out var ctEl) ? ctEl.GetString() : null;
+
+                                        var existingAtt = await _context.NoteAttachments
+                                            .FirstOrDefaultAsync(a => a.NoteId == activeNote.Id && (a.FileName == fileName || a.FilePath == fileUrl));
+
+                                        if (existingAtt == null)
+                                        {
+                                            existingAtt = new NoteAttachment
+                                            {
+                                                NoteId = activeNote.Id,
+                                                FileName = fileName,
+                                                FilePath = fileUrl,
+                                                FileSize = fileSize,
+                                                ContentType = contentType,
+                                                FileExtension = Path.GetExtension(fileName),
+                                                UploadedByUserId = noteAuthorId,
+                                                UploadedAt = DateTime.UtcNow
+                                            };
+                                            _context.NoteAttachments.Add(existingAtt);
+                                            await _context.SaveChangesAsync();
+                                            result.NoteAttachmentsSynced++;
+                                        }
+
+                                        // Download physical file to local disk if missing
+                                        var relative = fileUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+                                        if (relative.StartsWith($"uploads{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            relative = relative.Substring($"uploads{Path.DirectorySeparatorChar}".Length);
+                                        }
+
+                                        var localFilePath = Path.Combine(uploadsDir, relative);
+                                        if (!File.Exists(localFilePath) || new FileInfo(localFilePath).Length == 0)
+                                        {
+                                            var cleanHost = targetHost.TrimEnd('/');
+                                            var cleanPath = fileUrl.StartsWith("/") ? fileUrl : $"/{fileUrl}";
+                                            var remoteFileUrl = fileUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) 
+                                                ? fileUrl 
+                                                : $"{cleanHost}{cleanPath}";
+
+                                            try
+                                            {
+                                                var fileDownloadResp = await client.GetAsync(remoteFileUrl);
+                                                if (fileDownloadResp.IsSuccessStatusCode)
+                                                {
+                                                    var targetDir = Path.GetDirectoryName(localFilePath);
+                                                    if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
+                                                    {
+                                                        Directory.CreateDirectory(targetDir);
+                                                    }
+
+                                                    var bytes = await fileDownloadResp.Content.ReadAsByteArrayAsync();
+                                                    await File.WriteAllBytesAsync(localFilePath, bytes);
+                                                    result.NoteFilesDownloaded++;
+                                                    result.NoteFilesDownloadedSizeBytes += bytes.Length;
+                                                    result.Details.Add($"-> Unduh lampiran berkas: '{fileName}' ({FormatBytes(bytes.Length)}) berhasil.");
+                                                }
+                                                else
+                                                {
+                                                    result.Details.Add($"-> Peringatan: Tidak dapat mengunduh berkas '{fileName}' (HTTP {(int)fileDownloadResp.StatusCode})");
+                                                }
+                                            }
+                                            catch (Exception fEx)
+                                            {
+                                                result.Details.Add($"-> Error mengunduh berkas '{fileName}': {fEx.Message}");
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                            result.Details.Add($"-> Notes Pull: {result.NotesSynced} baru ditambahkan, {result.NotesUpdated} diperbarui.");
+                            result.Details.Add($"-> Notes Pull: {result.NotesSynced} baru, {result.NotesUpdated} diupdate, {result.NoteAttachmentsSynced} lampiran terdaftar, {result.NoteFilesDownloaded} berkas fisik tersimpan.");
                         }
                     }
                     else
                     {
                         result.Details.Add($"-> Notes: Server remote mengembalikan status HTTP {(int)notesResp.StatusCode}");
                     }
+                }
+                else
+                {
+                    // Push Notes & Attachments to Remote Host
+                    result.Details.Add("-> Memulai Push catatan kerja beserta lampiran ke server induk...");
+                    var localNotes = await _context.Notes
+                        .Include(n => n.Attachments)
+                        .AsNoTracking()
+                        .ToListAsync();
+
+                    int pushedNotes = 0;
+                    int pushedFiles = 0;
+
+                    foreach (var note in localNotes)
+                    {
+                        try
+                        {
+                            using var formData = new MultipartFormDataContent();
+                            formData.Add(new StringContent(note.Title), "title");
+                            formData.Add(new StringContent(note.ContentHtml ?? ""), "contentHtml");
+                            formData.Add(new StringContent(note.Category ?? "General"), "category");
+                            formData.Add(new StringContent(note.Color ?? "#6366F1"), "color");
+                            formData.Add(new StringContent(note.IsPinned.ToString().ToLower()), "isPinned");
+
+                            foreach (var att in note.Attachments)
+                            {
+                                var relative = att.FilePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+                                if (relative.StartsWith($"uploads{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    relative = relative.Substring($"uploads{Path.DirectorySeparatorChar}".Length);
+                                }
+                                var localFilePath = Path.Combine(uploadsDir, relative);
+
+                                if (File.Exists(localFilePath))
+                                {
+                                    var fileBytes = await File.ReadAllBytesAsync(localFilePath);
+                                    var byteContent = new ByteArrayContent(fileBytes);
+                                    byteContent.Headers.ContentType = new MediaTypeHeaderValue(att.ContentType ?? "application/octet-stream");
+                                    formData.Add(byteContent, "files", att.FileName);
+                                    pushedFiles++;
+                                }
+                            }
+
+                            var pushResp = await client.PostAsync($"{targetHost}/api/notes", formData);
+                            if (pushResp.IsSuccessStatusCode)
+                            {
+                                pushedNotes++;
+                            }
+                        }
+                        catch (Exception pEx)
+                        {
+                            result.Details.Add($"-> Peringatan: Gagal push catatan '{note.Title}': {pEx.Message}");
+                        }
+                    }
+
+                    result.NotesSynced = pushedNotes;
+                    result.NoteFilesDownloaded = pushedFiles;
+                    result.Details.Add($"-> Notes Push: {pushedNotes} catatan dan {pushedFiles} berkas terunggah ke server induk.");
                 }
             }
             catch (Exception ex)

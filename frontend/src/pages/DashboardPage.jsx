@@ -169,7 +169,7 @@ export default function DashboardPage() {
   const chartHeightPx = 220; // Maximum bar height in pixels
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 w-full animate-fade-in">
       {/* Welcome Banner */}
       <div 
         className="p-6 sm:p-8 rounded-3xl border shadow-sm relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
@@ -178,7 +178,7 @@ export default function DashboardPage() {
           borderColor: 'var(--border-color)' 
         }}
       >
-        <div className="space-y-2 z-10 max-w-2xl">
+        <div className="space-y-2 z-10 flex-1 max-w-4xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--accent-primary)' }}>
             <span>🏢 {user?.companyName || 'PT Elistec Teknologi'}</span>
             <span>•</span>
