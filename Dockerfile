@@ -38,7 +38,10 @@ RUN dotnet publish "WorkTracker.Api.csproj" -c Release -o /app/publish /p:UseApp
 FROM backend-base AS backend
 WORKDIR /app
 COPY --from=backend-publish /app/publish .
-RUN mkdir -p /app/uploads /app/logs && chmod -R 777 /app/uploads /app/logs
+RUN mkdir -p /app/uploads/notes /app/uploads/avatars /app/uploads/covers \
+             /app/wwwroot/uploads/notes /app/wwwroot/uploads/avatars /app/wwwroot/uploads/covers \
+             /app/logs \
+    && chmod -R 777 /app/uploads /app/wwwroot /app/logs
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
 ENTRYPOINT ["dotnet", "WorkTracker.Api.dll"]

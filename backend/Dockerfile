@@ -43,8 +43,10 @@ WORKDIR /app
 COPY --from=publish /app/publish .
 
 # Create persistent storage directories with proper permissions
-RUN mkdir -p /app/uploads /app/logs \
-    && chmod -R 777 /app/uploads /app/logs
+RUN mkdir -p /app/uploads/notes /app/uploads/avatars /app/uploads/covers \
+             /app/wwwroot/uploads/notes /app/wwwroot/uploads/avatars /app/wwwroot/uploads/covers \
+             /app/logs \
+    && chmod -R 777 /app/uploads /app/wwwroot /app/logs
 
 # Health check configuration
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

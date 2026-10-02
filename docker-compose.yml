@@ -42,6 +42,7 @@ services:
       - Cors__AllowedOrigins=http://localhost:5173,http://localhost:3000
     volumes:
       - ./uploads:/app/uploads
+      - ./uploads:/app/wwwroot/uploads
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
       interval: 10s
